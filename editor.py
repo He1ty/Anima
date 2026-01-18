@@ -59,10 +59,12 @@ class Editor:
         self.doors = []
         self.levers = []
         self.buttons = []
+
+
         self.teleporters = []
         self.categories = {}
         self.activators = {}
-        self.activators_types = {}
+        self.present_activators_types = {} # Dict of all the different activators types from the activators in the current map
 
         for env in self.environments:
             self.doors += [(door, 0) for door in load_doors('editor', env) if "door" in door]
@@ -70,6 +72,7 @@ class Editor:
             self.buttons += [(button, 0) for button in load_activators(env) if "button" in button]
             self.teleporters += [(tp, 0) for tp in load_activators(env) if "teleporter" in tp]
 
+        self.activators_types = [t[0] for t in self.levers] + [t[0] for t in self.buttons]
         self.assets = self.base_assets | load_tiles(self.get_environment(self.level))
         self.assets.update(load_doors('editor', self.get_environment(self.level)))
         self.assets.update(load_activators(self.get_environment(self.level)))
@@ -768,16 +771,16 @@ class Editor:
         self.current_category_name = list(self.categories.keys())[self.current_category]
 
     def get_activators(self):
-        self.activators_types["All"] = set()
+        self.present_activators_types["All"] = set()
         for a in ["Levers", "Teleporters", "Buttons"]:
-            self.activators_types[a] = set()
+            self.present_activators_types[a] = set()
             self.activators[a] = {pos: {"id": self.tilemap.tilemap[pos]["id"], "pos": self.tilemap.tilemap[pos]["pos"]}
                                   for pos in self.tilemap.tilemap if
                                   a.lower()[:-1] in self.tilemap.tilemap[pos]["type"]}
             for pos in self.tilemap.tilemap:
                 if a.lower()[:-1] in self.tilemap.tilemap[pos]["type"]:
-                    self.activators_types[a].add(self.tilemap.tilemap[pos]['type'])
-            self.activators_types["All"] = self.activators_types["All"] | self.activators_types[a]
+                    self.present_activators_types[a].add(self.tilemap.tilemap[pos]['type'])
+            self.present_activators_types["All"] = self.present_activators_types["All"] | self.present_activators_types[a]
             activators_actions = load_activators_actions()
 
             # Safe access to activators data
@@ -853,10 +856,10 @@ class Editor:
 
             self.tilemap.render(self.display, offset=render_scroll,
                                 mask_opacity=80 if self.edit_properties_mode_on else 255,
-                                exception=self.activators_types[self.current_activator_category])
+                                exception=self.present_activators_types[self.current_activator_category])
             self.tilemap.render_over(self.display, offset=render_scroll,
                                      mask_opacity=80 if self.edit_properties_mode_on else 255,
-                                     exception=self.activators_types[self.current_activator_category])
+                                     exception=self.present_activators_types[self.current_activator_category])
 
             current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
             current_tile_img.set_alpha(100)
@@ -903,16 +906,21 @@ class Editor:
                     self.save_action()
 
             for lever in self.tilemap.extract(self.levers, keep=True):
-                self.levers_ids.add(lever['id'])
+                if 'id' in lever:
+                    self.levers_ids.add(lever['id'])
 
             for door in self.tilemap.extract(self.doors, keep=True):
-                self.doors_ids.add(door['id'])
+                if 'id' in door:
+                    self.doors_ids.add(door['id'])
 
             for tp in self.tilemap.extract(self.teleporters, keep=True):
-                self.tps_ids.add(tp['id'])
+                if 'id' in tp:
+                    self.tps_ids.add(tp['id'])
 
             for button in self.tilemap.extract(self.buttons, keep=True):
-                self.buttons_ids.add(button['id'])
+                if 'id' in button:
+                    self.buttons_ids.add(button['id'])
+
 
             self.activators_ids = {"Levers": self.levers_ids,
                                    "Buttons": self.buttons_ids,
@@ -929,7 +937,7 @@ class Editor:
                     else:
                         tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
                         if tile_loc in self.tilemap.tilemap:
-                            if self.tilemap.tilemap[tile_loc]["type"] in self.activators_types[
+                            if self.tilemap.tilemap[tile_loc]["type"] in self.present_activators_types[
                                 self.current_activator_category] or self.tilemap.tilemap[tile_loc][
                                 "type"] == "transition" and not self.clicking:
                                 element = self.tilemap.tilemap[tile_loc]["type"]
@@ -964,7 +972,7 @@ class Editor:
             if self.clicking and self.ongrid and mpos_in_mainarea:
                 if not self.window_mode:
                     if not self.edit_properties_mode_on:
-                        if self.tile_list[self.tile_group] in self.activators_types["All"]:
+                        if self.tile_list[self.tile_group] in self.activators_types:
                             t = self.tile_list[self.tile_group]
                             self.set_window_mode()
                             self.showing_properties_window = True
@@ -973,6 +981,7 @@ class Editor:
                                                        "infos": {"id": "", "type": ""}}
                             self.clicking = False
                             self.selected_activator["infos"]["pos"] = list(tile_pos)
+
 
                         elif self.tile_list[self.tile_group] in (d[0] for d in self.doors):
                             iD = int(input("Enter the door id: "))
@@ -1006,7 +1015,7 @@ class Editor:
                         tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
                         if tile_loc in self.tilemap.tilemap:
                             t = self.tilemap.tilemap[tile_loc]["type"]
-                            if t in self.activators_types[self.current_activator_category]:
+                            if t in self.present_activators_types[self.current_activator_category]:
                                 self.set_window_mode()
                                 self.showing_properties_window = True
                                 self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
@@ -1044,6 +1053,7 @@ class Editor:
                             if self.tilemap.tilemap[tile_loc]['type'] in (b[0] for b in self.buttons):
                                 self.buttons_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
                             del self.tilemap.tilemap[tile_loc]
+                            self.get_activators()
                         for tile in self.tilemap.offgrid_tiles.copy():
                             tile_img = self.assets[tile['type']][tile['variant']]
                             tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
@@ -1251,6 +1261,10 @@ class Editor:
                                                     'pos': self.selected_activator["infos"]["pos"],
                                                     'id': iD
                                                 }
+                                                self.present_activators_types[self.selected_activator_type].add(
+                                                    self.tilemap.tilemap[tile_loc]['type'])
+                                                self.present_activators_types["All"].add(
+                                                    self.tilemap.tilemap[tile_loc]['type'])
 
                                             # Ensure activator entry exists
                                             if tile_loc not in self.activators[self.selected_activator_type]:
