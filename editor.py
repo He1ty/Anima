@@ -31,7 +31,7 @@ class LevelManager:
         # We look at actual files on disk to avoid conflicts
         existing_files = [int(f.split('.')[0]) for f in os.listdir('data/maps/') if f.endswith('.json')]
         # Also look at active maps in memory (in case we created one but haven't saved yet)
-        all_ids = set(existing_files + self.active_maps)
+        all_ids = set(existing_files + self.editor.active_maps)
         if not all_ids:
             return 0
         return max(all_ids) + 1

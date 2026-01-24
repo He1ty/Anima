@@ -17,7 +17,17 @@
     "2": {
         "levers": {},
         "teleporters": {},
-        "buttons": {}
+        "buttons": {
+            "1": {
+                "type": "improve_tp_progress",
+                "pos": [
+                    12,
+                    6
+                ],
+                "amount": 1,
+                "tp_id": ""
+            }
+        }
     },
     "4": {
         "levers": {},

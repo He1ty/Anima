@@ -272,12 +272,21 @@ class PhysicsPlayer:
             self.dict_kb["key_right"] = self.force_movement == "r"
             self.dict_kb["key_left"] = self.force_movement == "l"
 
-    def walk(self,direction,mult=1):
-        """Changes x velocity depending on current speed and direction. To make walking faster in specific calls, use the mult parameter"""
-        if self.velocity[0] != 0 and abs(self.velocity[0]) / self.velocity[0] != float(direction):
-            self.velocity[0] += direction * self.SPEED / 2 * mult
-        elif abs(self.velocity[0]) <= abs(direction * self.SPEED*mult):
-            self.velocity[0] = direction * self.SPEED * mult
+    def walk(self, direction, mult=1):
+        """Changes x velocity with gradual acceleration and deceleration."""
+        target_speed = direction * self.SPEED * mult
+
+        # Acceleration factor: how fast we reach target speed
+        # Lower = more slippery/weighty, Higher = snappier
+        accel = 0.15 if self.is_on_floor() else 0.1
+
+        if direction != 0:
+            # Gradually move current velocity toward target speed
+            self.velocity[0] += (target_speed - self.velocity[0]) * accel
+        else:
+            # This handles the 'active' release of keys (handled in apply_momentum usually,
+            # but kept here for logic consistency)
+            pass
 
     def set_action(self, action):
         if action != self.action :
@@ -397,11 +406,11 @@ class PhysicsPlayer:
         player is missing some. Stops movement if no input is given."""
         if not self.is_on_floor() and not self.dashtime_cur > 0:
             if self.can_walljump["available"]:
-                if self.acceleration[1] == 0.45:
+                if self.acceleration[1] == 0.42:
                     self.velocity[1] = 0
                 self.acceleration[1] = 0.1
             else:
-                self.acceleration[1] = 0.45
+                self.acceleration[1] = 0.42
             self.velocity[1] = min(7, self.velocity[1] + self.acceleration[1])
         elif self.is_on_floor():
             if self.velocity[1] > 0:
@@ -434,7 +443,7 @@ class PhysicsPlayer:
                 self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
                 self.velocity[1] /= self.tech_momentum_mult
 
-        '''elif self.dict_kb["key_jump"] == 1 and self.can_walljump["available"] == True and not self.holding_jump and \
+        elif self.dict_kb["key_jump"] == 1 and self.can_walljump["available"] == True and not self.holding_jump and \
                 self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
             "allowed"]:  # Walljump
             self.jump_logic_helper()
@@ -455,11 +464,10 @@ class PhysicsPlayer:
                     self.force_movement_direction["l"] = [False, 0]
 
 
-            self.can_walljump["available"] = False'''
+            self.can_walljump["available"] = False
 
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
-
 
     def jump_logic_helper(self):
         """Avoid code redundancy"""
@@ -470,8 +478,8 @@ class PhysicsPlayer:
         """Handles player dash."""
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - 1, 0)
         if not self.anti_dash_buffer:
-            self.dash_direction = [self.get_direction("x"), max(0, self.get_direction("y"))]
-            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0 and self.dash_direction != [0, -1]:
+            self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
+            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0: #and self.dash_direction != [0, -1]:
                 if self.game.player_grabbing:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
@@ -607,9 +615,13 @@ class PhysicsPlayer:
         if not self.is_stunned:
             if self.is_on_floor():
                 self.air_time = 0
-                self.velocity[0] *= 0.2
-            elif self.get_direction("x") == 0:
-                self.velocity[0] *= 0.8
+                # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)
+                if self.get_direction("x") == 0:
+                    self.velocity[0] *= 0.8
+            else:
+                # Air resistance/deceleration when not pressing anything in air
+                if self.get_direction("x") == 0:
+                    self.velocity[0] *= 0.95
         else:
             self.velocity[0] *= 0.95
 
@@ -668,9 +680,9 @@ class PhysicsPlayer:
             # Get the new rect centered on that point
             ghost_rect = ghost_surf.get_rect(center=(ghost_center_x, ghost_center_y))
 
-            # Apply your manual offsets (-11, -5) if they were for visual alignment
+            # Apply your manual offsets (-8, -5) if they were for visual alignment
             # (You might need to tweak these depending on your sprite art)
-            ghost_rect.x -= 11
+            ghost_rect.x -= 8
             ghost_rect.y -= 5
 
             surf.blit(ghost_surf, ghost_rect)

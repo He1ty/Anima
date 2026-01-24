@@ -96,7 +96,7 @@ class Game:
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to per level
         self.scroll_limits = {
-            0: {"x": (48, 1680), "y": (-112, 10000)},
+            0: {"x": (16, 1680), "y": (-112, 10000)},
             1: {"x": (-48, 16), "y": (-1000, 400)},
             2: {"x": (-48, 280), "y": (-192, -80)},
             3: {"x": (16, 190400), "y": (0, 20000000)},
