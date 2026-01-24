@@ -16,7 +16,164 @@ SIDEBAR_WIDTH = 200
 UNDERBAR_HEIGHT = 200
 
 
+class LevelManager:
+
+    def __init__(self, editor_instance):
+        self.editor = editor_instance
+
+    # Helper to get the actual File ID from the UI Level Index
+    def get_file_id(self, ui_level):
+        if 0 <= ui_level < len(self.editor.active_maps):
+            return self.editor.active_maps[ui_level]
+        return 0
+
+    def get_next_file_id(self):
+        # We look at actual files on disk to avoid conflicts
+        existing_files = [int(f.split('.')[0]) for f in os.listdir('data/maps/') if f.endswith('.json')]
+        # Also look at active maps in memory (in case we created one but haven't saved yet)
+        all_ids = set(existing_files + self.active_maps)
+        if not all_ids:
+            return 0
+        return max(all_ids) + 1
+
+    def delete_current_map(self):
+        if not self.editor.active_maps:
+            return
+
+        # 1. Remove the current File ID from our active list
+        # We don't touch the file system yet!
+        del self.editor.active_maps[self.editor.level]
+
+        # 2. Determine new level index
+        # If we deleted the last map, go to the previous one
+        if self.editor.level >= len(self.editor.active_maps):
+            self.editor.level = max(0, len(self.editor.active_maps) - 1)
+
+        # 3. If list is empty, create a fresh map 0 immediately
+        if len(self.editor.active_maps) == 0:
+            self.editor.active_maps.append(0)
+            self.editor.level = 0
+
+        # 4. Reload the view
+        # We call change_level but pass the *same* index (or adjusted one),
+        # which now points to a different File ID because the list shifted.
+        # We need to manually trigger the load logic without saving the "deleted" map
+        self.map_data_reset()
+
+    def map_data_reset(self):
+        # Load new level (using new file ID)
+        new_file_id = self.get_file_id(self.editor.level)
+
+        try:
+            self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
+        except FileNotFoundError:
+            # Create the file if it doesn't exist (e.g. new map)
+            with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
+                json.dump({'tilemap': {}, 'tilesize': 16, 'offgrid': []}, f)
+            self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
+
+        self.editor.scroll = [0, 0]
+
+        # Reload assets
+        new_env = self.editor.get_environment(self.editor.level)
+        self.editor.assets = self.editor.base_assets | load_tiles(new_env)
+        self.editor.assets.update(load_doors('editor', new_env))
+        self.editor.assets.update(load_activators(new_env))
+
+        # ... (rest of function: update tile_list, ids, etc) ...
+        self.editor.tile_list = list(self.editor.assets)
+        self.editor.levers_ids = set()
+        self.editor.doors_ids = set()
+        self.editor.buttons_ids = set()
+        self.editor.tps_ids = set()
+        self.editor.tile_group = 0
+        self.editor.tile_variant = 0
+        self.editor.get_categories()
+        self.editor.get_activators()
+
+        self.editor.history = []
+        self.editor.history_index = -1
+        self.editor.save_action()  # Save the initial state (Index 0)
+
+    def change_level(self, new_level):
+        # Save current level (using current file ID)
+        current_file_id = self.get_file_id(self.editor.level)
+        if self.editor.tilemap.tilemap != {}:
+            self.editor.tilemap.save('data/maps/' + str(current_file_id) + '.json')
+            self.editor.save_edited_values()
+
+        self.editor.level = new_level
+
+        self.map_data_reset()
+
+    def load_environments(self):
+        path = 'data/environments.json'
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                # Convert lists back to specific types if needed, json loads arrays as lists
+                return json.load(f)
+        else:
+            # Default fallback if file doesn't exist
+            return {"green_cave": [0, 1, 2], "blue_cave": []}
+
+    def save_environments(self):
+        with open('data/environments.json', 'w') as f:
+            json.dump(self.editor.environments, f, indent=4)
+
+    def full_save(self):
+        # 1. Save current map state first
+        current_file_id = self.get_file_id(self.editor.level)
+        self.editor.tilemap.save('data/maps/' + str(current_file_id) + '.json')
+        self.editor.save_edited_values()
+
+        # 2. Create a mapping of Old File ID -> New File ID (0, 1, 2...)
+        id_mapping = {}
+        for index, file_id in enumerate(self.editor.active_maps):
+            id_mapping[file_id] = index
+
+        # 3. Process Files: Move everything to a temp folder first to avoid collisions
+        # (e.g. renaming 2->1 while 1 exists)
+        temp_dir = 'data/maps/temp_save'
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+
+        # Move valid active maps to temp with their NEW names
+        for file_id in self.editor.active_maps:
+            src = f'data/maps/{file_id}.json'
+            dst = f'{temp_dir}/{id_mapping[file_id]}.json'
+            if os.path.exists(src):
+                shutil.copy2(src, dst)  # Copy is safer than move
+
+        # 4. Clear the main maps folder
+        for f in os.listdir('data/maps/'):
+            if f.endswith('.json'):
+                os.remove(f'data/maps/{f}')
+
+        # 5. Move files back from temp
+        for f in os.listdir(temp_dir):
+            shutil.move(f'{temp_dir}/{f}', f'data/maps/{f}')
+        os.rmdir(temp_dir)
+
+        # 6. Rebuild Environments with new IDs
+        new_environments = {k: [] for k in self.editor.environments}
+
+        for env_name in self.editor.environments:
+            for old_id in self.editor.environments[env_name]:
+                # Only keep IDs that are in our active list
+                if old_id in id_mapping:
+                    new_id = id_mapping[old_id]
+                    new_environments[env_name].append(new_id)
+
+        self.editor.environments = new_environments
+        self.save_environments()
+
+        # 7. Reset active maps to sequential order
+        self.editor.active_maps = list(range(len(self.editor.active_maps)))
+
+        print("Full Save Complete: Maps reordered and deleted files removed.")
+
 class Editor:
+
     def __init__(self):
         pygame.init()
 
@@ -37,7 +194,9 @@ class Editor:
             'checkpoint': load_images('checkpoint')
         }
 
-        self.environments = self.load_environments()
+        self.level_manager = LevelManager(self)
+
+        self.environments = self.level_manager.load_environments()
         # This maps the UI index (0, 1, 2) to the File ID (0.json, 5.json, etc.)
         # Initially, it's just a sequence [0, 1, 2, ... N] based on existing files
         total_files = sum(1 for entry in os.listdir('data/maps/') if os.path.isfile(os.path.join('data/maps/', entry)))
@@ -155,7 +314,7 @@ class Editor:
 
         self.save_action()
 
-    # --- UNDO/REDO METHODS ---
+    # --- UNDO/REDO METHODS --- #
     def create_snapshot(self):
         # Creates a deep copy of the current map state
         return {
@@ -219,85 +378,9 @@ class Editor:
             self.restore_snapshot(self.history[self.history_index])
             print(f"Redo: Step {self.history_index}")
 
-
-    def load_environments(self):
-        path = 'data/environments.json'
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                # Convert lists back to specific types if needed, json loads arrays as lists
-                return json.load(f)
-        else:
-            # Default fallback if file doesn't exist
-            return {"green_cave": [0, 1, 2], "blue_cave": []}
-
-    def save_environments(self):
-        with open('data/environments.json', 'w') as f:
-            json.dump(self.environments, f, indent=4)
-
-    def delete_current_map(self):
-        if not self.active_maps:
-            return
-
-        # 1. Remove the current File ID from our active list
-        # We don't touch the file system yet!
-        del self.active_maps[self.level]
-
-        # 2. Determine new level index
-        # If we deleted the last map, go to the previous one
-        if self.level >= len(self.active_maps):
-            self.level = max(0, len(self.active_maps) - 1)
-
-        # 3. If list is empty, create a fresh map 0 immediately
-        if len(self.active_maps) == 0:
-            self.active_maps.append(0)
-            self.level = 0
-
-        # 4. Reload the view
-        # We call change_level but pass the *same* index (or adjusted one),
-        # which now points to a different File ID because the list shifted.
-        # We need to manually trigger the load logic without saving the "deleted" map
-        new_file_id = self.get_file_id(self.level)
-
-        # Manual load logic to avoid saving the map we just "deleted"
-        try:
-            self.tilemap.load('data/maps/' + str(new_file_id) + '.json')
-        except FileNotFoundError:
-            with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
-                json.dump({'tilemap': {}, 'tilesize': 16, 'offgrid': []}, f)
-            self.tilemap.load('data/maps/' + str(new_file_id) + '.json')
-
-        self.scroll = [0, 0]
-        new_env = self.get_environment(self.level)
-        self.assets = self.base_assets | load_tiles(new_env)
-        self.assets.update(load_doors('editor', new_env))
-        self.assets.update(load_activators(new_env))
-        self.tile_list = list(self.assets)
-        self.levers_ids = set()
-        self.doors_ids = set()
-        self.buttons_ids = set()
-        self.tps_ids = set()
-        self.tile_group = 0
-        self.tile_variant = 0
-        self.get_categories()
-        self.get_activators()
-
-    # Helper to get the actual File ID from the UI Level Index
-    def get_file_id(self, ui_level):
-        if 0 <= ui_level < len(self.active_maps):
-            return self.active_maps[ui_level]
-        return 0
-
-    def get_next_file_id(self):
-        # We look at actual files on disk to avoid conflicts
-        existing_files = [int(f.split('.')[0]) for f in os.listdir('data/maps/') if f.endswith('.json')]
-        # Also look at active maps in memory (in case we created one but haven't saved yet)
-        all_ids = set(existing_files + self.active_maps)
-        if not all_ids:
-            return 0
-        return max(all_ids) + 1
-
+    # --- --- --- --- --- --- --- --- #
     def get_environment(self, level):
-        file_id = self.get_file_id(level)
+        file_id = self.level_manager.get_file_id(level)
 
         for environment in self.environments:
             if file_id in self.environments[environment]:
@@ -340,7 +423,7 @@ class Editor:
             if btn.pressed(mpos_rel):
                 # CREATE NEW MAP LOGIC
                 # 1. Calculate a unique file ID (so we don't overwrite existing files until save)
-                new_file_id = self.get_next_file_id()
+                new_file_id = self.level_manager.get_next_file_id()
 
                 # 2. Add to active maps
                 self.active_maps.append(new_file_id)
@@ -350,7 +433,7 @@ class Editor:
 
                 # 4. Switch to new level (This creates the file)
                 new_level_index = len(self.active_maps) - 1
-                self.change_level(new_level_index)
+                self.level_manager.change_level(new_level_index)
 
                 self.selecting_environment_mode = False
 
@@ -370,48 +453,6 @@ class Editor:
         return len(self.active_maps)
 
     # New method to centralize level changing logic
-    def change_level(self, new_level):
-        # Save current level (using current file ID)
-        current_file_id = self.get_file_id(self.level)
-        if self.tilemap.tilemap != {}:
-            self.tilemap.save('data/maps/' + str(current_file_id) + '.json')
-            self.save_edited_values()
-
-        self.level = new_level
-
-        # Load new level (using new file ID)
-        new_file_id = self.get_file_id(self.level)
-
-        try:
-            self.tilemap.load('data/maps/' + str(new_file_id) + '.json')
-        except FileNotFoundError:
-            # Create the file if it doesn't exist (e.g. new map)
-            with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
-                json.dump({'tilemap': {}, 'tilesize': 16, 'offgrid': []}, f)
-            self.tilemap.load('data/maps/' + str(new_file_id) + '.json')
-
-        self.scroll = [0, 0]
-
-        # Reload assets
-        new_env = self.get_environment(self.level)
-        self.assets = self.base_assets | load_tiles(new_env)
-        self.assets.update(load_doors('editor', new_env))
-        self.assets.update(load_activators(new_env))
-
-        # ... (rest of function: update tile_list, ids, etc) ...
-        self.tile_list = list(self.assets)
-        self.levers_ids = set()
-        self.doors_ids = set()
-        self.buttons_ids = set()
-        self.tps_ids = set()
-        self.tile_group = 0
-        self.tile_variant = 0
-        self.get_categories()
-        self.get_activators()
-
-        self.history = []
-        self.history_index = -1
-        self.save_action()  # Save the initial state (Index 0)
 
     def render_sidebar(self):
         # LOGIC
@@ -456,7 +497,7 @@ class Editor:
                                              y_pos + (btn_size - num_surf.get_height()) // 2))
 
                 if map_btn.pressed(mpos) and i != self.level:
-                    self.change_level(i)
+                    self.level_manager.change_level(i)
 
         # 2. Render "+" Button (Create new map)
         tool_y = start_y + (btn_size + gap) * total_maps
@@ -482,7 +523,7 @@ class Editor:
                                            del_y + (btn_size - minus_surf.get_height()) // 2))
 
             if del_btn.pressed(mpos):
-                self.delete_current_map()
+                self.level_manager.delete_current_map()
 
         # Separator Line between Tile selector and Map selector
         pygame.draw.line(self.sidebar, (0, 0, 0), (SIDEBAR_WIDTH - map_col_width, 0),
@@ -673,7 +714,7 @@ class Editor:
                             self.transition_edit_pos = self.selected_activator["infos"]["pos"]
 
                             target_index = self.active_maps.index(target_map_id)
-                            self.change_level(target_index)
+                            self.level_manager.change_level(target_index)
 
                             self.selecting_dest_pos = True
                             self.waiting_for_click_release = True
@@ -792,552 +833,508 @@ class Editor:
                             self.activators[a][activator][info] = \
                                 activators_actions[str(self.level)][a.lower()][str(id_l)].copy()[info]
 
-    def full_save(self):
-        # 1. Save current map state first
-        current_file_id = self.get_file_id(self.level)
-        self.tilemap.save('data/maps/' + str(current_file_id) + '.json')
-        self.save_edited_values()
+    def update_ids(self):
+        for lever in self.tilemap.extract(self.levers, keep=True):
+            if 'id' in lever:
+                self.levers_ids.add(lever['id'])
 
-        # 2. Create a mapping of Old File ID -> New File ID (0, 1, 2...)
-        id_mapping = {}
-        for index, file_id in enumerate(self.active_maps):
-            id_mapping[file_id] = index
+        for door in self.tilemap.extract(self.doors, keep=True):
+            if 'id' in door:
+                self.doors_ids.add(door['id'])
 
-        # 3. Process Files: Move everything to a temp folder first to avoid collisions
-        # (e.g. renaming 2->1 while 1 exists)
-        temp_dir = 'data/maps/temp_save'
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
+        for tp in self.tilemap.extract(self.teleporters, keep=True):
+            if 'id' in tp:
+                self.tps_ids.add(tp['id'])
 
-        # Move valid active maps to temp with their NEW names
-        for file_id in self.active_maps:
-            src = f'data/maps/{file_id}.json'
-            dst = f'{temp_dir}/{id_mapping[file_id]}.json'
-            if os.path.exists(src):
-                shutil.copy2(src, dst)  # Copy is safer than move
+        for button in self.tilemap.extract(self.buttons, keep=True):
+            if 'id' in button:
+                self.buttons_ids.add(button['id'])
 
-        # 4. Clear the main maps folder
-        for f in os.listdir('data/maps/'):
-            if f.endswith('.json'):
-                os.remove(f'data/maps/{f}')
+        self.activators_ids = {"Levers": self.levers_ids,
+                               "Buttons": self.buttons_ids,
+                               "Teleporters": self.tps_ids}
 
-        # 5. Move files back from temp
-        for f in os.listdir(temp_dir):
-            shutil.move(f'{temp_dir}/{f}', f'data/maps/{f}')
-        os.rmdir(temp_dir)
+    def main_editor_logic(self):
+        self.display.fill((0, 0, 0))
 
-        # 6. Rebuild Environments with new IDs
-        new_environments = {k: [] for k in self.environments}
+        current_sidebar_width = 0 if self.selecting_dest_pos else SIDEBAR_WIDTH
 
-        for env_name in self.environments:
-            for old_id in self.environments[env_name]:
-                # Only keep IDs that are in our active list
-                if old_id in id_mapping:
-                    new_id = id_mapping[old_id]
-                    new_environments[env_name].append(new_id)
+        self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
+        self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
+        render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
-        self.environments = new_environments
-        self.save_environments()
+        self.tilemap.render(self.display, offset=render_scroll,
+                            mask_opacity=80 if self.edit_properties_mode_on else 255,
+                            exception=self.present_activators_types[self.current_activator_category])
+        self.tilemap.render_over(self.display, offset=render_scroll,
+                                 mask_opacity=80 if self.edit_properties_mode_on else 255,
+                                 exception=self.present_activators_types[self.current_activator_category])
 
-        # 7. Reset active maps to sequential order
-        self.active_maps = list(range(len(self.active_maps)))
+        current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
+        current_tile_img.set_alpha(100)
 
-        print("Full Save Complete: Maps reordered and deleted files removed.")
+        # Calculate mouse position (only for main display area)
 
-    def run(self):
-        while True:
-            self.display.fill((0, 0, 0))
+        mpos = pygame.mouse.get_pos()
+        main_area_width = self.screen_width - current_sidebar_width
+        main_area_height = self.screen_height - UNDERBAR_HEIGHT if self.edit_properties_mode_on else self.screen_height
+        if mpos[0] < main_area_width and mpos[1] < main_area_height:  # Only if mouse is over main area
+            # Scale mouse position to account for display scaling
+            scale_x = 960 / (self.screen.get_size()[0] - current_sidebar_width)
+            scale_y = 576 / (self.screen.get_size()[1])
+            mpos_scaled = ((mpos[0] / RENDER_SCALE) * scale_x * self.zoom,
+                           (mpos[1] / RENDER_SCALE) * scale_y * self.zoom)
+            tile_pos = (int((mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
+                        int((mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
+        else:
+            # Default values if out of bounds to prevent crash
+            tile_pos = (0, 0)
+            mpos_scaled = (0, 0)
 
-            current_sidebar_width = 0 if self.selecting_dest_pos else SIDEBAR_WIDTH
+        mpos_in_mainarea = mpos[0] < main_area_width and mpos[1] < main_area_height
 
-            self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
-            self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
-            render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
+        if self.selecting_dest_pos:
+            # 1. Draw Visuals
+            overlay_text = self.font.render("SELECT DESTINATION POS", True, (255, 50, 50))
+            self.display.blit(overlay_text, (self.display.get_width() // 2 - overlay_text.get_width() // 2, 10))
+            pygame.draw.rect(self.display, (255, 0, 0),
+                             (tile_pos[0] * 16 - self.scroll[0], tile_pos[1] * 16 - self.scroll[1], 16, 16), 1)
 
-            self.tilemap.render(self.display, offset=render_scroll,
-                                mask_opacity=80 if self.edit_properties_mode_on else 255,
-                                exception=self.present_activators_types[self.current_activator_category])
-            self.tilemap.render_over(self.display, offset=render_scroll,
-                                     mask_opacity=80 if self.edit_properties_mode_on else 255,
-                                     exception=self.present_activators_types[self.current_activator_category])
-
-            current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
-            current_tile_img.set_alpha(100)
-
-            # Calculate mouse position (only for main display area)
-            mpos = pygame.mouse.get_pos()
-            main_area_width = self.screen_width - current_sidebar_width
-            main_area_height = self.screen_height - UNDERBAR_HEIGHT if self.edit_properties_mode_on else self.screen_height
-            if mpos[0] < main_area_width and mpos[1] < main_area_height:  # Only if mouse is over main area
-                # Scale mouse position to account for display scaling
-                scale_x = 960 / (self.screen.get_size()[0] - current_sidebar_width)
-                scale_y = 576 / (self.screen.get_size()[1])
-                mpos_scaled = ((mpos[0] / RENDER_SCALE) * scale_x * self.zoom,
-                               (mpos[1] / RENDER_SCALE) * scale_y * self.zoom)
-                tile_pos = (int((mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
-                            int((mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
-            else:
-                # Default values if out of bounds to prevent crash
-                tile_pos = (0, 0)
-                mpos_scaled = (0, 0)
-
-            mpos_in_mainarea = mpos[0] < main_area_width and mpos[1] < main_area_height
-
-            if self.selecting_dest_pos:
-                # 1. Draw Visuals
-                overlay_text = self.font.render("SELECT DESTINATION POS", True, (255, 50, 50))
-                self.display.blit(overlay_text, (self.display.get_width() // 2 - overlay_text.get_width() // 2, 10))
-                pygame.draw.rect(self.display, (255, 0, 0),
-                                 (tile_pos[0] * 16 - self.scroll[0], tile_pos[1] * 16 - self.scroll[1], 16, 16), 1)
-
-                # 2. Logic: Actual Selection (Only runs if lock is off)
-                if not self.waiting_for_click_release and self.clicking and mpos_in_mainarea:
-                    selected_pos = list(tile_pos)
-
-                    self.change_level(self.return_to_level)
-
-                    tile_loc = str(self.transition_edit_pos[0]) + ";" + str(self.transition_edit_pos[1])
-                    if tile_loc in self.tilemap.tilemap:
-                        self.tilemap.tilemap[tile_loc]["dest_pos"] = selected_pos
-                        print(f"Updated dest_pos to {selected_pos}")
-
-                    self.selecting_dest_pos = False
-                    self.clicking = False
-                    self.save_action()
-
-            for lever in self.tilemap.extract(self.levers, keep=True):
-                if 'id' in lever:
-                    self.levers_ids.add(lever['id'])
-
-            for door in self.tilemap.extract(self.doors, keep=True):
-                if 'id' in door:
-                    self.doors_ids.add(door['id'])
-
-            for tp in self.tilemap.extract(self.teleporters, keep=True):
-                if 'id' in tp:
-                    self.tps_ids.add(tp['id'])
-
-            for button in self.tilemap.extract(self.buttons, keep=True):
-                if 'id' in button:
-                    self.buttons_ids.add(button['id'])
-
-
-            self.activators_ids = {"Levers": self.levers_ids,
-                                   "Buttons": self.buttons_ids,
-                                   "Teleporters": self.tps_ids}
-
-            if mpos_in_mainarea:
-                if not self.window_mode:
-                    if not self.edit_properties_mode_on:
-                        if self.ongrid:
-                            self.display.blit(current_tile_img, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
-                                                                 tile_pos[1] * self.tilemap.tile_size - self.scroll[1]))
-                        else:
-                            self.display.blit(current_tile_img, mpos_scaled)
-                    else:
-                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                        if tile_loc in self.tilemap.tilemap:
-                            if self.tilemap.tilemap[tile_loc]["type"] in self.present_activators_types[
-                                self.current_activator_category] or self.tilemap.tilemap[tile_loc][
-                                "type"] == "transition" and not self.clicking:
-                                element = self.tilemap.tilemap[tile_loc]["type"]
-                                shining_image = \
-                                    self.assets[self.tile_list[self.tile_list.index(element)]][
-                                        self.tilemap.tilemap[tile_loc]["variant"]].copy()
-                                shining_image.fill((255, 255, 255, 100), special_flags=pygame.BLEND_ADD)
-                                self.display.blit(shining_image, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
-                                                                  tile_pos[1] * self.tilemap.tile_size - self.scroll[
-                                                                      1]))
-
-            if self.selecting_dest_pos and self.clicking and not self.waiting_for_click_release and mpos_in_mainarea:
+            # 2. Logic: Actual Selection (Only runs if lock is off)
+            if not self.waiting_for_click_release and self.clicking and mpos_in_mainarea:
                 selected_pos = list(tile_pos)
 
-                # 1. Switch back to original level
-                self.change_level(self.return_to_level)
+                self.level_manager.change_level(self.return_to_level)
 
-                # 2. Update the specific transition tile
                 tile_loc = str(self.transition_edit_pos[0]) + ";" + str(self.transition_edit_pos[1])
-
                 if tile_loc in self.tilemap.tilemap:
                     self.tilemap.tilemap[tile_loc]["dest_pos"] = selected_pos
                     print(f"Updated dest_pos to {selected_pos}")
-                else:
-                    print("Error: Original transition tile not found.")
 
-                # 3. Reset State
                 self.selecting_dest_pos = False
-                self.clicking = False  # Prevent accidental placement on return
+                self.clicking = False
                 self.save_action()
 
-            if self.clicking and self.ongrid and mpos_in_mainarea:
-                if not self.window_mode:
-                    if not self.edit_properties_mode_on:
-                        if self.tile_list[self.tile_group] in self.activators_types:
-                            t = self.tile_list[self.tile_group]
+        self.update_ids()
+
+        if mpos_in_mainarea:
+            if not self.window_mode:
+                if not self.edit_properties_mode_on:
+                    if self.ongrid:
+                        self.display.blit(current_tile_img, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
+                                                             tile_pos[1] * self.tilemap.tile_size - self.scroll[1]))
+                    else:
+                        self.display.blit(current_tile_img, mpos_scaled)
+                else:
+                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                    if tile_loc in self.tilemap.tilemap:
+                        if self.tilemap.tilemap[tile_loc]["type"] in self.present_activators_types[
+                            self.current_activator_category] or self.tilemap.tilemap[tile_loc][
+                            "type"] == "transition" and not self.clicking:
+                            element = self.tilemap.tilemap[tile_loc]["type"]
+                            shining_image = \
+                                self.assets[self.tile_list[self.tile_list.index(element)]][
+                                    self.tilemap.tilemap[tile_loc]["variant"]].copy()
+                            shining_image.fill((255, 255, 255, 100), special_flags=pygame.BLEND_ADD)
+                            self.display.blit(shining_image, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
+                                                              tile_pos[1] * self.tilemap.tile_size - self.scroll[
+                                                                  1]))
+
+        if self.selecting_dest_pos and self.clicking and not self.waiting_for_click_release and mpos_in_mainarea:
+            selected_pos = list(tile_pos)
+
+            # 1. Switch back to original level
+            self.level_manager.change_level(self.return_to_level)
+
+            # 2. Update the specific transition tile
+            tile_loc = str(self.transition_edit_pos[0]) + ";" + str(self.transition_edit_pos[1])
+
+            if tile_loc in self.tilemap.tilemap:
+                self.tilemap.tilemap[tile_loc]["dest_pos"] = selected_pos
+                print(f"Updated dest_pos to {selected_pos}")
+            else:
+                print("Error: Original transition tile not found.")
+
+            # 3. Reset State
+            self.selecting_dest_pos = False
+            self.clicking = False  # Prevent accidental placement on return
+            self.save_action()
+
+        if self.clicking and self.ongrid and mpos_in_mainarea:
+            if not self.window_mode:
+                if not self.edit_properties_mode_on:
+                    if self.tile_list[self.tile_group] in self.activators_types:
+                        t = self.tile_list[self.tile_group]
+                        self.set_window_mode()
+                        self.showing_properties_window = True
+                        self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
+                        self.selected_activator = {"image": self.assets[t][0],
+                                                   "infos": {"id": "", "type": ""}}
+                        self.clicking = False
+                        self.selected_activator["infos"]["pos"] = list(tile_pos)
+
+
+                    elif self.tile_list[self.tile_group] in (d[0] for d in self.doors):
+                        iD = int(input("Enter the door id: "))
+                        while iD in self.doors_ids:
+                            print("id already used")
+                            iD = int(input("Enter the door id: "))
+                        self.doors_ids.add(iD)
+                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': self.tile_list[self.tile_group],
+                            'variant': self.tile_variant,
+                            'pos': tile_pos,
+                            'id': iD}
+                    elif self.tile_list[self.tile_group] == "transition":
+                        # Default transition placement without console input
+                        dest = 0
+                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': "transition",
+                            'variant': self.tile_variant,
+                            'pos': tile_pos,
+                            'destination': dest,
+                            'dest_pos': [0, 0]}
+                    elif self.tile_list[
+                        self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
+                            [("spawners", 0)], keep=True):
+
+                        print("Player spawner already placed in this map")
+                    else:
+                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': self.tile_list[self.tile_group],
+                            'variant': self.tile_variant,
+                            'pos': tile_pos}
+                else:
+                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                    if tile_loc in self.tilemap.tilemap:
+                        t = self.tilemap.tilemap[tile_loc]["type"]
+                        if t in self.present_activators_types[self.current_activator_category]:
                             self.set_window_mode()
                             self.showing_properties_window = True
                             self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
                             self.selected_activator = {"image": self.assets[t][0],
-                                                       "infos": {"id": "", "type": ""}}
+                                                       "infos": self.activators[self.selected_activator_type][
+                                                           tile_loc]}
                             self.clicking = False
-                            self.selected_activator["infos"]["pos"] = list(tile_pos)
-
-
-                        elif self.tile_list[self.tile_group] in (d[0] for d in self.doors):
-                            iD = int(input("Enter the door id: "))
-                            while iD in self.doors_ids:
-                                print("id already used")
-                                iD = int(input("Enter the door id: "))
-                            self.doors_ids.add(iD)
-                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': self.tile_list[self.tile_group],
-                                'variant': self.tile_variant,
-                                'pos': tile_pos,
-                                'id': iD}
-                        elif self.tile_list[self.tile_group] == "transition":
-                            # Default transition placement without console input
-                            dest = 0
-                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': "transition",
-                                'variant': self.tile_variant,
-                                'pos': tile_pos,
-                                'destination': dest,
-                                'dest_pos':[0, 0]}
-                        elif self.tile_list[self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract([("spawners", 0)], keep=True):
-
-                            print("Player spawner already placed in this map")
-                        else:
-                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': self.tile_list[self.tile_group],
-                                'variant': self.tile_variant,
-                                'pos': tile_pos}
-                    else:
-                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                        if tile_loc in self.tilemap.tilemap:
-                            t = self.tilemap.tilemap[tile_loc]["type"]
-                            if t in self.present_activators_types[self.current_activator_category]:
-                                self.set_window_mode()
-                                self.showing_properties_window = True
-                                self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
-                                self.selected_activator = {"image": self.assets[t][0],
-                                                           "infos": self.activators[self.selected_activator_type][
-                                                               tile_loc]}
-                                self.clicking = False
-                            elif t == "transition":
-                                self.set_window_mode()
-                                self.showing_properties_window = True
-                                self.selected_activator_type = "Transitions"
-                                # Manual construction of info for transitions
-                                self.selected_activator = {
-                                    "image": self.assets[t][0],
-                                    "infos": {
-                                        "type": "transition",
-                                        "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
-                                        "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0,0]),
-                                        "pos": self.tilemap.tilemap[tile_loc]['pos']
-                                    }
+                        elif t == "transition":
+                            self.set_window_mode()
+                            self.showing_properties_window = True
+                            self.selected_activator_type = "Transitions"
+                            # Manual construction of info for transitions
+                            self.selected_activator = {
+                                "image": self.assets[t][0],
+                                "infos": {
+                                    "type": "transition",
+                                    "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
+                                    "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0, 0]),
+                                    "pos": self.tilemap.tilemap[tile_loc]['pos']
                                 }
-                                self.clicking = False
-
-            if self.right_clicking and mpos_in_mainarea:
-                if not self.window_mode:
-                    if not self.edit_properties_mode_on:
-                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                        if tile_loc in self.tilemap.tilemap:
-                            if self.tilemap.tilemap[tile_loc]['type'] in (l[0] for l in self.levers):
-                                self.levers_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                            if self.tilemap.tilemap[tile_loc]['type'] in (d[0] for d in self.doors):
-                                self.doors_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                            if self.tilemap.tilemap[tile_loc]['type'] in (tp[0] for tp in self.teleporters):
-                                self.tps_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                            if self.tilemap.tilemap[tile_loc]['type'] in (b[0] for b in self.buttons):
-                                self.buttons_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                            del self.tilemap.tilemap[tile_loc]
-                            self.get_activators()
-                        for tile in self.tilemap.offgrid_tiles.copy():
-                            tile_img = self.assets[tile['type']][tile['variant']]
-                            tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
-                                                 tile['pos'][1] - self.scroll[1],
-                                                 tile_img.get_width(),
-                                                 tile_img.get_height())
-                            if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
-                                self.tilemap.offgrid_tiles.remove(tile)
-
-            if not self.edit_properties_mode_on:
-                self.display.blit(current_tile_img, (5, 5))
-
-            if not self.selecting_dest_pos:
-                self.render_sidebar()
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-
-                if event.type == pygame.MOUSEWHEEL:
-                    mpos_wheel = pygame.mouse.get_pos()
-                    # If mouse is over the sidebar (specifically the map nav area)
-                    if mpos_wheel[0] > self.screen_width - current_sidebar_width:
-                        self.map_list_scroll -= event.y * 20
-                        # Clamp scrolling
-                        self.map_list_scroll = max(0, self.map_list_scroll)
-
-                if not self.window_mode:
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if event.button in (1, 3):  # Left or Right click
-                            self.temp_snapshot = self.create_snapshot()
-
-                        if event.button == 1:
-                            self.clicking = True
-                            if not self.ongrid:
-                                self.tilemap.offgrid_tiles.append({'type': self.tile_list[self.tile_group],
-                                                                   'variant': self.tile_variant,
-                                                                   'pos': (
-                                                                       mpos_scaled[0] + self.scroll[0],
-                                                                       mpos_scaled[1] + self.scroll[1])})
-                        if event.button == 3:
-                            self.right_clicking = True
-                        if not self.shift and self.tile_group:
-                            if event.button == 4:
-                                self.tile_variant = (self.tile_variant - 1) % len(
-                                    self.assets[self.tile_list[self.tile_group]])
-                            if event.button == 5:
-                                self.tile_variant = (self.tile_variant + 1) % len(
-                                    self.assets[self.tile_list[self.tile_group]])
-                    if event.type == pygame.KEYDOWN:
-                        mods = pygame.key.get_mods()
-                        if mods & pygame.KMOD_CTRL:
-                            if event.key == pygame.K_w:
-                                self.undo()
-                            if event.key == pygame.K_y:
-                                self.redo()
-                        if event.key == pygame.K_i and not self.holding_i:
-                            self.edit_properties_mode_on = not self.edit_properties_mode_on
-                            self.holding_i = True
-                        if event.key == pygame.K_q:
-                            self.movement[0] = True
-                        if event.key == pygame.K_RIGHT:
-                            self.change_level((self.level + 1) % self.sizeofmaps())
-                        if event.key == pygame.K_LEFT:
-                            self.change_level((self.level - 1) % self.sizeofmaps())
-                        if event.key == pygame.K_DOWN:
-                            self.zoom = self.zoom * 2
-                            self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
-                        if event.key == pygame.K_UP:
-                            self.zoom = self.zoom / 2
-                            self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
-
-                        if event.key == pygame.K_d:
-                            self.movement[1] = True
-                        if event.key == pygame.K_z:
-                            self.movement[2] = True
-                        if event.key == pygame.K_s:
-                            self.movement[3] = True
-                        if event.key == pygame.K_g:
-                            self.ongrid = not self.ongrid
-                        if event.key == pygame.K_t:
-                            self.tilemap.autotile()
-                            self.save_action()
-                        if event.key == pygame.K_LSHIFT:
-                            self.shift = True
-                        if event.key == pygame.K_o:
-                            self.full_save()
-                        if event.key == pygame.K_c:
-                            print((tile_pos[0] * 16, tile_pos[1] * 16))
-                        # Shortcut for placing transitions
-                        if event.key == pygame.K_p:
-                            dest = 0  # Default value
-                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': "transition",
-                                'variant': self.tile_variant,
-                                'pos': tile_pos,
-                                'destination': dest,
-                                'dest_pos' : [0,0]}
-                            self.save_action()
-                        # Shortcut for placing checkpoints
-                        if event.key == pygame.K_j:
-                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': "checkpoint",
-                                'variant': 0,
-                                'pos': tile_pos
                             }
-                            self.save_action()
-                        # Shortcut for placing portals
+                            self.clicking = False
 
-                    if event.type == pygame.KEYUP:
-                        if event.key == pygame.K_i:
-                            self.holding_i = False
-                        if event.key == pygame.K_q:
-                            self.movement[0] = False
-                        if event.key == pygame.K_d:
-                            self.movement[1] = False
-                        if event.key == pygame.K_z:
-                            self.movement[2] = False
-                        if event.key == pygame.K_s:
-                            self.movement[3] = False
-                        if event.key == pygame.K_LSHIFT:
-                            self.shift = False
-                else:
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if event.button == 1:
-                            self.clicking = True
-                        if event.button == 3:
-                            self.right_clicking = True
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            if self.edited_info:
-                                self.edited_info = ""
-                            elif (self.selected_activator["infos"]["type"] and
-                                  (self.selected_activator["infos"][info] for info in
-                                   self.infos_per_type_per_category[self.selected_activator_type][
-                                       self.selected_activator["infos"]["type"]])):
-                                self.window_mode = False
-                                self.selected_activator = None
-                                self.selected_activator_type = None
-                            else:
-                                print("All the infos have to be filled!")
-                        if event.key == pygame.K_RETURN:
-                            if self.edited_info:
-                                # Check if value actually changed
-                                if self.edited_value and str(
-                                        self.selected_activator["infos"][self.edited_info]) != self.edited_value:
+        if self.right_clicking and mpos_in_mainarea:
+            if not self.window_mode:
+                if not self.edit_properties_mode_on:
+                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                    if tile_loc in self.tilemap.tilemap:
+                        if self.tilemap.tilemap[tile_loc]['type'] in (l[0] for l in self.levers):
+                            self.levers_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                        if self.tilemap.tilemap[tile_loc]['type'] in (d[0] for d in self.doors):
+                            self.doors_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                        if self.tilemap.tilemap[tile_loc]['type'] in (tp[0] for tp in self.teleporters):
+                            self.tps_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                        if self.tilemap.tilemap[tile_loc]['type'] in (b[0] for b in self.buttons):
+                            self.buttons_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                        del self.tilemap.tilemap[tile_loc]
+                        self.get_activators()
+                    for tile in self.tilemap.offgrid_tiles.copy():
+                        tile_img = self.assets[tile['type']][tile['variant']]
+                        tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                             tile['pos'][1] - self.scroll[1],
+                                             tile_img.get_width(),
+                                             tile_img.get_height())
+                        if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
+                            self.tilemap.offgrid_tiles.remove(tile)
 
-                                    # --- VALIDATION LOGIC ---
-                                    input_possible = True
-                                    changing_id = self.edited_info == "id"
-                                    id_already_existing = False
+        if not self.edit_properties_mode_on:
+            self.display.blit(current_tile_img, (5, 5))
 
-                                    # 1. Validation for Transitions (Check if map exists)
-                                    if self.selected_activator_type == "Transitions" and self.edited_info == "destination":
-                                        if int(self.edited_value) > self.sizeofmaps():
-                                            print(f"Destination map {self.edited_value} does not exist")
-                                            input_possible = False
+        if not self.selecting_dest_pos:
+            self.render_sidebar()
 
-                                    # 2. Validation for Activators (Check specific ID targets)
-                                    elif "_id" in self.edited_info:
-                                        interested_activator = "Doors" if "door" in self.edited_info else "Teleporters"
-                                        ids = self.doors_ids if interested_activator == "Doors" else self.tps_ids
-                                        input_possible = int(self.edited_value) in ids
-                                        if not input_possible:
-                                            print("There is no " + interested_activator.lower()[:-1] + " with this id")
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-                                    # 3. Check for Duplicate IDs (Only for Activators)
-                                    if changing_id and self.selected_activator_type != "Transitions":
-                                        id_already_existing = int(self.edited_value) in self.activators_ids[
-                                            self.selected_activator_type]
+            if event.type == pygame.MOUSEWHEEL:
+                mpos_wheel = pygame.mouse.get_pos()
+                # If mouse is over the sidebar (specifically the map nav area)
+                if mpos_wheel[0] > self.screen_width - current_sidebar_width:
+                    self.map_list_scroll -= event.y * 20
+                    # Clamp scrolling
+                    self.map_list_scroll = max(0, self.map_list_scroll)
 
-                                    # --- SAVE LOGIC ---
-                                    if (not changing_id or not id_already_existing) and input_possible:
-                                        # Update the temporary selected_activator dict
-                                        new_val = int(
-                                            self.edited_value) if self.edited_value.isdigit() else self.edited_value
-                                        self.selected_activator["infos"][self.edited_info] = new_val
+            if not self.window_mode:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button in (1, 3):  # Left or Right click
+                        self.temp_snapshot = self.create_snapshot()
 
-                                        tile_loc = str(self.selected_activator["infos"]["pos"][0]) + ";" + \
-                                                   str(self.selected_activator["infos"]["pos"][1])
+                    if event.button == 1:
+                        self.clicking = True
+                        if not self.ongrid:
+                            self.tilemap.offgrid_tiles.append({'type': self.tile_list[self.tile_group],
+                                                               'variant': self.tile_variant,
+                                                               'pos': (
+                                                                   mpos_scaled[0] + self.scroll[0],
+                                                                   mpos_scaled[1] + self.scroll[1])})
+                    if event.button == 3:
+                        self.right_clicking = True
+                    if not self.shift and self.tile_group:
+                        if event.button == 4:
+                            self.tile_variant = (self.tile_variant - 1) % len(
+                                self.assets[self.tile_list[self.tile_group]])
+                        if event.button == 5:
+                            self.tile_variant = (self.tile_variant + 1) % len(
+                                self.assets[self.tile_list[self.tile_group]])
+                if event.type == pygame.KEYDOWN:
+                    mods = pygame.key.get_mods()
+                    if mods & pygame.KMOD_CTRL:
+                        if event.key == pygame.K_w:
+                            self.undo()
+                        if event.key == pygame.K_y:
+                            self.redo()
+                    if event.key == pygame.K_i and not self.holding_i:
+                        self.edit_properties_mode_on = not self.edit_properties_mode_on
+                        self.holding_i = True
+                    if event.key == pygame.K_q:
+                        self.movement[0] = True
+                    if event.key == pygame.K_RIGHT:
+                        self.level_manager.change_level((self.level + 1) % self.sizeofmaps())
+                    if event.key == pygame.K_LEFT:
+                        self.level_manager.change_level((self.level - 1) % self.sizeofmaps())
+                    if event.key == pygame.K_DOWN:
+                        self.zoom = self.zoom * 2
+                        self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
+                    if event.key == pygame.K_UP:
+                        self.zoom = self.zoom / 2
+                        self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
 
-                                        # A. Save Logic for Transitions
-                                        if self.selected_activator_type == "Transitions":
-                                            if tile_loc in self.tilemap.tilemap:
-                                                self.tilemap.tilemap[tile_loc][self.edited_info] = new_val
-                                            self.edited_value = None
-                                            self.edited_info = ""
-                                        # B. Save Logic for Activators (Levers, Buttons, Teleporters)
-                                        else:
-                                            iD = int(self.selected_activator["infos"]["id"])
-                                            self.activators_ids[self.selected_activator_type].add(iD)
+                    if event.key == pygame.K_d:
+                        self.movement[1] = True
+                    if event.key == pygame.K_z:
+                        self.movement[2] = True
+                    if event.key == pygame.K_s:
+                        self.movement[3] = True
+                    if event.key == pygame.K_g:
+                        self.ongrid = not self.ongrid
+                    if event.key == pygame.K_t:
+                        self.tilemap.autotile()
+                        self.save_action()
+                    if event.key == pygame.K_LSHIFT:
+                        self.shift = True
+                    if event.key == pygame.K_o:
+                        self.level_manager.full_save()
+                    if event.key == pygame.K_c:
+                        print((tile_pos[0] * 16, tile_pos[1] * 16))
+                    # Shortcut for placing transitions
+                    if event.key == pygame.K_p:
+                        dest = 0  # Default value
+                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': "transition",
+                            'variant': self.tile_variant,
+                            'pos': tile_pos,
+                            'destination': dest,
+                            'dest_pos': [0, 0]}
+                        self.save_action()
+                    # Shortcut for placing checkpoints
+                    if event.key == pygame.K_j:
+                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': "checkpoint",
+                            'variant': 0,
+                            'pos': tile_pos
+                        }
+                        self.save_action()
+                    # Shortcut for placing portals
 
-                                            # Handle changing the main ID of an object
-                                            if tile_loc in self.tilemap.tilemap and self.edited_info == "id" and \
-                                                    self.edited_value != str(self.tilemap.tilemap[tile_loc]["id"]):
-                                                self.activators_ids[self.selected_activator_type].remove(
-                                                    self.tilemap.tilemap[tile_loc]["id"])
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_i:
+                        self.holding_i = False
+                    if event.key == pygame.K_q:
+                        self.movement[0] = False
+                    if event.key == pygame.K_d:
+                        self.movement[1] = False
+                    if event.key == pygame.K_z:
+                        self.movement[2] = False
+                    if event.key == pygame.K_s:
+                        self.movement[3] = False
+                    if event.key == pygame.K_LSHIFT:
+                        self.shift = False
+            else:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 1:
+                        self.clicking = True
+                    if event.button == 3:
+                        self.right_clicking = True
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        if self.edited_info:
+                            self.edited_info = ""
+                        elif (self.selected_activator["infos"]["type"] and
+                              (self.selected_activator["infos"][info] for info in
+                               self.infos_per_type_per_category[self.selected_activator_type][
+                                   self.selected_activator["infos"]["type"]])):
+                            self.window_mode = False
+                            self.selected_activator = None
+                            self.selected_activator_type = None
+                        else:
+                            print("All the infos have to be filled!")
+                    if event.key == pygame.K_RETURN:
+                        if self.edited_info:
+                            # Check if value actually changed
+                            if self.edited_value and str(
+                                    self.selected_activator["infos"][self.edited_info]) != self.edited_value:
 
-                                            # Create tile entry if it somehow doesn't exist (e.g. newly placed)
-                                            elif tile_loc not in self.tilemap.tilemap:
-                                                self.tilemap.tilemap[tile_loc] = {
-                                                    'type': self.tile_list[self.tile_group],
-                                                    'variant': self.tile_variant,
-                                                    'pos': self.selected_activator["infos"]["pos"],
-                                                    'id': iD
-                                                }
-                                                self.present_activators_types[self.selected_activator_type].add(
-                                                    self.tilemap.tilemap[tile_loc]['type'])
-                                                self.present_activators_types["All"].add(
-                                                    self.tilemap.tilemap[tile_loc]['type'])
+                                # --- VALIDATION LOGIC ---
+                                input_possible = True
+                                changing_id = self.edited_info == "id"
+                                id_already_existing = False
 
-                                            # Ensure activator entry exists
-                                            if tile_loc not in self.activators[self.selected_activator_type]:
-                                                self.activators[self.selected_activator_type][tile_loc] = {}
+                                # 1. Validation for Transitions (Check if map exists)
+                                if self.selected_activator_type == "Transitions" and self.edited_info == "destination":
+                                    if int(self.edited_value) > self.sizeofmaps():
+                                        print(f"Destination map {self.edited_value} does not exist")
+                                        input_possible = False
 
-                                            # Save data
-                                            self.activators[self.selected_activator_type][tile_loc] = \
+                                # 2. Validation for Activators (Check specific ID targets)
+                                elif "_id" in self.edited_info:
+                                    interested_activator = "Doors" if "door" in self.edited_info else "Teleporters"
+                                    ids = self.doors_ids if interested_activator == "Doors" else self.tps_ids
+                                    input_possible = int(self.edited_value) in ids
+                                    if not input_possible:
+                                        print("There is no " + interested_activator.lower()[:-1] + " with this id")
+
+                                # 3. Check for Duplicate IDs (Only for Activators)
+                                if changing_id and self.selected_activator_type != "Transitions":
+                                    id_already_existing = int(self.edited_value) in self.activators_ids[
+                                        self.selected_activator_type]
+
+                                # --- SAVE LOGIC ---
+                                if (not changing_id or not id_already_existing) and input_possible:
+                                    # Update the temporary selected_activator dict
+                                    new_val = int(
+                                        self.edited_value) if self.edited_value.isdigit() else self.edited_value
+                                    self.selected_activator["infos"][self.edited_info] = new_val
+
+                                    tile_loc = str(self.selected_activator["infos"]["pos"][0]) + ";" + \
+                                               str(self.selected_activator["infos"]["pos"][1])
+
+                                    # A. Save Logic for Transitions
+                                    if self.selected_activator_type == "Transitions":
+                                        if tile_loc in self.tilemap.tilemap:
+                                            self.tilemap.tilemap[tile_loc][self.edited_info] = new_val
+                                        self.edited_value = None
+                                        self.edited_info = ""
+                                    # B. Save Logic for Activators (Levers, Buttons, Teleporters)
+                                    else:
+                                        iD = int(self.selected_activator["infos"]["id"])
+                                        self.activators_ids[self.selected_activator_type].add(iD)
+
+                                        # Handle changing the main ID of an object
+                                        if tile_loc in self.tilemap.tilemap and self.edited_info == "id" and \
+                                                self.edited_value != str(self.tilemap.tilemap[tile_loc]["id"]):
+                                            self.activators_ids[self.selected_activator_type].remove(
+                                                self.tilemap.tilemap[tile_loc]["id"])
+
+                                        # Create tile entry if it somehow doesn't exist (e.g. newly placed)
+                                        elif tile_loc not in self.tilemap.tilemap:
+                                            self.tilemap.tilemap[tile_loc] = {
+                                                'type': self.tile_list[self.tile_group],
+                                                'variant': self.tile_variant,
+                                                'pos': self.selected_activator["infos"]["pos"],
+                                                'id': iD
+                                            }
+                                            self.present_activators_types[self.selected_activator_type].add(
+                                                self.tilemap.tilemap[tile_loc]['type'])
+                                            self.present_activators_types["All"].add(
+                                                self.tilemap.tilemap[tile_loc]['type'])
+
+                                        # Ensure activator entry exists
+                                        if tile_loc not in self.activators[self.selected_activator_type]:
+                                            self.activators[self.selected_activator_type][tile_loc] = {}
+
+                                        # Save data
+                                        self.activators[self.selected_activator_type][tile_loc] = \
                                             self.selected_activator["infos"]
-                                            self.tilemap.tilemap[tile_loc]["id"] = \
+                                        self.tilemap.tilemap[tile_loc]["id"] = \
                                             self.activators[self.selected_activator_type][tile_loc]["id"]
 
-                                            self.edited_value = None
-                                            self.edited_info = ""
-                                        self.save_action()
-                                    elif changing_id and id_already_existing:
-                                        print("id already used")
-                                else:
-                                    # Value didn't change
-                                    self.edited_info = ""
+                                        self.edited_value = None
+                                        self.edited_info = ""
+                                    self.save_action()
+                                elif changing_id and id_already_existing:
+                                    print("id already used")
+                            else:
+                                # Value didn't change
+                                self.edited_info = ""
 
-                        if self.edited_info not in ["type", ""] and 48 <= ord(
-                                self.edited_value[0] if len(self.edited_value) else '0') <= 57:
-                            if event.key == pygame.K_BACKSPACE:
-                                self.edited_value = self.edited_value[:-1]
-                            if 48 <= event.key <= 57:
-                                if len(self.edited_value) < 3:
-                                    self.edited_value = str(int(self.edited_value + chr(event.key)))
-                                else:
-                                    print("max id reached")
+                    if self.edited_info not in ["type", ""] and 48 <= ord(
+                            self.edited_value[0] if len(self.edited_value) else '0') <= 57:
+                        if event.key == pygame.K_BACKSPACE:
+                            self.edited_value = self.edited_value[:-1]
+                        if 48 <= event.key <= 57:
+                            if len(self.edited_value) < 3:
+                                self.edited_value = str(int(self.edited_value + chr(event.key)))
+                            else:
+                                print("max id reached")
 
-                if event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 1:
-                        self.clicking = False
-                        self.waiting_for_click_release = False
-                    if event.button == 3:
-                        self.right_clicking = False
-                    if event.button in (1, 3) and self.temp_snapshot:
-                        current_state = self.create_snapshot()
-                        # Simply comparing the dicts detects if anything changed
-                        if current_state != self.temp_snapshot:
-                            self.save_action()
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.clicking = False
+                    self.waiting_for_click_release = False
+                if event.button == 3:
+                    self.right_clicking = False
+                if event.button in (1, 3) and self.temp_snapshot:
+                    current_state = self.create_snapshot()
+                    # Simply comparing the dicts detects if anything changed
+                    if current_state != self.temp_snapshot:
+                        self.save_action()
 
-                if event.type == pygame.VIDEORESIZE:
-                    # Update screen dimensions
-                    self.screen_width = max(event.w, 480 + SIDEBAR_WIDTH)  # Minimum width
-                    self.screen_height = max(event.h, 288 + UNDERBAR_HEIGHT)  # Minimum height
-                    self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
+            if event.type == pygame.VIDEORESIZE:
+                # Update screen dimensions
+                self.screen_width = max(event.w, 480 + SIDEBAR_WIDTH)  # Minimum width
+                self.screen_height = max(event.h, 288 + UNDERBAR_HEIGHT)  # Minimum height
+                self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
 
-            # Calculate main area dimensions for scaling
-            main_area_width = self.screen_width - current_sidebar_width
-            main_area_height = self.screen_height
+        # Calculate main area dimensions for scaling
+        main_area_width = self.screen_width - current_sidebar_width
+        main_area_height = self.screen_height
 
-            # Blit everything to screen
-            if not self.window_mode:
-                scaled_display = pygame.transform.scale(self.display, (main_area_width, main_area_height))
-                self.screen.blit(scaled_display, (0, 0))
-                self.screen.blit(self.sidebar, (main_area_width, 0))
-                if self.edit_properties_mode_on and not self.selecting_dest_pos:
-                    self.render_underbar()
-                    self.screen.blit(self.underbar, (0, main_area_height - UNDERBAR_HEIGHT))
-                if self.selecting_environment_mode:
-                    self.update_window_mode_bg()  # Darken background
-                    self.render_environment_selection_window()
-            else:
-                self.update_window_mode_bg()
-                if self.showing_properties_window:
-                    self.render_info_window()
-                    self.screen.blit(self.properties_window,
-                                     ((self.screen_width - self.properties_window.get_width()) / 2,
-                                      (self.screen_height - self.properties_window.get_height()) / 2))
+        # Blit everything to screen
+        if not self.window_mode:
+            scaled_display = pygame.transform.scale(self.display, (main_area_width, main_area_height))
+            self.screen.blit(scaled_display, (0, 0))
+            self.screen.blit(self.sidebar, (main_area_width, 0))
+            if self.edit_properties_mode_on and not self.selecting_dest_pos:
+                self.render_underbar()
+                self.screen.blit(self.underbar, (0, main_area_height - UNDERBAR_HEIGHT))
+            if self.selecting_environment_mode:
+                self.update_window_mode_bg()  # Darken background
+                self.render_environment_selection_window()
+        else:
+            self.update_window_mode_bg()
+            if self.showing_properties_window:
+                self.render_info_window()
+                self.screen.blit(self.properties_window,
+                                 ((self.screen_width - self.properties_window.get_width()) / 2,
+                                  (self.screen_height - self.properties_window.get_height()) / 2))
 
-            pygame.display.update()
-            self.clock.tick(60)
+        pygame.display.update()
+        self.clock.tick(60)
 
+    def run(self):
+        while True:
+            self.main_editor_logic()
 
-Editor().run()
+if __name__ == "__main__":
+    Editor().run()
