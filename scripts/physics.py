@@ -36,6 +36,8 @@ class PhysicsPlayer:
         self.DASH_COOLDOWN = 50
         self.WALLJUMP_COOLDOWN = 5
 
+        self.COLLISION_DODGED_PIXELS = 4 # Number of pixels collision can dodge (ledge snapping/corner correction)
+
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
         self.dash_cooldown = 0
@@ -83,8 +85,8 @@ class PhysicsPlayer:
         self.facing = ""
         self.action = "idle"
         self.animation = self.game.assets['player/' + "idle"].copy()
-        self.collision = {'left': False, 'right': False, 'bottom': False}
-        self.get_block_on = {'left': False, 'right': False}
+        self.collision = {'left': False, 'right': False, 'bottom': False, 'top': False}
+        self.get_block_on = {'left': False, 'right': False, 'top':False}
         self.air_time = 0
         self.disablePlayerInput = False
 
@@ -254,6 +256,7 @@ class PhysicsPlayer:
             if self.dict_kb["key_noclip"] == 1:
                 self.noclip = False
 
+
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -279,6 +282,11 @@ class PhysicsPlayer:
         # Acceleration factor: how fast we reach target speed
         # Lower = more slippery/weighty, Higher = snappier
         accel = 0.15 if self.is_on_floor() else 0.1
+
+        # Deceleration in case speed in higher than self.SPEED (dash for example)
+        if abs(self.velocity[0]) > self.SPEED:
+            accel = 0.2
+
 
         if direction != 0:
             # Gradually move current velocity toward target speed
@@ -408,9 +416,9 @@ class PhysicsPlayer:
             if self.can_walljump["available"]:
                 if self.acceleration[1] == 0.42:
                     self.velocity[1] = 0
-                self.acceleration[1] = 0.1
+                self.acceleration[1] = 0.05 # gravity acceleration while sliding (on wall)
             else:
-                self.acceleration[1] = 0.42
+                self.acceleration[1] = 0.42 # Normal gravity acceleration
             self.velocity[1] = min(7, self.velocity[1] + self.acceleration[1])
         elif self.is_on_floor():
             if self.velocity[1] > 0:
@@ -451,9 +459,10 @@ class PhysicsPlayer:
             # Jouer le son de wall jump
             self.play_sound('wall_jump', True)
 
-            if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall
-                self.velocity[0] = -self.can_walljump["wall"] * self.SPEED * 3
-                self.velocity[1] *= 1.18
+
+            if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
+                self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
+                self.velocity[1] *= 1
             else:  # Jumping away from the wall
                 self.velocity[0] = 0
                 if self.can_walljump["wall"] == 1:
@@ -508,7 +517,7 @@ class PhysicsPlayer:
             if not self.stop_dash_momentum["y"]:
                 self.velocity[1] = -self.dash_direction[1] * self.DASH_SPEED
             if self.dashtime_cur == 0:
-                self.velocity = [0, 0]
+                self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
 
         self.update_ghost_trail()
 
@@ -519,6 +528,7 @@ class PhysicsPlayer:
         tilemap = self.tilemap
         b_r = set()
         b_l = set()
+        b_t = set()
 
         # Handle Vertical Collision First
         if axe == "y":
@@ -533,22 +543,66 @@ class PhysicsPlayer:
             for rect in tilemap.physics_rects_under(self.pos, self.size) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     if self.velocity[1] > 0:
-                        self.pos[1] = rect.top - entity_rect.height
-                        self.velocity[1] = 0
-                        self.collision['bottom'] = True
-                        self.can_walljump["buffer"] = True
-                        self.can_walljump["available"] = False
+                        # --- GROUND CORNER CORRECTION ---
+                        # If falling and clipping a corner, try to nudge onto the ledge
+                        nudged = False
+                        for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
+                            # Check Right nudge
+                            if not any(
+                                    pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
+                                    for r in tilemap.physics_rects_under([self.pos[0] + i, self.pos[1]], self.size)):
+                                self.pos[0] += i
+                                nudged = True
+                                break
+                            # Check Left nudge
+                            if not any(
+                                    pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
+                                    for r in tilemap.physics_rects_under([self.pos[0] - i, self.pos[1]], self.size)):
+                                self.pos[0] -= i
+                                nudged = True
+                                break
+
+                        if not nudged:
+                            self.pos[1] = rect.top - entity_rect.height
+                            self.velocity[1] = 0
+                            self.collision['bottom'] = True
+                            self.can_walljump["buffer"] = True
+                            self.can_walljump["available"] = False
 
             for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     if self.velocity[1] < 0:
-                        self.pos[1] = rect.bottom
-                        self.velocity[1] = 0
-                        self.can_walljump["buffer"] = True
-                        self.can_walljump["available"] = False
+                        # If jumping and hitting a head-block corner, nudge to the side
+                        nudged = False
+                        for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
+                            # Try nudging Right
+                            if not any(
+                                    pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
+                                    for r in tilemap.physics_rects_around([self.pos[0] + i, self.pos[1]], self.size)):
+                                self.pos[0] += i
+                                nudged = True
+                                break
+                            # Try nudging Left
+                            if not any(
+                                    pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
+                                    for r in tilemap.physics_rects_around([self.pos[0] - i, self.pos[1]], self.size)):
+                                self.pos[0] -= i
+                                nudged = True
+                                break
+
+                        if not nudged:
+                            self.pos[1] = rect.bottom
+                            self.velocity[1] = 0
+                            self.collision['top'] = True
+                            self.can_walljump["buffer"] = True
+                            self.can_walljump["available"] = False
 
                     self.stop_dash_momentum["y"] = True
 
+                if entity_rect.y - self.size[1] < rect.y < entity_rect.y and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width:
+                    b_t.add(True)
+
+            self.get_block_on["top"] = bool(b_t)
             entity_rect.y -= backup_velo
 
         if axe == "x":
@@ -556,19 +610,39 @@ class PhysicsPlayer:
                 self.can_walljump["cooldown"] = max(self.can_walljump["cooldown"]-1,0)
             for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
-                    if self.velocity[0] > 0:
-                        entity_rect.right = rect.left
-                        self.collision['right'] = True
-                        self.anti_dash_buffer = True
-                        self.dash_cooldown = 5
+                    # --- HORIZONTAL CORNER CORRECTION ---
+                    # If hitting a wall, try to nudge the player Up or Down to bypass the corner
+                    nudged = False
+                    for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
+                        # 1. Try nudging UP (Useful for stepping onto a ledge automatically)
+                        if not any(
+                                pygame.Rect(self.pos[0], self.pos[1] - i, self.size[0], self.size[1]).colliderect(r) for
+                                r in tilemap.physics_rects_around([self.pos[0], self.pos[1] - i], self.size)):
+                            self.pos[1] -= i
+                            nudged = True
+                            break
+                        # 2. Try nudging DOWN (Useful for clearing a ceiling corner)
+                        if not any(
+                                pygame.Rect(self.pos[0], self.pos[1] + i, self.size[0], self.size[1]).colliderect(r) for
+                                r in tilemap.physics_rects_around([self.pos[0], self.pos[1] + i], self.size)):
+                            self.pos[1] += i
+                            nudged = True
+                            break
 
-                    if self.velocity[0] < 0:
-                        entity_rect.left = rect.right
-                        self.collision['left'] = True
-                        self.anti_dash_buffer = True
-                        self.dash_cooldown = 5
-                    self.pos[0] = entity_rect.x
-                    self.stop_dash_momentum["x"] = True
+                    if not nudged:
+                        if self.velocity[0] > 0:
+                            entity_rect.right = rect.left
+                            self.collision['right'] = True
+                            self.anti_dash_buffer = True
+                            self.dash_cooldown = 5
+
+                        if self.velocity[0] < 0:
+                            entity_rect.left = rect.right
+                            self.collision['left'] = True
+                            self.anti_dash_buffer = True
+                            self.dash_cooldown = 5
+                        self.pos[0] = entity_rect.x
+                        self.stop_dash_momentum["x"] = True
                 if entity_rect.x - self.size[0] < rect.x < entity_rect.x:
                     b_l.add(True)
                 if entity_rect.x + self.size[0] > rect.x > entity_rect.x:
@@ -597,6 +671,9 @@ class PhysicsPlayer:
             self.collision["right"] = False
         if self.velocity[1] > 0:
             self.collision["bottom"] = False
+        if self.velocity[1] < 0 or not self.get_block_on["top"]:
+            self.collision["top"] = False
+
         self.pos[0] += self.velocity[0]
         self.collision_check("x")
 

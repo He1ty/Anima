@@ -112,7 +112,7 @@ class Save:
             if "settings" in save_data:
                 volume = save_data["settings"].get("volume", 0.5)
                 set_game_volume(self.game, volume)
-                self.game.keyboard_layout = save_data["settings"].get("keyboard_layout", "qwerty")
+                self.game.keyboard_layout = save_data["settings"].get("keyboard_layout")
                 self.game.selected_language = save_data["settings"].get("language", "English")
                 if hasattr(self.game, "menu"):
                     self.game.menu.update_settings_from_game()

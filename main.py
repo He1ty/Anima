@@ -236,6 +236,7 @@ class Game:
 
         self.playtime = 0
         self.menu_time = 0
+
     def toggle_hitboxes(self):
         self.player.show_hitbox = not self.player.show_hitbox
         self.show_spikes_hitboxes = not self.show_spikes_hitboxes
@@ -265,7 +266,10 @@ class Game:
         """
         layout = self.keyboard_layout.lower()
         if layout == "azerty":
-            return {pygame.K_z: "key_up", pygame.K_s: "key_down", pygame.K_q: "key_left",
+            #return {pygame.K_z: "key_up", pygame.K_s: "key_down", pygame.K_q: "key_left",
+            #        pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
+            #        pygame.K_n: "key_noclip"}
+            return {pygame.K_w: "key_up", pygame.K_s: "key_down", pygame.K_a: "key_left",
                     pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
                     pygame.K_n: "key_noclip"}
         return {pygame.K_w: "key_up", pygame.K_s: "key_down", pygame.K_a: "key_left",
