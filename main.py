@@ -318,7 +318,7 @@ class Game:
         # Initial setup for enemies and interactive objects
         self.enemies = []
         for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 3)]):
-            if spawner['variant'] == 0:
+            if spawner['variant'] == 0 and self.current_checkpoint is None:
                 self.spawners[str(map_id)] = spawner["pos"].copy()
                 self.spawner_pos[str(map_id)] = spawner["pos"]
                 self.player.pos = spawner["pos"].copy()
@@ -383,18 +383,18 @@ class Game:
 
         if self.transition < 0: self.transition += 1
 
-
         # --- Teleportation & Checkpoints ---
         if self.teleporting: update_teleporter(self, self.tp_id)
 
         for checkpoint in self.checkpoints:
             pos = checkpoint["pos"]
-            if pos[0] <= self.player.pos[0] <= pos[0] + 16 and self.current_checkpoint != checkpoint:
+            if pos[0] <= self.player.pos[0] <= pos[0] + 16 and pos[1] >= self.player.pos[1] >= pos[1] - 16 and self.current_checkpoint != checkpoint:
                 self.current_checkpoint = checkpoint
                 if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
                     continue
                 self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
                 save_game(self, self.current_slot)
+                print('checkpoint set')
 
 
         # Define respawn point based on current section or checkpoint

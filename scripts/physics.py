@@ -10,6 +10,7 @@ import pygame
 from time import sleep
 
 import random
+import math
 
 from scripts.particle import Particle
 from scripts.tilemap import Tilemap
@@ -449,7 +450,7 @@ class PhysicsPlayer:
                 self.dashtime_cur = 0
                 self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
                 self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
-                self.velocity[1] /= self.tech_momentum_mult
+                self.velocity[1] = self.velocity[1]/self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
         elif self.dict_kb["key_jump"] == 1 and self.can_walljump["available"] == True and not self.holding_jump and \
                 self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
@@ -508,14 +509,20 @@ class PhysicsPlayer:
                 self.anti_dash_buffer = False
 
     def dash_momentum(self):
-        """Applies momentum from dash. Deletes all momentum when the dash ends."""
+        """Applies momentum from dash. Manage momentum when dash ends."""
         if self.dashtime_cur > 0:
             self.dash_ghost_trail()
             self.dashtime_cur -= 1
-            if not self.stop_dash_momentum["x"]:
-                self.velocity[0] = self.dash_direction[0] * self.DASH_SPEED
-            if not self.stop_dash_momentum["y"]:
-                self.velocity[1] = -self.dash_direction[1] * self.DASH_SPEED
+            move_x = self.dash_direction[0]
+            move_y = -self.dash_direction[1]
+
+            # Calculate the magnitude (length) of the direction
+            magnitude = math.sqrt(move_x ** 2 + move_y ** 2)
+
+            if magnitude > 0:
+                # Divide by magnitude to "normalize" the vector to a length of 1
+                self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
+                self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
             if self.dashtime_cur == 0:
                 self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
 
@@ -653,12 +660,12 @@ class PhysicsPlayer:
 
     def collision_check_walljump_helper(self,axis):
         """Avoids redundancy"""
-        if not self.can_walljump["buffer"] and self.velocity[1] > 0 and not self.is_on_floor() and self.can_walljump["blocks_around"]:
+        if not self.can_walljump["buffer"] and self.velocity[1] > 0 and not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"]):
             if not self.can_walljump["available"]:
                 self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
             self.can_walljump["available"] = True
             self.can_walljump["wall"] = axis
-            self.can_walljump["timer"] = 16
+            self.can_walljump["timer"] = 2
 
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
