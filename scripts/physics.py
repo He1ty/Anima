@@ -655,13 +655,13 @@ class PhysicsPlayer:
                         if self.velocity[0] > 0:
                             entity_rect.right = rect.left
                             self.collision['right'] = True
-                            self.anti_dash_buffer = True
+                            #self.anti_dash_buffer = True
                             self.dash_cooldown = 5
 
                         if self.velocity[0] < 0:
                             entity_rect.left = rect.right
                             self.collision['left'] = True
-                            self.anti_dash_buffer = True
+                            #self.anti_dash_buffer = True
                             self.dash_cooldown = 5
                         self.pos[0] = entity_rect.x
                         self.stop_dash_momentum["x"] = True
