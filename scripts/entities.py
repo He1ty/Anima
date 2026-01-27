@@ -399,18 +399,25 @@ class Throwable(PhysicsEntity):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
 class DamageBlock:
-    def __init__(self, game, pos, size):
+    def __init__(self, game, pos, size, hitbox_type='', rotation=0):
         # Initialize a block that damages the player on contact
         self.pos = pos
         self.size = size
         self.last_attack_time = 0
         self.game = game
+        self.type = hitbox_type
+        self.rotation = rotation
 
     def rect(self):
         # Return collision rectangle
         r = pygame.Rect(self.pos[0], self.pos[1],
                         self.size.get_width(), self.size.get_height())
-        return r.inflate(-r.width / 2, -r.height / 2)
+
+        if self.type == 'spike':
+            r = r.inflate(-r.width / (2 - 0.6*abs(math.cos(self.rotation*math.pi/2))), -r.height / (2 - 0.6*abs(math.sin(self.rotation*math.pi/2))))
+            r.y += (self.size.get_height()/4) * math.cos(self.rotation*math.pi/2)
+            r.x -= (self.size.get_height()/4) * math.sin(self.rotation*math.pi/2)
+        return r
 
     def render(self, surf, offset=(0, 0)):
         # Draw the damage block on screen

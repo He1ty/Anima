@@ -258,9 +258,6 @@ class PhysicsPlayer:
             if self.dict_kb["key_noclip"] == 1:
                 self.noclip = False
 
-        print(self.can_walljump["cooldown"])
-
-
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:

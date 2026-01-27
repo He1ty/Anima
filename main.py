@@ -298,7 +298,7 @@ class Game:
             spike_types += [("spikes", n), ("bloody_spikes", n), ("big_spikes", n), ("big_bloody_spikes", n)]
 
         for spike in self.tilemap.extract(spike_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]]))
+            self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]], hitbox_type='spike', rotation=spike["rotation"]))
 
         # --- Objects & Particles ---
         self.throwable = []

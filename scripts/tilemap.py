@@ -202,5 +202,7 @@ class Tilemap:
                         img = self.game.assets[tile['type']][tile['variant']].copy()
                         img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity),
                                  special_flags=BLEND_RGBA_MULT)
+                        if 'rotation' in tile:
+                            img = pygame.transform.rotate(img, tile['rotation'] * -90)
                         surf.blit(img, (
                             tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))

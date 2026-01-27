@@ -295,6 +295,9 @@ class Editor:
         self.showing_properties_window = False
         self.get_activators()
 
+        #Block rotation (for spikes)
+        self.rotation = 0
+
         self.selecting_dest_pos = False
         self.return_to_level = 0
         self.waiting_for_click_release = False
@@ -921,6 +924,8 @@ class Editor:
             if not self.window_mode:
                 if not self.edit_properties_mode_on:
                     if self.ongrid:
+                        if 'spike' in self.tile_list[self.tile_group]:
+                            current_tile_img = pygame.transform.rotate(current_tile_img, self.rotation * -90)
                         self.display.blit(current_tile_img, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
                                                              tile_pos[1] * self.tilemap.tile_size - self.scroll[1]))
                     else:
@@ -999,6 +1004,12 @@ class Editor:
                             [("spawners", 0)], keep=True):
 
                         print("Player spawner already placed in this map")
+                    elif "spike" in self.tile_list[self.tile_group] :
+                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': self.tile_list[self.tile_group],
+                            'variant': self.tile_variant,
+                            'pos': tile_pos,
+                            'rotation': self.rotation}
                     else:
                         self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
                             'type': self.tile_list[self.tile_group],
@@ -1156,6 +1167,8 @@ class Editor:
                         }
                         self.save_action()
                     # Shortcut for placing portals
+                    if event.key == pygame.K_r:
+                        self.rotation = (self.rotation + 1)%4
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_i:
