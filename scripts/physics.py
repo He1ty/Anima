@@ -637,14 +637,14 @@ class PhysicsPlayer:
                         if not any(
                                 pygame.Rect(self.pos[0], self.pos[1] - i, self.size[0], self.size[1]).colliderect(r) for
                                 r in tilemap.physics_rects_around([self.pos[0], self.pos[1] - i], self.size)):
-                            self.pos[1] -= i
+                            self.pos[1] = round(self.pos[1] - i)
                             nudged = True
                             break
                         # 2. Try nudging DOWN (Useful for clearing a ceiling corner)
                         if not any(
                                 pygame.Rect(self.pos[0], self.pos[1] + i, self.size[0], self.size[1]).colliderect(r) for
                                 r in tilemap.physics_rects_around([self.pos[0], self.pos[1] + i], self.size)):
-                            self.pos[1] += i
+                            self.pos[1] = round(self.pos[1] + i)
                             nudged = True
                             break
 
