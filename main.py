@@ -113,6 +113,7 @@ class Game:
             'empty_heart': load_image('empty_heart.png', (16, 16)),
             'glorbo_projectile': load_image('projectiles/glorbo_projectile.png', (16, 16)),
             'missile': load_image('projectiles/missile.png', (16, 16)),
+            'checkpoint': Animation(load_images('checkpoint'))
         }
 
         # Dynamically load assets from folders using helper functions
