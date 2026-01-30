@@ -70,12 +70,17 @@ class Tilemap:
                 return True
         return False
 
-    def under_offset(self, size):
+    def under_offset(self, size, gravity_dir):
         u_offset = []
-        tiles_x = round_up(size[0] / self.tile_size)
-        tiles_y = round_up(size[1] / self.tile_size)
-        for x in range(-1, tiles_x + 1):
-            for y in range(tiles_y, tiles_y+1):
+        tiles_x = round_up(size[0] / self.tile_size) + 1
+        tiles_y = round_up(size[1] / self.tile_size) + gravity_dir
+        if gravity_dir == 1:
+            r = range(tiles_y - 1, tiles_y)
+        elif gravity_dir == -1:
+            r = range(tiles_y - 1, tiles_y)
+
+        for x in range(-1, tiles_x):
+            for y in r:
                 u_offset.append((x, y))
         return u_offset
 
@@ -94,10 +99,10 @@ class Tilemap:
                 tiles.append(self.tilemap[check_loc])
         return tiles
 
-    def tiles_under(self, pos, size):
+    def tiles_under(self, pos, size, gravity_dir):
         u_tiles = []
         u_tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1]+size[0]/2) // self.tile_size))
-        for offset in self.under_offset(size):
+        for offset in self.under_offset(size, gravity_dir):
             check_loc = str(u_tile_loc[0] + offset[0]) + ';' + str(u_tile_loc[1] + offset[1])
             if self.show_collisions:
                 pygame.draw.rect(self.game.display, (0, 0, 255),
@@ -147,16 +152,16 @@ class Tilemap:
             elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
                 return self.tilemap[tile_loc]
 
-    def physics_rects_around(self, pos, size):
+    def physics_rects_around(self, pos, size, gravity_dir=1):
         rects = []
         for tile in self.tiles_around(pos, size):
             if tile['type'] in PHYSICS_TILES:
                 rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
         return rects
 
-    def physics_rects_under(self, pos, size):
+    def physics_rects_under(self, pos, size, gravity_dir):
         u_rects = []
-        for tile in self.tiles_under(pos, size):
+        for tile in self.tiles_under(pos, size, gravity_dir):
             if tile['type'] in PHYSICS_TILES:
                 u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
             elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
