@@ -113,7 +113,8 @@ class Game:
             'empty_heart': load_image('empty_heart.png', (16, 16)),
             'glorbo_projectile': load_image('projectiles/glorbo_projectile.png', (16, 16)),
             'missile': load_image('projectiles/missile.png', (16, 16)),
-            'checkpoint': Animation(load_images('checkpoint'))
+            'checkpoint/1': Animation(load_images('checkpoint/activated'), img_dur=10),
+            'checkpoint/0': load_images('checkpoint/deactivated')
         }
 
         # Dynamically load assets from folders using helper functions
@@ -389,6 +390,18 @@ class Game:
 
         for checkpoint in self.checkpoints:
             pos = checkpoint["pos"]
+            if self.current_checkpoint == checkpoint:
+                checkpoint["state"] = 1
+                animation = self.assets['checkpoint/1'].copy()
+                if "frame" in checkpoint:
+                    animation.frame = checkpoint["frame"]
+                animation.update()
+                checkpoint["frame"] = animation.frame
+                self.display.blit(animation.img(), (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
+                continue
+            checkpoint["state"] = 0
+            img = self.assets['checkpoint/0'].copy()[0]
+            self.display.blit(img, (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
             if pos[0] <= self.player.pos[0] <= pos[0] + 16 and pos[1] >= self.player.pos[1] >= pos[1] - 16 and self.current_checkpoint != checkpoint:
                 self.current_checkpoint = checkpoint
                 if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
@@ -396,6 +409,8 @@ class Game:
                 self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
                 save_game(self, self.current_slot)
                 print('checkpoint set')
+
+
 
 
         # Define respawn point based on current section or checkpoint

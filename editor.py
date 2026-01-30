@@ -191,7 +191,7 @@ class Editor:
             'spawners': load_images('spawners'),
             'transition': load_images('transition'),
             'throwable': load_images('entities/elements/blue_rock/intact'),
-            'checkpoint': load_images('checkpoint')
+            'checkpoint': load_images('checkpoint/deactivated')
         }
 
         self.level_manager = LevelManager(self)
@@ -1163,7 +1163,8 @@ class Editor:
                         self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
                             'type': "checkpoint",
                             'variant': 0,
-                            'pos': tile_pos
+                            'pos': tile_pos,
+                            'state': 0
                         }
                         self.save_action()
                     # Shortcut for placing portals
