@@ -41,10 +41,14 @@ class PhysicsPlayer:
 
         self.COLLISION_DODGED_PIXELS = 4 # Number of pixels collision can dodge (ledge snapping/corner correction)
 
+        self.dash_max_amt = 1
+
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
-        self.dash_cooldown = 0
-        self.dash_amt = 1
+
+        #self.dash_cooldown = 0
+
+        self.dash_amt = self.dash_max_amt
         self.tech_momentum_mult = 0
 
         # Direction vars
@@ -58,7 +62,8 @@ class PhysicsPlayer:
         self.stop_dash_momentum = {"y": False, "x": False}
         self.holding_jump = False
         self.can_walljump = {"sliding": False, "wall": -1, "buffer": False, "timer": 0, "blocks_around": False,
-                             "cooldown": 0, "allowed": True, "available": False}
+                             "cooldown": 0, "allowed": True, "available": False, "count":0}
+        self.max_walljumps = 3
         self.force_movement_direction = {"r":[False,0],"l":[False,0]}
         self.force_movement = ""
         
@@ -421,11 +426,16 @@ class PhysicsPlayer:
         """Handles gravity. Gives downwards momentum (capped at 5) if in the air, negates momentum if on the ground, gives back a dash if the
         player is missing some. Stops movement if no input is given."""
         if not self.is_on_floor() and not self.dashtime_cur > 0:
+            # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
-                # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
-                self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
+                if self.acceleration[1] == 0.42:
+                    self.velocity[1] = 0
+                if self.can_walljump["count"] < self.max_walljumps - 1:
+                    self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
+                else:
+                    self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (on wall)
             else:
-                self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION
+                self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION # Normal gravity acceleration
 
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
@@ -440,8 +450,13 @@ class PhysicsPlayer:
            (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
                 self.velocity[1] = 0
 
+
+            #Resets dash amount and walljump count
             if self.dashtime_cur < 5 and self.dash_amt == 0:
-                self.dash_amt = 1
+                self.dash_amt = self.dash_max_amt
+
+            self.can_walljump["count"] = 0
+
             # Stop unintended horizontal movement if no input is given
             if self.get_direction("x") == 0 and not self.is_stunned:
                 self.velocity[0] = 0
@@ -482,12 +497,13 @@ class PhysicsPlayer:
                     # Jouer le son de wall jump
                     self.play_sound('wall_jump', True)
 
-                    if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
+                    if self.can_walljump["wall"] == self.get_direction("x") :  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
                         self.velocity[1] *= 1
                     else:  # Jumping away from the wall
                         self.wall_jump_logic_helper()
 
+                    self.can_walljump["count"] += 1
                     self.can_walljump["sliding"] = False
 
                 else:
@@ -678,13 +694,13 @@ class PhysicsPlayer:
                             entity_rect.right = rect.left
                             self.collision['right'] = True
                             #self.anti_dash_buffer = True
-                            self.dash_cooldown = 5
+                            #self.dash_cooldown = 5
 
                         if self.velocity[0] < 0:
                             entity_rect.left = rect.right
                             self.collision['left'] = True
                             #self.anti_dash_buffer = True
-                            self.dash_cooldown = 5
+                            #self.dash_cooldown = 5
                         self.pos[0] = entity_rect.x
                         self.stop_dash_momentum["x"] = True
                 if entity_rect.x - self.size[0] < rect.x < entity_rect.x:
@@ -697,7 +713,8 @@ class PhysicsPlayer:
 
     def collision_check_walljump_helper(self,axis):
         """Avoids redundancy"""
-        if not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"]):
+        if (not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and
+                not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"]) and self.can_walljump["count"] < self.max_walljumps):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
             self.can_walljump["sliding"] = True
@@ -813,6 +830,18 @@ class PhysicsPlayer:
 
         if self.GRAVITY_DIRECTION == -1:
             img = pygame.transform.flip(img, False, True)
+
+        if self.can_walljump['count'] >= 1:
+            # Create a red surface the same size as the image
+            red_mask = pygame.Surface(img.get_size()).convert_alpha()
+
+            # Update color depending on fatigue level (based on walljump count)
+            removal_factor = 255 * ((self.can_walljump["count"]-1)/self.max_walljumps)
+            color = (0, removal_factor, removal_factor, 0)
+            red_mask.fill(color)
+
+            # It keeps the alpha channel of the original sprite so only the player turns red.
+            img.blit(red_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
 
         if self.rotation_angle != 0:
             # Rotate the image

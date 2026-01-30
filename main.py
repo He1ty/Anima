@@ -411,8 +411,6 @@ class Game:
                 print('checkpoint set')
 
 
-
-
         # Define respawn point based on current section or checkpoint
         if self.current_checkpoint is None:
             for section in self.sections.keys():
@@ -462,10 +460,6 @@ class Game:
                 enemy.set_action("death")
                 if enemy.animation.done: self.enemies.remove(enemy)
 
-        for spike_hitbox in self.spikes:
-            if self.player.rect().colliderect(spike_hitbox.rect()) and not self.player.noclip:
-                deal_dmg(self, spike_hitbox, "player", 200, 0.5)
-
         # 5. Player & Physics
         attacking_update(self)
         self.player.physics_process(self.tilemap, self.dict_kb)
@@ -475,10 +469,13 @@ class Game:
             o.update(self.tilemap, (0, 0))
             o.render(self.display, offset=render_scroll)
 
-        # 6. Foreground & Lighting
-        if self.show_spikes_hitboxes:
-            for spike_hitbox in self.spikes:
+        for spike_hitbox in self.spikes:
+            if self.player.rect().colliderect(spike_hitbox.rect()) and not self.player.noclip:
+                deal_dmg(self, spike_hitbox, "player", 200, 0.5)
+            if self.show_spikes_hitboxes:
                 spike_hitbox.render(self.display, offset=render_scroll)
+
+        # 6. Foreground & Lighting
         display_level_fg(self, self.level)
         apply_lighting(self, render_scroll)
 
