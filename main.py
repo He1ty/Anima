@@ -158,6 +158,7 @@ class Game:
         self.level = 0
         self.default_level = self.level
 
+        self.active_checkpoint_anim = None
 
         self.activators = []
         self.projectiles = []
@@ -392,20 +393,37 @@ class Game:
 
         for checkpoint in self.checkpoints:
             pos = checkpoint["pos"]
+
             if self.current_checkpoint == checkpoint:
                 checkpoint["state"] = 1
-                animation = self.assets['checkpoint/1'].copy()
-                if "frame" in checkpoint:
-                    animation.frame = checkpoint["frame"]
-                animation.update()
-                checkpoint["frame"] = animation.frame
-                self.display.blit(animation.img(), (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
+
+                # 1. Only create the animation object if we haven't already!
+                if self.active_checkpoint_anim is None:
+                    self.active_checkpoint_anim = self.assets['checkpoint/1'].copy()
+                    # Restore the frame from data if it exists (for loading saves)
+                    if "frame" in checkpoint:
+                        self.active_checkpoint_anim.frame = checkpoint["frame"]
+
+                # 2. Update the PERSISTENT animation object
+                self.active_checkpoint_anim.update()
+
+                # 3. Sync the frame number back to the dict (so saving still works)
+                checkpoint["frame"] = self.active_checkpoint_anim.frame
+
+                # 4. Render using the persistent object
+                self.display.blit(self.active_checkpoint_anim.img(),
+                                  (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
                 continue
+
             checkpoint["state"] = 0
             img = self.assets['checkpoint/0'].copy()[0]
             self.display.blit(img, (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
-            if pos[0] <= self.player.pos[0] <= pos[0] + 16 and pos[1] >= self.player.pos[1] >= pos[1] - 16 and self.current_checkpoint != checkpoint:
+            if (pos[0] <= self.player.pos[0] <= pos[0] + 16 and
+                    pos[1] >= self.player.pos[1] >= pos[1] - 16 and
+                    self.current_checkpoint != checkpoint):
+
                 self.current_checkpoint = checkpoint
+
                 if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
                     continue
                 self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
