@@ -7,7 +7,7 @@ import json
 BASE_IMG_PATH = "assets/images/"
 
 def load_image(path, size=None):#Takes a path and load the coresponding image. Can resize the image if size given
-    img = pygame.image.load(BASE_IMG_PATH + path)
+    img = pygame.image.load(BASE_IMG_PATH + path).convert_alpha()
     img.set_colorkey((0, 0, 0))
     if size:
         img = pygame.transform.scale(img, size)  # Resize image if size is provided

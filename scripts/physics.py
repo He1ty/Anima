@@ -264,6 +264,8 @@ class PhysicsPlayer:
             if self.dict_kb["key_noclip"] == 1:
                 self.noclip = False
 
+        #print(self.can_walljump["wall"])
+
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -429,9 +431,10 @@ class PhysicsPlayer:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
                 if self.acceleration[1] == 0.42:
-                    self.velocity[1] = 0
+                    self.velocity[1] = max(0, self.velocity[1] - 1.5)
                 if self.can_walljump["count"] < self.max_walljumps - 1:
-                    self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
+                    if self.velocity[1] == 0:
+                        self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
                 else:
                     self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (on wall)
             else:
@@ -713,6 +716,7 @@ class PhysicsPlayer:
 
     def collision_check_walljump_helper(self,axis):
         """Avoids redundancy"""
+        #The condition checks if there is no buffer, if player is falling, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
         if (not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and
                 not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"]) and self.can_walljump["count"] < self.max_walljumps):
             if not self.can_walljump["sliding"]:
@@ -720,11 +724,13 @@ class PhysicsPlayer:
             self.can_walljump["sliding"] = True
             self.can_walljump["wall"] = axis
             self.can_walljump["timer"] = 2
+        elif self.can_walljump["wall"] != axis:
+            self.can_walljump["wall"] = axis
 
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
-        self.can_walljump["blocks_around"] = (self.tilemap.solid_check((self.rect().centerx + 11*self.last_direction, self.rect().centery)) and
-                                              self.tilemap.solid_check((self.rect().centerx + 11*self.last_direction, self.rect().centery + self.size[1])))
+        self.can_walljump["blocks_around"] = (self.tilemap.solid_check((self.rect().centerx + 9*self.last_direction, self.rect().y + 2)) or
+                                              self.tilemap.solid_check((self.rect().centerx + 9*self.last_direction, self.rect().bottom - 2)))
 
         if int(self.velocity[0]) > 0 or not self.get_block_on["left"]:
             self.collision["left"] = False
