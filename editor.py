@@ -6,7 +6,7 @@ import shutil
 import copy
 
 # Assuming these exist in your project structure
-from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators
+from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators, load_pickups
 from scripts.tilemap import Tilemap
 from scripts.button import Button
 from scripts.activators import load_activators_actions
@@ -191,7 +191,7 @@ class Editor:
             'spawners': load_images('spawners'),
             'transition': load_images('transition'),
             'throwable': load_images('entities/elements/blue_rock/intact'),
-            'checkpoint': load_images('checkpoint/deactivated')
+            'checkpoint': load_images('checkpoint/deactivated'),
         }
 
         self.level_manager = LevelManager(self)
@@ -235,6 +235,7 @@ class Editor:
         self.assets = self.base_assets | load_tiles(self.get_environment(self.level))
         self.assets.update(load_doors('editor', self.get_environment(self.level)))
         self.assets.update(load_activators(self.get_environment(self.level)))
+        self.assets.update(load_pickups())
         self.get_categories()
 
         self.category_changed = False
@@ -811,6 +812,7 @@ class Editor:
         self.categories["Doors"] = load_doors('editor', self.get_environment(self.level))
         self.categories["Activators"] = load_activators(self.get_environment(self.level))
         self.categories["Entities"] = self.base_assets["spawners"].copy()
+        self.categories["Pickups"] = load_pickups()
         self.current_category = 0
         self.current_category_name = list(self.categories.keys())[self.current_category]
 
@@ -861,6 +863,7 @@ class Editor:
         self.display.fill((0, 0, 0))
 
         current_sidebar_width = 0 if self.selecting_dest_pos else SIDEBAR_WIDTH
+
 
         self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
         self.scroll[1] += (self.movement[3] - self.movement[2]) * 8

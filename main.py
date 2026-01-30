@@ -124,6 +124,7 @@ class Game:
         self.assets.update(load_entities(self.e_info))
         self.assets.update(load_player())
         self.assets.update(load_backgrounds(self.b_info))
+        self.assets.update(load_pickups())
 
         # --- Map Object Caching ---
         # Pre-loads and pairs interactive objects for efficient lookup during level loading
@@ -293,6 +294,7 @@ class Game:
 
         # --- Checkpoints & Traps ---
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
+        self.pickups = self.tilemap.extract([("doubledashball", 0)])
 
         self.spikes = []
         spike_types = []
@@ -408,7 +410,14 @@ class Game:
                     continue
                 self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
                 save_game(self, self.current_slot)
-                print('checkpoint set')
+
+        for ball in self.pickups:
+            img = self.assets[ball["type"]].copy()[0]
+            rect = pygame.Rect(ball["pos"][0], ball["pos"][1], 16, 16)
+            self.display.blit(img, (ball["pos"][0] - render_scroll[0], ball["pos"][1] - render_scroll[1]))
+            if rect.colliderect(self.player.rect().inflate(0, 0)):
+                self.player.dash_amt = 2
+                self.pickups.remove(ball)
 
 
         # Define respawn point based on current section or checkpoint
@@ -419,7 +428,6 @@ class Game:
                         self.spawn_point = {"pos": self.spawner_pos[str(section)], "level": section}
                     except KeyError:
                         pass
-
 
         self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
 

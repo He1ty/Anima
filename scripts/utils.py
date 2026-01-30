@@ -79,6 +79,12 @@ def load_activators(env=None):
                 pass
     return tiles
 
+def load_pickups():
+    pickups = {}
+    for pickup in sorted(os.listdir(BASE_IMG_PATH + 'pickups')):
+        pickups[pickup] = load_images('pickups/doubledashball')
+    return pickups
+
 def load_backgrounds(b_info):
     tiles = {}
     for environment in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/')):
