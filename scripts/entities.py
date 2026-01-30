@@ -3,6 +3,8 @@ import pygame
 import random
 import math
 
+from pygame.transform import rotate
+
 from scripts.display import update_light
 
 
@@ -406,17 +408,30 @@ class DamageBlock:
         self.last_attack_time = 0
         self.game = game
         self.type = hitbox_type
-        self.rotation = rotation
+        self.rotation = (rotation - 1) % 4
 
     def rect(self):
         # Return collision rectangle
-        r = pygame.Rect(self.pos[0], self.pos[1],
-                        self.size.get_width(), self.size.get_height())
 
         if self.type == 'spike':
-            r = r.inflate(-r.width / (2 - 0.6*abs(math.cos(self.rotation*math.pi/2))), -r.height / (2 - 0.6*abs(math.sin(self.rotation*math.pi/2))))
-            r.y += (self.size.get_height()/4) * math.cos(self.rotation*math.pi/2)
-            r.x -= (self.size.get_height()/4) * math.sin(self.rotation*math.pi/2)
+            width = 8
+            height = 3
+            angle = self.rotation*math.pi/2
+            if self.rotation % 2 == 0:
+                width, height = height, width
+                pos = (self.pos[0] + (self.size.get_width() - width) / 2 - math.cos(angle) * (
+                            self.size.get_width() - width) / 2, self.pos[1] + (self.size.get_height() - height) / 2
+                       )
+            else:
+                pos = (self.pos[0] + (self.size.get_width() - width) / 2,
+                       self.pos[1] + ((self.size.get_height() - height) / 2) - math.sin(angle) * (self.size.get_height() - height) / 2
+                       )
+
+            r = pygame.Rect(pos[0], pos[1],
+                            width, height)
+
+
+
         return r
 
     def render(self, surf, offset=(0, 0)):
