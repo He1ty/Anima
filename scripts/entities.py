@@ -519,6 +519,7 @@ def kill_player(game, screen, spawn_pos, spawn_level, animation=True):
     game.level = spawn_level
     game.load_level(spawn_level, transition_effect=animation)
     update_light(game)
+    game.player.dashtime_cur = 0
     game.player.pos[0] = spawn_pos[0]
     game.player.pos[1] = spawn_pos[1]
 

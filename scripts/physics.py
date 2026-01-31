@@ -184,7 +184,6 @@ class PhysicsPlayer:
                             "key_noclip": 0}
             # Consider all keys as not pressed
 
-
         if self.is_stunned:
             # Calculate time since stun started
             stun_elapsed = time.time() - self.last_stun_time
@@ -263,8 +262,6 @@ class PhysicsPlayer:
 
             if self.dict_kb["key_noclip"] == 1:
                 self.noclip = False
-
-        #print(self.can_walljump["wall"])
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -461,7 +458,7 @@ class PhysicsPlayer:
             self.can_walljump["count"] = 0
 
             # Stop unintended horizontal movement if no input is given
-            if self.get_direction("x") == 0 and not self.is_stunned:
+            if self.get_direction("x") == 0 and not self.is_stunned and self.dashtime_cur == 0:
                 self.velocity[0] = 0
 
     def disallow_movement(self,bool):
@@ -729,8 +726,8 @@ class PhysicsPlayer:
 
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
-        self.can_walljump["blocks_around"] = (self.tilemap.solid_check((self.rect().centerx + 9*self.last_direction, self.rect().y + 2)) or
-                                              self.tilemap.solid_check((self.rect().centerx + 9*self.last_direction, self.rect().bottom - 2)))
+        self.can_walljump["blocks_around"] = (self.tilemap.solid_check((self.rect().centerx + 8.5*self.last_direction, self.rect().y + 2), transparent_check=False) or
+                                              self.tilemap.solid_check((self.rect().centerx + 8.5*self.last_direction, self.rect().bottom - 2), transparent_check=False))
 
         if int(self.velocity[0]) > 0 or not self.get_block_on["left"]:
             self.collision["left"] = False
@@ -760,7 +757,7 @@ class PhysicsPlayer:
             if self.is_on_floor():
                 self.air_time = 0
                 # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)
-                if self.get_direction("x") == 0:
+                if self.get_direction("x") == 0 and self.dashtime_cur == 0:
                     self.velocity[0] *= 0.8
             else:
                 # Air resistance/deceleration when not pressing anything in air

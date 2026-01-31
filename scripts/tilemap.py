@@ -143,13 +143,13 @@ class Tilemap:
             if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
                 tile['variant'] = AUTOTILE_MAP[neighbors]
 
-    def solid_check(self, pos):
+    def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))
         if tile_loc in self.tilemap:
             tile = self.tilemap[tile_loc]
             if tile["type"] in PHYSICS_TILES:
                 return self.tilemap[tile_loc]
-            elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
+            elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
                 return self.tilemap[tile_loc]
 
     def physics_rects_around(self, pos, size, gravity_dir=1):
