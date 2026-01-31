@@ -512,6 +512,11 @@ class Game:
             door.render(self.display, offset=render_scroll)
             if not door.opened:
                 ds.append(door.rect())
+                if self.player.show_hitbox:
+                    k = door.rect().copy()
+                    k.x -= render_scroll[0]
+                    k.y -= render_scroll[1]
+                    pygame.draw.rect(self.display, (255, 0, 0), k, 1)
         self.doors_rects = ds
 
         # 7. VFX (Sparks/Particles)

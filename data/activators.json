@@ -1,6 +1,16 @@
 {
     "0": {
-        "levers": {},
+        "levers": {
+            "0": {
+                "type": "visual_and_door",
+                "pos": [
+                    2,
+                    94
+                ],
+                "visual_duration": 3,
+                "door_id": 0
+            }
+        },
         "teleporters": {},
         "buttons": {}
     },
