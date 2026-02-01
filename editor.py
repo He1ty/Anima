@@ -79,6 +79,7 @@ class LevelManager:
         self.editor.assets = self.editor.base_assets | load_tiles(new_env)
         self.editor.assets.update(load_doors('editor', new_env))
         self.editor.assets.update(load_activators(new_env))
+        self.editor.assets.update(load_pickups())
 
         # ... (rest of function: update tile_list, ids, etc) ...
         self.editor.tile_list = list(self.editor.assets)
@@ -90,6 +91,7 @@ class LevelManager:
         self.editor.tile_variant = 0
         self.editor.get_categories()
         self.editor.get_activators()
+
 
         self.editor.history = []
         self.editor.history_index = -1

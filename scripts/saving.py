@@ -127,9 +127,9 @@ class Save:
             if "player" in save_data:
                 if "position" in save_data["player"]:
                     self.game.player.pos = save_data["player"]["position"]
+                    self.game.scroll = [self.game.player.pos[0] - self.game.display.get_width()/2, self.game.player.pos[1] - self.game.display.get_height()]
                 if "spawn_point" in save_data["player"]:
                     self.game.spawn_point = save_data["player"]["spawn_point"]
-
             self.game.playtime = save_data["playtime"]
 
             print(f"Game loaded successfully from {save_path}")

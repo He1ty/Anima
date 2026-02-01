@@ -96,7 +96,7 @@ class Game:
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to per level
         self.scroll_limits = {
-            0: {"x": (16, 1680), "y": (-112, 10000)},
+            0: {"x": (16, 1680), "y": (-112, 1744)},
             1: {"x": (-48, 16), "y": (-1000, 400)},
             2: {"x": (-48, 280), "y": (-192, -80)},
             3: {"x": (16, 190400), "y": (0, 20000000)},
@@ -323,17 +323,21 @@ class Game:
         # Initial setup for enemies and interactive objects
         self.enemies = []
         for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 3)]):
-            if spawner['variant'] == 0 and self.current_checkpoint is None:
-                self.spawners[str(map_id)] = spawner["pos"].copy()
-                self.spawner_pos[str(map_id)] = spawner["pos"]
-                self.player.pos = spawner["pos"].copy()
-                self.spawn_point = {"pos": spawner["pos"].copy(), "level": map_id}
+            if spawner['variant'] == 0:
+                if self.current_checkpoint is None:
+                    self.spawners[str(map_id)] = spawner["pos"].copy()
+                    self.spawner_pos[str(map_id)] = spawner["pos"]
+                    self.player.pos = spawner["pos"].copy()
+                    self.spawn_point = {"pos": spawner["pos"].copy(), "level": map_id}
             elif spawner['variant'] == 1:
                 self.enemies.append(Enemy(self, "picko", spawner['pos'], (16, 16), 100,
                                           {"attack_distance": 20, "attack_dmg": 10, "attack_time": 1.5}))
             elif spawner['variant'] == 3:
                 self.enemies.append(DistanceEnemy(self, "glorbo", spawner['pos'], (16, 16), 100,
                                                   {"attack_distance": 100, "attack_dmg": 10, "attack_time": 1.5}))
+
+        if self.current_checkpoint is not None:
+            self.player.pos = self.current_checkpoint["pos"]
 
         self.activators = []
         for activator in self.tilemap.extract(self.levers_id_pairs + self.buttons_id_pairs + self.tp_id_pairs):
@@ -350,7 +354,11 @@ class Game:
                 Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))
 
         self.transitions = self.tilemap.extract([("transition", 0)])
-        self.scroll = [self.player.pos[0], self.player.pos[1]]
+
+
+        #Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
+        if not hasattr(self, "scroll"):
+            self.scroll = [self.player.pos[0] - self.display.get_width()/2 , self.player.pos[1] - self.display.get_height()/2]
 
         # Reset VFX and interaction pools
         self.interactable = self.throwable.copy() + self.activators.copy()
@@ -366,6 +374,7 @@ class Game:
         The core gameplay loop. Handles physics, collision, rendering order,
         entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
         """
+
         update_camera(self)
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
 
@@ -554,7 +563,7 @@ class Game:
                 if event.key == pygame.K_h:
                     self.toggle_hitboxes()
                 if event.key == pygame.K_r:
-                    kill_player(self, self.screen, self.spawn_point["pos"], self.spawn_point["level"], animation=False)
+                    kill_player(self, self.screen, self.spawn_point["pos"], self.spawn_point["level"], animation=False, transition=True)
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_f:
                     self.dict_kb["key_attack"] = 0

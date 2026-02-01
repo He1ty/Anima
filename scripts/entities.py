@@ -510,15 +510,18 @@ def death_animation(screen):
         clock.tick(30)
 
 
-def kill_player(game, screen, spawn_pos, spawn_level, animation=True):
+def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition=True):
     # Handle player death, respawn them at the proper position
     game.cutscene = False
 
     if animation:
         death_animation(screen)
     game.level = spawn_level
-    game.load_level(spawn_level, transition_effect=animation)
+    game.load_level(spawn_level, transition_effect=animation or transition)
     update_light(game)
+    if game.current_checkpoint is not None:
+        game.scroll = [game.current_checkpoint["pos"][0]  - game.display.get_width()/2, game.current_checkpoint["pos"][1] - game.display.get_height()]
+    game.player.velocity = [0, 0]
     game.player.dashtime_cur = 0
     game.player.pos[0] = spawn_pos[0]
     game.player.pos[1] = spawn_pos[1]

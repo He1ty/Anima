@@ -568,8 +568,6 @@ class Menu:
 
                 if i in used_slots:
                     save_data = used_slots[i]
-                    print(self.thumbs)
-
                     # --- PREVIEW IMAGE LOGIC ---
                     if self.thumbs[i]:
                         img = py.transform.scale(self.thumbs[i], img_rect.size)

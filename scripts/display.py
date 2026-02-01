@@ -157,7 +157,6 @@ def update_camera(game):
 
         if game.moving_visual:
             elapsed_time = current_time - game.visual_start_time
-
             if elapsed_time < game.visual_movement_duration:
                 game.scroll[0] += (game.visual_pos[0] - game.display.get_width() / 2 - game.scroll[0]) / 20
                 game.scroll[1] += (game.visual_pos[1] - game.display.get_height() / 2 - game.scroll[1]) / 20
@@ -177,6 +176,7 @@ def update_camera(game):
 
                 if level_limits["y"]:
                     min_y, max_y = level_limits["y"]
+                    max_y -= game.display.get_height()
                     target_y = max(min_y, min(target_y, max_y))
 
             game.scroll[0] += (target_x - game.scroll[0]) / 20
