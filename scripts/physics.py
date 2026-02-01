@@ -533,8 +533,8 @@ class PhysicsPlayer:
         """Handles player dash."""
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - 1, 0)
         if not self.anti_dash_buffer:
-            self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
             if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0: #and self.dash_direction != [0, -1]:
+                self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
                 if self.game.player_grabbing:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
@@ -549,6 +549,11 @@ class PhysicsPlayer:
 
                 self.anti_dash_buffer = True
                 self.dash_cooldown_cur = self.DASH_COOLDOWN
+
+            if (self.dashtime_cur != 0 and self.get_direction("x") == -self.dash_direction[0] and self.get_direction("x") != 0 and
+                    self.get_direction("y") == -self.dash_direction[1] and self.get_direction("y") != 0):
+                self.dashtime_cur = 0
+
         else:
             if self.dict_kb["key_dash"] == 0:
                 self.anti_dash_buffer = False

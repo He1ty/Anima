@@ -48,9 +48,9 @@ class Menu:
         self.thumbs = {}
         for i in range(3):
             try:
-                self.thumbs[i] = py.image.load(f"saves/slot_{i}_thumb.png")
+                self.thumbs[i+1] = py.image.load(f"saves/slot_{i+1}_thumb.png")
             except FileNotFoundError:
-                self.thumbs[i] = None
+                self.thumbs[i+1] = None
 
         self.COLORS = {
             "white": (255, 255, 255),
@@ -568,6 +568,7 @@ class Menu:
 
                 if i in used_slots:
                     save_data = used_slots[i]
+                    print(self.thumbs)
 
                     # --- PREVIEW IMAGE LOGIC ---
                     if self.thumbs[i]:

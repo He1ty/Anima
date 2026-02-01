@@ -2,11 +2,11 @@
     "0": {
         "levers": {
             "0": {
-                "type": "visual_and_door",
                 "pos": [
                     2,
                     94
                 ],
+                "type": "visual_and_door",
                 "visual_duration": 3,
                 "door_id": 0
             }
