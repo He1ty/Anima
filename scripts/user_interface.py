@@ -9,7 +9,7 @@ import datetime
 from scripts.sound import set_game_volume
 from scripts.utils import load_images, load_image
 from scripts.text import load_game_font
-from scripts.saving import save_game, load_game
+from scripts.saving import save_game, load_game, load_settings, save_settings
 
 class Menu:
 
@@ -319,6 +319,9 @@ class Menu:
                     sys.exit()
                 elif text == "BACK":
                     self.options_visible = False
+                    save_settings(self.game)
+                    if self.game.state == "START_SCREEN":
+                        return False
                     return True
         return True
 
@@ -423,7 +426,8 @@ class Menu:
 
     def menu_display(self): #when called: Display the main menu with it's buttons, monitor keyboard and mouse input (keyboard means escape key but it looks cooler), and thirdly displaythe background and optio npanel if needed
         self.capture_background()
-        save_game(self.game, self.game.current_slot)
+        if self.game.state == "PLAYING":
+            save_game(self.game, self.game.current_slot)
         self.menu_time_start = time.time()
         running = True
         while running:
@@ -492,6 +496,7 @@ class Menu:
 
                 elif event.type == py.MOUSEMOTION and self.dragging_volume and not self.dropdown_expanded:
                     self._handle_volume_drag(event.pos[0])
+
         if not running:
             self.game.menu_time += time.time() - self.menu_time_start
 
@@ -699,42 +704,97 @@ class Menu:
 
         return False  # Back was pressed
 
-def start_menu():#Display a simple welcome screen that diseappear when clicked.
+
+def start_menu(game):
     py.init()
-    screen = py.display.set_mode((1000, 600), py.NOFRAME)
+    load_settings(game)
+    if py.display.get_window_size() == (960, 576):
+        size = (1000, 600)
+    else:
+        size = py.display.get_window_size()
+    screen = py.display.set_mode(size, py.RESIZABLE)
+    # Increase font size for better visibility on buttons
     font = py.font.Font(None, 24)
     font.set_italic(True)
-    text = font.render("Click anywhere to start", True, (255, 255, 255))
-    text_rect = text.get_rect(center=(500, 580))
 
     cap = cv2.VideoCapture("assets/images/start_video.mp4")
-    frame_id = -5
     running = True
-    sound_running = False
+
+    # We will store the user's choice here
+    action = None
+
     while running:
+        # 1. Define Button Rectangles (x, y, width, height)
+        # Centered horizontally at x=400 (since screen width is 1000, center is 500, button width 200)
+        width = 200
+        height = 60
+        x = screen.get_width() / 2 - width / 2
+        y = screen.get_height() * 21 / 32
+        play_rect = py.Rect(x, y, width, height)
+        settings_rect = py.Rect(x, y + height, width, height)
+        quit_rect = py.Rect(x, y + 2 * height, width, height)
+
         ret, frame = cap.read()
         if not ret:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
+            # Restart video loop
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             continue
 
-
+        # --- Video Processing ---
         frame = cv2.flip(frame, 1)
-        frame = cv2.resize(frame, (1000, 600))
+        frame = cv2.resize(frame, (screen.get_width(), screen.get_height()))
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame = np.rot90(frame)
         frame = py.surfarray.make_surface(frame)
-
         screen.blit(frame, (0, 0))
-        screen.blit(text, text_rect)
 
+        # --- Draw Buttons ---
+        mouse_pos = py.mouse.get_pos()
+
+        # List of buttons to iterate through: (Rectangle, Text Label, Return Value)
+        buttons = [
+            (play_rect, "Play", "play"),
+            (settings_rect, "Settings", "settings"),
+            (quit_rect, "Quit", "quit")
+        ]
+
+        for rect, label, _ in buttons:
+            # Check if mouse is hovering over the button
+            if rect.collidepoint(mouse_pos):
+                color = (50, 50, 50)  # Lighter grey on hover
+            else:
+                color = (255, 255, 255)  # Dark grey default
+
+
+            # Draw text centered in the button
+            text_surf = font.render(label, True, color)
+            text_rect = text_surf.get_rect(center=rect.center)
+            screen.blit(text_surf, text_rect)
+
+        # --- Event Handling ---
         for event in py.event.get():
             if event.type == py.QUIT:
-                running = False
-            elif event.type == py.MOUSEBUTTONDOWN:
-                running = False
-            elif event.type == py.KEYDOWN and event.key == py.K_SPACE:
+                action = "quit"
                 running = False
 
+            elif event.type == py.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    # Check which button was clicked
+                    if play_rect.collidepoint(event.pos):
+                        action = "play"
+                        running = False
+                    elif settings_rect.collidepoint(event.pos):
+                        action = "settings"
+                        running = False
+                    elif quit_rect.collidepoint(event.pos):
+                        action = "quit"
+                        running = False
+
         py.display.flip()
-        py.time.wait(50)
+        # Reduced wait time slightly for smoother mouse movement (approx 30 FPS)
+        py.time.wait(30)
+
+    cap.release()
+    # py.quit() # Optional: keep this commented if you want to keep the window open for the game
+    return action
 

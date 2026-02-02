@@ -685,8 +685,15 @@ class Game:
                 change_music(self,
                              "assets/sounds/GV2space-ambient-music-interstellar-space-journey-8wlwxmjrzj8_MDWW6nat.wav")
                 # start_menu is a blocking call (usually handles its own internal loop)
-                start_menu()
-                self.state = "PROFILE_SELECT"
+                action = start_menu(self)
+                if action == "play":
+                    self.state = "PROFILE_SELECT"
+                elif action == "settings":
+                    self.menu.options_visible = True
+                    self.menu.menu_display()
+                elif action == "quit":
+                    pygame.quit()
+                    sys.exit()
 
             elif self.state == "PROFILE_SELECT":
                 change_music(self,

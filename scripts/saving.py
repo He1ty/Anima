@@ -62,11 +62,6 @@ class Save:
                 "spawn_point": self.game.spawn_point,
             },
             "level": self.game.level,
-            "settings": {
-                "volume": self.game.volume,
-                "keyboard_layout": self.game.keyboard_layout,
-                "language": self.game.selected_language
-            },
             "timestamp": time.time(),
             "playtime": time.time() - self.game.start_time + self.game.playtime - self.game.menu_time,
         }
@@ -106,16 +101,6 @@ class Save:
             level = save_data.get("level", 0)
             self.game.level = level
             self.game.current_slot = slot
-
-
-            # --- Restore Settings ---
-            if "settings" in save_data:
-                volume = save_data["settings"].get("volume", 0.5)
-                set_game_volume(self.game, volume)
-                self.game.keyboard_layout = save_data["settings"].get("keyboard_layout")
-                self.game.selected_language = save_data["settings"].get("language", "English")
-                if hasattr(self.game, "menu"):
-                    self.game.menu.update_settings_from_game()
             # --- Finalize Load ---
             # Set scroll to player position
             if "player" in save_data and "position" in save_data["player"]:
@@ -186,11 +171,64 @@ class Save:
         saves.sort(key=lambda x: x["date"], reverse=True)
         return saves[0]["slot"]
 
+    def save_settings(self):
+
+        save_data = {
+                "volume": self.game.volume,
+                "keyboard_layout": self.game.keyboard_layout,
+                "language": self.game.selected_language
+            }
+
+        save_path = os.path.join(self.save_folder, f"settings.json")
+        try:
+            with open(save_path, 'w') as save_file:
+                json.dump(save_data, save_file, indent=4)
+            print(f"Game saved successfully to {save_path}")
+            return True
+        except Exception as e:
+            print(f"Error saving game: {e}")
+            return False
+
+    def load_settings(self):
+        save_path = os.path.join(self.save_folder, f"settings.json")
+
+        if not os.path.exists(save_path):
+            print(f"No save found in {save_path}")
+            return False
+
+        try:
+            with open(save_path, 'r') as save_file:
+                save_data = json.load(save_file)
+
+            # --- Restore Settings ---
+            volume = save_data.get("volume", 0.5)
+            set_game_volume(self.game, volume)
+            self.game.keyboard_layout = save_data.get("keyboard_layout")
+            self.game.selected_language = save_data.get("language", "English")
+            if hasattr(self.game, "menu"):
+                self.game.menu.update_settings_from_game()
+        except Exception as e:
+            print(f"Error while loading the save: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+
 
 # --- Global Helpers ---
 def save_game(game, slot=1):
     if hasattr(game, 'save_system'):
         return game.save_system.save_game(slot)
+    return False
+
+def save_settings(game):
+    if hasattr(game, 'save_system'):
+        return game.save_system.save_settings()
+    return False
+
+def load_settings(game):
+    if hasattr(game, 'save_system'):
+        return game.save_system.load_settings()
     return False
 
 
