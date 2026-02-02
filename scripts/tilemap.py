@@ -23,6 +23,7 @@ PHYSICS_TILES = {'grass','stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blu
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
 AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass'}
 LEVER_TILES = {'lever': [0, 1]}
+LAYER_0 = {'vine_transp_back','dark_vine'}
 
 class Tilemap:
     def __init__(self, game, tile_size = 16):
@@ -189,7 +190,7 @@ class Tilemap:
                 loc = str(x) + ";" + str(y)
                 if loc in self.tilemap:
                     tile = self.tilemap[loc]
-                    if tile['type'] in {'vine_transp_back','dark_vine'}:
+                    if tile['type'] in LAYER_0:
                         img = self.game.assets[tile['type']][tile['variant']].copy()
                         img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
                         surf.blit(img, (
@@ -203,7 +204,7 @@ class Tilemap:
                 loc = str(x) + ";" + str(y)
                 if loc in self.tilemap:
                     tile = self.tilemap[loc]
-                    if tile['type'] not in {'vine_transp_back','dark_vine'}:
+                    if tile['type'] not in LAYER_0:
                         img = self.game.assets[tile['type']][tile['variant']].copy()
                         img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity),
                                  special_flags=BLEND_RGBA_MULT)

@@ -423,6 +423,7 @@ class Menu:
 
     def menu_display(self): #when called: Display the main menu with it's buttons, monitor keyboard and mouse input (keyboard means escape key but it looks cooler), and thirdly displaythe background and optio npanel if needed
         self.capture_background()
+        save_game(self.game, self.game.current_slot)
         self.menu_time_start = time.time()
         running = True
         while running:

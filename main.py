@@ -336,9 +336,6 @@ class Game:
                 self.enemies.append(DistanceEnemy(self, "glorbo", spawner['pos'], (16, 16), 100,
                                                   {"attack_distance": 100, "attack_dmg": 10, "attack_time": 1.5}))
 
-        if self.current_checkpoint is not None:
-            self.player.pos = self.current_checkpoint["pos"]
-
         self.activators = []
         for activator in self.tilemap.extract(self.levers_id_pairs + self.buttons_id_pairs + self.tp_id_pairs):
             a = Activator(self, activator['pos'], activator['type'], i=activator["id"])
@@ -369,37 +366,17 @@ class Game:
         self.max_falling_depth = 50000000000
         update_light(self)
 
-    def main_game_logic(self):
-        """
-        The core gameplay loop. Handles physics, collision, rendering order,
-        entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
-        """
 
-        update_camera(self)
-        render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
-
-        display_level_bg(self, self.level)
-        self.tilemap.render(self.display, offset=render_scroll)
-        self.tilemap.render_over(self.display, offset=render_scroll)
-
-        if not self.game_initialized:
-            self.start_time = time.time()
-        self.screenshake = max(0, self.screenshake - 1)
-
-        # --- Transition & Level Switching ---
+    def update_transitions(self):
         for transition in self.transitions:
-            if (transition['pos'][0] + 16 > self.player.rect().centerx >= transition['pos'][0] and
+            if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
                     self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
                 self.level = transition["destination"]
                 self.load_level(self.level, transition_effect=False)
                 self.player.pos = [transition["dest_pos"][0] * 16, transition["dest_pos"][1] * 16]
                 self.scroll = [self.player.pos[0], self.player.pos[1]]
 
-        if self.transition < 0: self.transition += 1
-
-        # --- Teleportation & Checkpoints ---
-        if self.teleporting: update_teleporter(self, self.tp_id)
-
+    def update_teleport(self, render_scroll):
         for checkpoint in self.checkpoints:
             pos = checkpoint["pos"]
 
@@ -436,8 +413,8 @@ class Game:
                 if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
                     continue
                 self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
-                save_game(self, self.current_slot)
 
+    def update_pickups(self, render_scroll):
         for ball in self.pickups:
             img = self.assets[ball["type"]].copy()[0]
             rect = pygame.Rect(ball["pos"][0], ball["pos"][1], 16, 16)
@@ -446,7 +423,7 @@ class Game:
                 self.player.dash_amt = 2
                 self.pickups.remove(ball)
 
-
+    def update_spawn(self):
         # Define respawn point based on current section or checkpoint
         if self.current_checkpoint is None:
             for section in self.sections.keys():
@@ -456,18 +433,13 @@ class Game:
                     except KeyError:
                         pass
 
-        self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
-
-        # --- Rendering Sequence ---
-        # 1. Background
-
-        # 2. Ambient Particles (Leaves)
+    def update_particles(self):
         for rect in self.leaf_spawners:
             if random.random() * 49999 < rect.width * rect.height:
                 pos = (rect.x + random.random() * rect.width, rect.y + random.random() * rect.height)
                 self.particles.append(Particle(self, 'leaf', pos, velocity=[-0.1, 0.3], frame=random.randint(0, 20)))
 
-        # 3. Projectiles
+    def update_projectile(self, render_scroll):
         for projectile in self.projectiles[:]:
             projectile['pos'][0] += projectile['direction'][0]
             projectile['pos'][1] += projectile['direction'][1]
@@ -485,9 +457,7 @@ class Game:
                 self.damage_flash_end_time = pygame.time.get_ticks() + self.damage_flash_duration
                 self.projectiles.remove(projectile)
 
-        # 4. Tilemap & Entities
-
-        for activator in self.activators: activator.render(self.display, offset=render_scroll)
+    def update_enemies(self, render_scroll):
         for enemy in self.enemies.copy():
             enemy.update(self.tilemap, (0, 0))
             enemy.render(self.display, offset=render_scroll)
@@ -495,25 +465,65 @@ class Game:
                 enemy.set_action("death")
                 if enemy.animation.done: self.enemies.remove(enemy)
 
+    def prerender_update(self):
+        update_camera(self)
+        render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
+
+        display_level_bg(self, self.level)
+        return render_scroll
+
+
+    def prerender_over_update(self, render_scroll):
+
+        if not self.game_initialized:
+            self.start_time = time.time()
+
+        self.update_transitions()
+
+        if self.transition < 0: self.transition += 1
+
+        self.update_teleport(render_scroll)
+
+        if self.teleporting: update_teleporter(self, self.tp_id)
+
+        self.screenshake = max(0, self.screenshake - 1)
+
+        self.update_pickups(render_scroll)
+
+        self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
+
+        self.update_particles()
+
+        self.update_particles()
+
+        #Projectiles
+        #self.update_projectile(render_scroll)
+
+        # 4. Tilemap & Entities
+
+        for activator in self.activators: activator.render(self.display, offset=render_scroll)
+
+        # self.update_enemies(render_scroll)
+
         # 5. Player & Physics
-        attacking_update(self)
+        # attacking_update(self)
         self.player.physics_process(self.tilemap, self.dict_kb)
         self.player.render(self.display, offset=render_scroll)
 
+
+    def throwable_update(self, render_scroll):
         for o in self.throwable:
             o.update(self.tilemap, (0, 0))
             o.render(self.display, offset=render_scroll)
 
+    def spike_hitbox_update(self, render_scroll):
         for spike_hitbox in self.spikes:
             if self.player.rect().colliderect(spike_hitbox.rect()) and not self.player.noclip:
                 deal_dmg(self, spike_hitbox, "player", 200, 0.5)
             if self.show_spikes_hitboxes:
                 spike_hitbox.render(self.display, offset=render_scroll)
 
-        # 6. Foreground & Lighting
-        display_level_fg(self, self.level)
-        apply_lighting(self, render_scroll)
-
+    def doors_update(self, render_scroll):
         # Doors (Colliders updated for physics)
         ds = []
         for door in self.doors:
@@ -528,20 +538,55 @@ class Game:
                     pygame.draw.rect(self.display, (255, 0, 0), k, 1)
         self.doors_rects = ds
 
-        # 7. VFX (Sparks/Particles)
+    def spark_update(self, render_scroll):
         for spark in self.sparks[:]:
             if spark.update(): self.sparks.remove(spark)
             spark.render(self.display, offset=render_scroll)
 
+    def particle_render(self, render_scroll):
         for particle in self.particles[:]:
             if particle.update(): self.particles.remove(particle)
             particle.render(self.display, offset=render_scroll)
 
-        # --- Death Handling ---
+    def death_handling(self):
         if self.player.pos[1] > self.max_falling_depth or self.player_hp <= 0:
             kill_player(self, self.screen, self.spawn_point["pos"], self.spawn_point["level"])
             for key in self.dict_kb.keys(): self.dict_kb[key] = 0
             self.player_hp = 100
+
+    def damage_effect_update(self):
+        if self.damage_flash_active:
+            if pygame.time.get_ticks() < self.damage_flash_end_time:
+                screen_shake(self, 16)
+                screen_width, screen_height = self.screen.get_size()
+                border_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
+                elapsed = pygame.time.get_ticks() - (self.damage_flash_end_time - self.damage_flash_duration)
+                progress = min(1.0, elapsed / self.damage_flash_duration)
+                alpha = int(240 * (1 - progress))
+                pygame.draw.rect(border_surface, (0, 0, 0, alpha), (0, 0, screen_width, screen_height), 100)
+                self.screen.blit(border_surface, (0, 0))
+            else:
+                self.damage_flash_active = False
+
+
+    def post_render_update(self, render_scroll):
+
+        #self.throwable_update(render_scroll)
+
+        self.spike_hitbox_update(render_scroll)
+
+        # 6. Foreground & Lighting
+        display_level_fg(self, self.level)
+        apply_lighting(self, render_scroll)
+
+        self.doors_update(render_scroll)
+
+        #self.spark_update(render_scroll)
+
+        self.particle_render(render_scroll)
+
+        # --- Death Handling ---
+        self.death_handling()
 
         # --- Input Handling ---
         for event in pygame.event.get():
@@ -602,18 +647,7 @@ class Game:
         self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), screenshake_offset)
 
         # Damage Vignette Effect
-        if self.damage_flash_active:
-            if pygame.time.get_ticks() < self.damage_flash_end_time:
-                screen_shake(self, 16)
-                screen_width, screen_height = self.screen.get_size()
-                border_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-                elapsed = pygame.time.get_ticks() - (self.damage_flash_end_time - self.damage_flash_duration)
-                progress = min(1.0, elapsed / self.damage_flash_duration)
-                alpha = int(240 * (1 - progress))
-                pygame.draw.rect(border_surface, (0, 0, 0, alpha), (0, 0, screen_width, screen_height), 100)
-                self.screen.blit(border_surface, (0, 0))
-            else:
-                self.damage_flash_active = False
+        self.damage_effect_update()
 
         pygame.display.update()
 
@@ -623,6 +657,23 @@ class Game:
                 save_game(self, self.current_slot)
 
         self.clock.tick(60)
+
+
+    def main_game_logic(self):
+        """
+        The core gameplay loop. Handles physics, collision, rendering order,
+        entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
+        """
+
+        render_scroll = self.prerender_update()
+
+        self.tilemap.render(self.display, offset=render_scroll)
+
+        self.prerender_over_update(render_scroll)
+
+        self.tilemap.render_over(self.display, offset=render_scroll)
+
+        self.post_render_update(render_scroll)
 
     def run(self):
         """

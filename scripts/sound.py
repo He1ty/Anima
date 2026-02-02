@@ -38,3 +38,4 @@ def change_music(game, path):
             game.current_music_path = path
         except Exception as e:
             print(f"Error changing music to {path}: {e}")
+            game.current_music_path = None
