@@ -193,9 +193,9 @@ class Game:
         self.doors_rects = []
 
         # --- Lighting System ---
-        self.darkness_level = 150
-        self.light_radius = 100
-        self.light_soft_edge = 350
+        self.darkness_level = 255
+        self.light_radius = 10
+        self.light_soft_edge = 200
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
 
@@ -379,6 +379,8 @@ class Game:
 
     def update_teleport(self, render_scroll):
         for checkpoint in self.checkpoints:
+            if not self.tilemap.pos_visible(self.display, checkpoint["pos"], render_scroll, additional_offset=(16, 16)):
+                continue
             pos = checkpoint["pos"]
 
             if self.current_checkpoint == checkpoint:
@@ -591,6 +593,8 @@ class Game:
 
         self.spike_hitbox_update(render_scroll)
 
+        self.particle_render(render_scroll)
+
         # 6. Foreground & Lighting
         display_level_fg(self, self.level)
         apply_lighting(self, render_scroll)
@@ -598,11 +602,6 @@ class Game:
         self.doors_update(render_scroll)
 
         #self.spark_update(render_scroll)
-
-        self.particle_render(render_scroll)
-
-        # --- Death Handling ---
-        self.death_handling()
 
         # --- Input Handling ---
         for event in pygame.event.get():
@@ -663,9 +662,12 @@ class Game:
         self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), screenshake_offset)
 
         # Damage Vignette Effect
-        self.damage_effect_update()
+        #self.damage_effect_update()
 
         pygame.display.update()
+
+        # --- Death Handling ---
+        self.death_handling()
 
         if not self.game_initialized:
             self.game_initialized = True

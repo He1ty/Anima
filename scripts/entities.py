@@ -416,7 +416,7 @@ class DamageBlock:
 
         if self.type == 'spike':
             width = 8
-            height = 3
+            height = 5
             angle = self.rotation*math.pi/2
             if self.rotation % 2 == 0:
                 width, height = height, width

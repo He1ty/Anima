@@ -36,7 +36,7 @@ class PhysicsPlayer:
         self.DASHTIME = 12
         self.JUMPTIME = 10
         self.DASH_COOLDOWN = 18
-        self.FIRST_JUMP_WALLJUMP_COOLDOWN = 5
+        self.FIRST_JUMP_WALLJUMP_COOLDOWN = 0
         self.WALLJUMP_COOLDOWN = 30
 
         self.COLLISION_DODGED_PIXELS = 4 # Number of pixels collision can dodge (ledge snapping/corner correction)
@@ -47,6 +47,8 @@ class PhysicsPlayer:
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
 
         #self.dash_cooldown = 0
+
+        self.jump_boosed = False
 
         self.dash_amt = self.dash_max_amt
         self.tech_momentum_mult = 0
@@ -297,6 +299,7 @@ class PhysicsPlayer:
 
         if direction != 0:
             # Gradually move current velocity toward target speed
+            pass
             self.velocity[0] += (target_speed - self.velocity[0]) * accel
         else:
             # This handles the 'active' release of keys (handled in apply_momentum usually,
@@ -492,6 +495,7 @@ class PhysicsPlayer:
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
                 "allowed"]:
+                print('primo if')
                 if self.can_walljump["sliding"]:
                     self.jump_logic_helper()
 
@@ -550,8 +554,8 @@ class PhysicsPlayer:
                 self.anti_dash_buffer = True
                 self.dash_cooldown_cur = self.DASH_COOLDOWN
 
-            if (self.dashtime_cur != 0 and self.get_direction("x") == -self.dash_direction[0] and self.get_direction("x") != 0 and
-                    self.get_direction("y") == -self.dash_direction[1] and self.get_direction("y") != 0):
+            if (self.dashtime_cur != 0 and self.get_direction("x") == -self.dash_direction[0] and self.get_direction("x") != 0 or
+                    (self.get_direction("y") == -self.dash_direction[1] and self.get_direction("y") != 0)):
                 self.dashtime_cur = 0
 
         else:
@@ -575,6 +579,8 @@ class PhysicsPlayer:
                 self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
             if self.dashtime_cur == 0:
                 self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
+                if self.collision["left"] or self.collision["right"]:
+                    self.velocity[0] = 0
 
         self.update_ghost_trail()
 
