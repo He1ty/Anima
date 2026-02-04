@@ -409,6 +409,7 @@ class DamageBlock:
         self.game = game
         self.type = hitbox_type
         self.rotation = (rotation - 1) % 4
+        self.circle_hitbox = False
 
     def rect(self):
         # Return collision rectangle
@@ -430,14 +431,24 @@ class DamageBlock:
             r = pygame.Rect(pos[0], pos[1],
                             width, height)
 
-
+        elif self.type == 'spike_block':
+            self.circle_hitbox = True
+            r = pygame.Rect(self.pos[0], self.pos[1],
+                            self.size.get_width(), self.size.get_height())
+            r = r.inflate(-4, -4)
 
         return r
 
-    def render(self, surf, offset=(0, 0)):
+    def render(self, surf, circle, offset=(0, 0)):
         # Draw the damage block on screen
         r = self.rect()
-        pygame.draw.rect(surf, (255, 0, 255), pygame.Rect(r.x - offset[0], r.y - offset[1],
+        if circle:
+            xq = r.right - (r.right - r.x) / 2 != r.centerx
+            yq = r.bottom - (r.bottom - r.y) / 2 != r.centery
+
+            pygame.draw.circle(surf, (255, 0, 255),(r.centerx - offset[0] + 1*xq, r.centery - offset[1] + 1*yq), r.width/2)
+        else:
+            pygame.draw.rect(surf, (255, 0, 255), pygame.Rect(r.x - offset[0], r.y - offset[1],
                                                           r.width, r.height))
 
 

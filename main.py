@@ -298,12 +298,17 @@ class Game:
         self.pickups = self.tilemap.extract([("doubledashball", 0)])
 
         self.spikes = []
-        spike_types = []
-        for n in range(4):
-            spike_types += [("spikes", n), ("bloody_spikes", n), ("big_spikes", n), ("big_bloody_spikes", n)]
+        spike_types = [("spikes", 0)]
+        spike_block_types = []
+        for n in range(9):
+            spike_block_types += [("spike_roots", n)]
+
 
         for spike in self.tilemap.extract(spike_types, keep=True):
             self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]], hitbox_type='spike', rotation=spike["rotation"]))
+
+        for spike_block in  self.tilemap.extract(spike_block_types, keep=True):
+            self.spikes.append(DamageBlock(self, spike_block["pos"], self.assets[spike_block["type"]][spike_block["variant"]], hitbox_type='spike_block', rotation=spike_block["rotation"]))
 
         # --- Objects & Particles ---
         self.throwable = []
@@ -518,10 +523,20 @@ class Game:
 
     def spike_hitbox_update(self, render_scroll):
         for spike_hitbox in self.spikes:
-            if self.player.rect().colliderect(spike_hitbox.rect()) and not self.player.noclip:
-                deal_dmg(self, spike_hitbox, "player", 200, 0.5)
+            if not self.player.noclip:
+                if not spike_hitbox.circle_hitbox:
+                    if self.player.rect().colliderect(spike_hitbox.rect()):
+                        deal_dmg(self, spike_hitbox, "player", 200, 0.5)
+                else:
+                    dx = self.player.pos[0] - spike_hitbox.pos[0]
+                    dy = self.player.pos[1] - spike_hitbox.pos[1]
+                    distance = math.sqrt(dx ** 2 + dy ** 2)
+                    if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.rect().colliderect(spike_hitbox.rect()):
+                        deal_dmg(self, spike_hitbox, "player", 200, 0.5)
+
+
             if self.show_spikes_hitboxes:
-                spike_hitbox.render(self.display, offset=render_scroll)
+                spike_hitbox.render(self.display, spike_hitbox.circle_hitbox, offset=render_scroll)
 
     def doors_update(self, render_scroll):
         # Doors (Colliders updated for physics)
