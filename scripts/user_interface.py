@@ -426,8 +426,6 @@ class Menu:
 
     def menu_display(self): #when called: Display the main menu with it's buttons, monitor keyboard and mouse input (keyboard means escape key but it looks cooler), and thirdly displaythe background and optio npanel if needed
         self.capture_background()
-        if self.game.state == "PLAYING":
-            save_game(self.game, self.game.current_slot)
         self.menu_time_start = time.time()
         running = True
         while running:
@@ -508,16 +506,13 @@ class Menu:
         """
         # 1. Setup background (darken current screen)
         current_screen = self.screen.copy()
-        overlay = py.Surface(self.screen.get_size(), py.SRCALPHA)
+        overlay = py.Surface(py.display.get_window_size(), py.SRCALPHA)
         overlay.fill((0, 0, 0, 230))  # Very dark overlay like the reference image
 
         # 2. Fetch Save Data
         saves = self.game.save_system.list_saves()
         used_slots = {save["slot"]: save for save in saves}
 
-        # 3. Layout Configuration
-        screen_w, screen_h = self.screen.get_size()
-        center_x = screen_w // 2
 
         slot_width = 800  # Wide slots
         slot_height = 110  # Height between dividers
@@ -532,8 +527,15 @@ class Menu:
         confirm_delete_id = None  # Tracks which slot is being asked for deletion
         running = True
         while running:
+
+            # 3. Layout Configuration
+            screen_w, screen_h = py.display.get_window_size()
+            center_x = screen_w // 2
+            overlay = py.Surface(py.display.get_window_size(), py.SRCALPHA)
+            overlay.fill((0, 0, 0, 230))
+
             # Draw base layers
-            self.screen.blit(current_screen, (0, 0))
+            self.screen.blit(py.transform.scale(current_screen, py.display.get_window_size()), (0, 0))
             self.screen.blit(overlay, (0, 0))
             mouse_pos = py.mouse.get_pos()
 

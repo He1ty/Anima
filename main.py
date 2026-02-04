@@ -96,7 +96,7 @@ class Game:
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to per level
         self.scroll_limits = {
-            0: {"x": (16, 1680), "y": (-112, 1744)},
+            0: {"x": (16, 656), "y": (-112, 1744)},
             1: {"x": (-48, 16), "y": (-1000, 400)},
             2: {"x": (-48, 280), "y": (-192, -80)},
             3: {"x": (16, 190400), "y": (0, 20000000)},
@@ -295,7 +295,7 @@ class Game:
         self.pickups = self.tilemap.extract([("doubledashball", 0)])
 
         self.spikes = []
-        spike_types = [("spikes", 0)]
+        spike_types = [("spikes", 0), ("spikes", 1)]
         spike_block_types = []
         for n in range(9):
             spike_block_types += [("spike_roots", n)]
@@ -368,7 +368,6 @@ class Game:
         self.max_falling_depth = 50000000000
         update_light(self)
 
-
     def update_transitions(self):
         for transition in self.transitions:
             if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
@@ -415,6 +414,7 @@ class Game:
                 if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
                     continue
                 self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
+                save_game(self, self.current_slot)
 
     def update_pickups(self, render_scroll):
         for ball in self.pickups:
@@ -559,6 +559,7 @@ class Game:
     def particle_render(self, render_scroll):
         for particle in self.particles[:]:
             if not self.tilemap.pos_visible(self.display, particle.pos, offset=render_scroll, additional_offset=(100, 100)):
+                self.particles.remove(particle)
                 continue
             if particle.update(): self.particles.remove(particle)
             particle.render(self.display, offset=render_scroll)

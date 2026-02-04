@@ -172,6 +172,7 @@ def update_camera(game):
 
                 if level_limits["x"]:
                     min_x, max_x = level_limits["x"]
+                    max_x -= game.display.get_width()
                     target_x = max(min_x, min(target_x, max_x))
 
                 if level_limits["y"]:
