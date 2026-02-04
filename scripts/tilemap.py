@@ -179,6 +179,10 @@ class Tilemap:
             if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
                 return self.tilemap[tile]["variant"]
 
+    def pos_visible(self, surf, pos, offset = (0, 0), additional_offset=(0, 0)):
+           return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
+                   offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
+
     def render(self, surf, offset = (0, 0), mask_opacity=255, exception=()):
         for tile in self.offgrid_tiles:
             img = self.game.assets[tile['type']][tile['variant']].copy()

@@ -228,7 +228,7 @@ class Game:
         # --- Menu & System Configuration ---
         self.selected_language = "English"
         self.menu = Menu(self)
-        self.keyboard_layout = "azerty"
+        self.keyboard_layout = "AZERTY"
         self.save_system = Save(self)
         self.current_slot = None  # Tracking the active save slot
 
@@ -270,10 +270,7 @@ class Game:
         """
         layout = self.keyboard_layout.lower()
         if layout == "azerty":
-            #return {pygame.K_z: "key_up", pygame.K_s: "key_down", pygame.K_q: "key_left",
-            #        pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
-            #        pygame.K_n: "key_noclip"}
-            return {pygame.K_w: "key_up", pygame.K_s: "key_down", pygame.K_a: "key_left",
+            return {pygame.K_z: "key_up", pygame.K_s: "key_down", pygame.K_q: "key_left",
                     pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
                     pygame.K_n: "key_noclip"}
         return {pygame.K_w: "key_up", pygame.K_s: "key_down", pygame.K_a: "key_left",
@@ -438,8 +435,10 @@ class Game:
                     except KeyError:
                         pass
 
-    def update_particles(self):
+    def update_particles(self, render_scroll):
         for rect in self.leaf_spawners:
+            if not self.tilemap.pos_visible(self.display, (rect.x, rect.y), offset=render_scroll, additional_offset=(100, 100)):
+                continue
             if random.random() * 49999 < rect.width * rect.height:
                 pos = (rect.x + random.random() * rect.width, rect.y + random.random() * rect.height)
                 self.particles.append(Particle(self, 'leaf', pos, velocity=[-0.1, 0.3], frame=random.randint(0, 20)))
@@ -497,9 +496,8 @@ class Game:
 
         self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
 
-        self.update_particles()
+        self.update_particles(render_scroll)
 
-        self.update_particles()
 
         #Projectiles
         #self.update_projectile(render_scroll)
@@ -560,6 +558,8 @@ class Game:
 
     def particle_render(self, render_scroll):
         for particle in self.particles[:]:
+            if not self.tilemap.pos_visible(self.display, particle.pos, offset=render_scroll, additional_offset=(100, 100)):
+                continue
             if particle.update(): self.particles.remove(particle)
             particle.render(self.display, offset=render_scroll)
 
