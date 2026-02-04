@@ -48,7 +48,7 @@ class PhysicsPlayer:
 
         #self.dash_cooldown = 0
 
-        self.jump_boosed = False
+        self.jump_boosted = False
 
         self.dash_amt = self.dash_max_amt
         self.tech_momentum_mult = 0
@@ -294,7 +294,10 @@ class PhysicsPlayer:
 
         # Deceleration in case speed in higher than self.SPEED (dash for example)
         if abs(self.velocity[0]) > self.SPEED:
-            accel = 0.2
+            if not self.jump_boosted:
+                accel = 0.2
+            else:
+                accel = 0.05
 
 
         if direction != 0:
@@ -465,7 +468,7 @@ class PhysicsPlayer:
             if self.get_direction("x") == 0 and not self.is_stunned and self.dashtime_cur == 0:
                 self.velocity[0] = 0
 
-    def disallow_movement(self,bool):
+    def disallow_movement(self, bool):
         """allows to disable or re-enable player movement. Bool as parameter, True to disable, False to enable movement."""
         self.disablePlayerInput = bool
 
@@ -475,8 +478,9 @@ class PhysicsPlayer:
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
 
-        # Jumping
+
         if self.dict_kb["key_jump"] == 1:
+            # Jumping
             if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
                 self.jump_logic_helper()
 
@@ -487,15 +491,14 @@ class PhysicsPlayer:
                 # Tech
                 if self.dashtime_cur != 0:
                     self.dashtime_cur = 0
-                    self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
-                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
+                    self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.4)
+                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 1.75
                     self.velocity[1] = self.velocity[1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
             # Walljump
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
                 "allowed"]:
-                print('primo if')
                 if self.can_walljump["sliding"]:
                     self.jump_logic_helper()
 
