@@ -48,8 +48,6 @@ class PhysicsPlayer:
 
         #self.dash_cooldown = 0
 
-        self.jump_boosted = False
-
         self.dash_amt = self.dash_max_amt
         self.tech_momentum_mult = 0
 
@@ -492,7 +490,7 @@ class PhysicsPlayer:
                 if self.dashtime_cur != 0:
                     self.dashtime_cur = 0
                     self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.4)
-                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 1.75
+                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 2
                     self.velocity[1] = self.velocity[1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
             # Walljump
