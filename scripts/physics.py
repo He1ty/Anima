@@ -264,6 +264,7 @@ class PhysicsPlayer:
             if self.dict_kb["key_noclip"] == 1:
                 self.noclip = False
 
+
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -775,8 +776,8 @@ class PhysicsPlayer:
             else:
                 # Air resistance/deceleration when not pressing anything in air
                 if self.get_direction("x") == 0:
-                    if abs(self.velocity[0]) < 2:
-                        self.velocity[0] *= 0.3
+                    if abs(self.velocity[0]) < 2 and not self.jumping:
+                        self.velocity[0] *= 0.1
                     else:
                         self.velocity[0] *= 0.98
         else:
