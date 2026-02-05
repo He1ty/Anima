@@ -7,7 +7,7 @@
                     94
                 ],
                 "type": "visual_and_door",
-                "visual_duration": 3,
+                "visual_duration": 0,
                 "door_id": 0
             }
         },

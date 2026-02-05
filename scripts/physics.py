@@ -292,10 +292,7 @@ class PhysicsPlayer:
 
         # Deceleration in case speed in higher than self.SPEED (dash for example)
         if abs(self.velocity[0]) > self.SPEED:
-            if not self.jump_boosted:
-                accel = 0.2
-            else:
-                accel = 0.05
+            accel = 0.2
 
 
         if direction != 0:
@@ -778,7 +775,10 @@ class PhysicsPlayer:
             else:
                 # Air resistance/deceleration when not pressing anything in air
                 if self.get_direction("x") == 0:
-                    self.velocity[0] *= 0.95
+                    if abs(self.velocity[0]) < 2:
+                        self.velocity[0] *= 0.3
+                    else:
+                        self.velocity[0] *= 0.98
         else:
             self.velocity[0] *= 0.95
 

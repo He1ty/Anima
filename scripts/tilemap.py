@@ -153,7 +153,7 @@ class Tilemap:
             elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
                 return self.tilemap[tile_loc]
 
-    def physics_rects_around(self, pos, size, gravity_dir=1):
+    def physics_rects_around(self, pos, size):
         rects = []
         for tile in self.tiles_around(pos, size):
             if tile['type'] in PHYSICS_TILES:
