@@ -352,6 +352,16 @@ class Game:
             self.doors.append(
                 Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))
 
+        #Checks if any door should be open
+        current_save = self.save_system.get_current_save(self.current_slot)
+        if current_save:
+            saved_doors = current_save["doors"]
+            if len(saved_doors):
+                for door in self.doors:
+                    if str(door.id) in saved_doors:
+                        door.opened = True
+
+
         self.transitions = self.tilemap.extract([("transition", 0)])
 
 

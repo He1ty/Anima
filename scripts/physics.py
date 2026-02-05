@@ -296,9 +296,8 @@ class PhysicsPlayer:
             accel = 0.2
 
 
-        if direction != 0:
+        if direction != 0 or self.dash_direction[0] != 0:
             # Gradually move current velocity toward target speed
-            pass
             self.velocity[0] += (target_speed - self.velocity[0]) * accel
         else:
             # This handles the 'active' release of keys (handled in apply_momentum usually,

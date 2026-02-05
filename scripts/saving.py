@@ -61,10 +61,18 @@ class Save:
                 "position": self.game.spawn_point["pos"].copy(),
                 "spawn_point": self.game.spawn_point,
             },
+            "doors": [],
             "level": self.game.level,
             "timestamp": time.time(),
             "playtime": time.time() - self.game.start_time + self.game.playtime - self.game.menu_time,
         }
+
+        #Only the opened doors' id is saved in save_data
+        if hasattr(self.game, "doors"):
+            for door in self.game.doors:
+                if door.opened:
+                    save_data["doors"].append(str(door.id))
+
 
         py.image.save(self.game.screen, f"saves/slot_{slot}_thumb.png")
 
@@ -81,6 +89,25 @@ class Save:
         except Exception as e:
             print(f"Error saving game: {e}")
             return False
+
+    def get_current_save(self, slot=1):
+        save_path = os.path.join(self.save_folder, f"save_{slot}.json")
+
+        if not os.path.exists(save_path):
+            print(f"No save found in {save_path}")
+            return False
+
+        try:
+            with open(save_path, 'r') as save_file:
+                save_data = json.load(save_file)
+
+        except Exception as e:
+            print(f"Error while loading the save: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+        return save_data
 
     def load_game(self, slot=1):
         """
@@ -107,6 +134,14 @@ class Save:
                 self.game.scroll = list(save_data["player"]["position"])
             # Load the actual map tiles and background
             self.game.load_level(level, transition_effect=False)
+
+
+            if len(save_data["doors"]):
+                for door in self.game.doors:
+                    print(save_data["doors"])
+                    if str(door.id) in save_data["doors"]:
+                        print('accadendo')
+                        door.opened = True
 
             # Override player stats with saved stats
             if "player" in save_data:
