@@ -293,7 +293,11 @@ class Editor:
 
         self.zoom = 1
         self.edit_properties_mode_on = False
+        self.edit_background_mode_on = False
+        self.make_background_invisible = False
         self.holding_i = False
+        self.holding_b = False
+        self.holding_y = False
         self.window_mode = False
         self.showing_properties_window = False
         self.get_activators()
@@ -871,18 +875,20 @@ class Editor:
         self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
+        if self.edit_background_mode_on or not self.make_background_invisible:
+            self.tilemap.render_background_tiles(self.display, offset=render_scroll)
+
         self.tilemap.render(self.display, offset=render_scroll,
-                            mask_opacity=80 if self.edit_properties_mode_on else 255,
+                            mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255,
                             exception=self.present_activators_types[self.current_activator_category])
         self.tilemap.render_over(self.display, offset=render_scroll,
-                                 mask_opacity=80 if self.edit_properties_mode_on else 255,
+                                 mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255,
                                  exception=self.present_activators_types[self.current_activator_category])
 
         current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
         current_tile_img.set_alpha(100)
 
         # Calculate mouse position (only for main display area)
-
         mpos = pygame.mouse.get_pos()
         main_area_width = self.screen_width - current_sidebar_width
         main_area_height = self.screen_height - UNDERBAR_HEIGHT if self.edit_properties_mode_on else self.screen_height
@@ -971,106 +977,116 @@ class Editor:
             self.save_action()
 
         if self.clicking and self.ongrid and mpos_in_mainarea:
-            if not self.window_mode:
-                if not self.edit_properties_mode_on:
-                    if self.tile_list[self.tile_group] in self.activators_types:
-                        t = self.tile_list[self.tile_group]
-                        self.set_window_mode()
-                        self.showing_properties_window = True
-                        self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
-                        self.selected_activator = {"image": self.assets[t][0],
-                                                   "infos": {"id": "", "type": ""}}
-                        self.clicking = False
-                        self.selected_activator["infos"]["pos"] = list(tile_pos)
-
-
-                    elif self.tile_list[self.tile_group] in (d[0] for d in self.doors):
-                        iD = int(input("Enter the door id: "))
-                        while iD in self.doors_ids:
-                            print("id already used")
-                            iD = int(input("Enter the door id: "))
-                        self.doors_ids.add(iD)
-                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                            'type': self.tile_list[self.tile_group],
-                            'variant': self.tile_variant,
-                            'pos': tile_pos,
-                            'id': iD}
-                    elif self.tile_list[self.tile_group] == "transition":
-                        # Default transition placement without console input
-                        dest = 0
-                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                            'type': "transition",
-                            'variant': self.tile_variant,
-                            'pos': tile_pos,
-                            'destination': dest,
-                            'dest_pos': [0, 0]}
-                    elif self.tile_list[
-                        self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
-                            [("spawners", 0)], keep=True):
-
-                        print("Player spawner already placed in this map")
-                    elif "spike" in self.tile_list[self.tile_group] :
-                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                            'type': self.tile_list[self.tile_group],
-                            'variant': self.tile_variant,
-                            'pos': tile_pos,
-                            'rotation': self.rotation}
-                    else:
-                        self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                            'type': self.tile_list[self.tile_group],
-                            'variant': self.tile_variant,
-                            'pos': tile_pos}
-                else:
-                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                    if tile_loc in self.tilemap.tilemap:
-                        t = self.tilemap.tilemap[tile_loc]["type"]
-                        if t in self.present_activators_types[self.current_activator_category]:
+            if not self.edit_background_mode_on:
+                if not self.window_mode:
+                    if not self.edit_properties_mode_on:
+                        if self.tile_list[self.tile_group] in self.activators_types:
+                            t = self.tile_list[self.tile_group]
                             self.set_window_mode()
                             self.showing_properties_window = True
                             self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
                             self.selected_activator = {"image": self.assets[t][0],
-                                                       "infos": self.activators[self.selected_activator_type][
-                                                           tile_loc]}
+                                                       "infos": {"id": "", "type": ""}}
                             self.clicking = False
-                        elif t == "transition":
-                            self.set_window_mode()
-                            self.showing_properties_window = True
-                            self.selected_activator_type = "Transitions"
-                            # Manual construction of info for transitions
-                            self.selected_activator = {
-                                "image": self.assets[t][0],
-                                "infos": {
-                                    "type": "transition",
-                                    "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
-                                    "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0, 0]),
-                                    "pos": self.tilemap.tilemap[tile_loc]['pos']
+                            self.selected_activator["infos"]["pos"] = list(tile_pos)
+
+
+                        elif self.tile_list[self.tile_group] in (d[0] for d in self.doors):
+                            iD = int(input("Enter the door id: "))
+                            while iD in self.doors_ids:
+                                print("id already used")
+                                iD = int(input("Enter the door id: "))
+                            self.doors_ids.add(iD)
+                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': self.tile_list[self.tile_group],
+                                'variant': self.tile_variant,
+                                'pos': tile_pos,
+                                'id': iD}
+                        elif self.tile_list[self.tile_group] == "transition":
+                            # Default transition placement without console input
+                            dest = 0
+                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': "transition",
+                                'variant': self.tile_variant,
+                                'pos': tile_pos,
+                                'destination': dest,
+                                'dest_pos': [0, 0]}
+                        elif self.tile_list[
+                            self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
+                                [("spawners", 0)], keep=True):
+
+                            print("Player spawner already placed in this map")
+                        elif "spike" in self.tile_list[self.tile_group] :
+                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': self.tile_list[self.tile_group],
+                                'variant': self.tile_variant,
+                                'pos': tile_pos,
+                                'rotation': self.rotation}
+                        else:
+                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': self.tile_list[self.tile_group],
+                                'variant': self.tile_variant,
+                                'pos': tile_pos}
+                    else:
+                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                        if tile_loc in self.tilemap.tilemap:
+                            t = self.tilemap.tilemap[tile_loc]["type"]
+                            if t in self.present_activators_types[self.current_activator_category]:
+                                self.set_window_mode()
+                                self.showing_properties_window = True
+                                self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
+                                self.selected_activator = {"image": self.assets[t][0],
+                                                           "infos": self.activators[self.selected_activator_type][
+                                                               tile_loc]}
+                                self.clicking = False
+                            elif t == "transition":
+                                self.set_window_mode()
+                                self.showing_properties_window = True
+                                self.selected_activator_type = "Transitions"
+                                # Manual construction of info for transitions
+                                self.selected_activator = {
+                                    "image": self.assets[t][0],
+                                    "infos": {
+                                        "type": "transition",
+                                        "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
+                                        "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0, 0]),
+                                        "pos": self.tilemap.tilemap[tile_loc]['pos']
+                                    }
                                 }
-                            }
-                            self.clicking = False
+                                self.clicking = False
+            else:
+                self.tilemap.background[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                    'type': self.tile_list[self.tile_group],
+                    'variant': self.tile_variant,
+                    'pos': tile_pos}
 
         if self.right_clicking and mpos_in_mainarea:
             if not self.window_mode:
                 if not self.edit_properties_mode_on:
                     tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                    if tile_loc in self.tilemap.tilemap:
-                        if self.tilemap.tilemap[tile_loc]['type'] in (l[0] for l in self.levers):
-                            self.levers_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                        if self.tilemap.tilemap[tile_loc]['type'] in (d[0] for d in self.doors):
-                            self.doors_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                        if self.tilemap.tilemap[tile_loc]['type'] in (tp[0] for tp in self.teleporters):
-                            self.tps_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                        if self.tilemap.tilemap[tile_loc]['type'] in (b[0] for b in self.buttons):
-                            self.buttons_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
-                        del self.tilemap.tilemap[tile_loc]
-                        self.get_activators()
-                    for tile in self.tilemap.offgrid_tiles.copy():
-                        tile_img = self.assets[tile['type']][tile['variant']]
-                        tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
-                                             tile['pos'][1] - self.scroll[1],
-                                             tile_img.get_width(),
-                                             tile_img.get_height())
-                        if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
-                            self.tilemap.offgrid_tiles.remove(tile)
+                    if not self.edit_background_mode_on:
+                        if tile_loc in self.tilemap.tilemap:
+                            if self.tilemap.tilemap[tile_loc]['type'] in (l[0] for l in self.levers):
+                                self.levers_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                            if self.tilemap.tilemap[tile_loc]['type'] in (d[0] for d in self.doors):
+                                self.doors_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                            if self.tilemap.tilemap[tile_loc]['type'] in (tp[0] for tp in self.teleporters):
+                                self.tps_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                            if self.tilemap.tilemap[tile_loc]['type'] in (b[0] for b in self.buttons):
+                                self.buttons_ids.remove(self.tilemap.tilemap[tile_loc]["id"])
+                            del self.tilemap.tilemap[tile_loc]
+                            self.get_activators()
+                        for tile in self.tilemap.offgrid_tiles.copy():
+                            tile_img = self.assets[tile['type']][tile['variant']]
+                            tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                                 tile['pos'][1] - self.scroll[1],
+                                                 tile_img.get_width(),
+                                                 tile_img.get_height())
+                            if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
+                                self.tilemap.offgrid_tiles.remove(tile)
+                    else:
+                        if tile_loc in self.tilemap.background:
+                            del self.tilemap.background[tile_loc]
 
         if not self.edit_properties_mode_on:
             self.display.blit(current_tile_img, (5, 5))
@@ -1136,6 +1152,9 @@ class Editor:
                         self.zoom = self.zoom / 2
                         self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
 
+                    if event.key == pygame.K_b and not self.holding_b:
+                        self.edit_background_mode_on = not self.edit_background_mode_on
+                        self.holding_b = True
                     if event.key == pygame.K_d:
                         self.movement[1] = True
                     if event.key == pygame.K_z:
@@ -1175,8 +1194,16 @@ class Editor:
                     # Shortcut for placing portals
                     if event.key == pygame.K_r:
                         self.rotation = (self.rotation + 1)%4
+                    # Make tiles invisible
+                    if event.key == pygame.K_y and not self.holding_y:
+                        self.make_background_invisible = not self.make_background_invisible
+                        self.holding_y = True
 
                 if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_y:
+                        self.holding_y = False
+                    if event.key == pygame.K_b:
+                        self.holding_b = False
                     if event.key == pygame.K_i:
                         self.holding_i = False
                     if event.key == pygame.K_q:

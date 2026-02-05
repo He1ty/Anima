@@ -21,7 +21,7 @@ AUTOTILE_MAP = {
 
 PHYSICS_TILES = {'grass','stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass'}
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
-AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots'}
+AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone'}
 LEVER_TILES = {'lever': [0, 1]}
 LAYER_0 = {'vine_transp_back','dark_vine'}
 
@@ -31,6 +31,7 @@ class Tilemap:
         self.tile_size = tile_size
         self.tilemap = {}
         self.offgrid_tiles = []
+        self.background = {}
         self.show_collisions = False
 
     def extract(self, id_pairs, keep=False):
@@ -119,7 +120,8 @@ class Tilemap:
         f = open(path, 'w')
         json.dump({'tilemap': self.tilemap,
                    'tilesize': self.tile_size,
-                   'offgrid': self.offgrid_tiles}, f)
+                   'offgrid': self.offgrid_tiles,
+                   'background': self.background},f)
         f.close()
 
     def load(self, path):
@@ -130,6 +132,7 @@ class Tilemap:
         self.tilemap = map_data['tilemap']
         self.tile_size = map_data['tilesize']
         self.offgrid_tiles = map_data['offgrid']
+        self.background = map_data['background']
 
     def autotile(self):
         for loc in self.tilemap:
@@ -143,6 +146,18 @@ class Tilemap:
             neighbors = tuple(sorted(neighbors))
             if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
                 tile['variant'] = AUTOTILE_MAP[neighbors]
+        for loc in self.background:
+            tile = self.background[loc]
+            neighbors = set()
+            for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
+                check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
+                if check_loc in self.background:
+                    if self.background[check_loc]['type'] == tile['type']:
+                        neighbors.add(shift)
+            neighbors = tuple(sorted(neighbors))
+            if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
+                tile['variant'] = AUTOTILE_MAP[neighbors]
+
 
     def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))
@@ -182,6 +197,17 @@ class Tilemap:
     def pos_visible(self, surf, pos, offset = (0, 0), additional_offset=(0, 0)):
            return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
                    offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
+
+    def render_background_tiles(self, surf, offset = (0, 0), mask_opacity=255, exception=()):
+        for x in range(offset[0]// self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
+            for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
+                loc = str(x) + ";" + str(y)
+                if loc in self.background:
+                    tile = self.background[loc]
+                    img = self.game.assets[tile['type']][tile['variant']].copy()
+                    img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
+                    surf.blit(img, (
+                    tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
 
     def render(self, surf, offset = (0, 0), mask_opacity=255, exception=()):
         for tile in self.offgrid_tiles:
