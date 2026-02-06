@@ -51,6 +51,10 @@ class PhysicsPlayer:
         self.dash_amt = self.dash_max_amt
         self.tech_momentum_mult = 0
 
+        self.superjump = False
+
+        self.last_on_floor_velocity = [0, 0]
+
         # Direction vars
         self.last_direction = 1
         self.dash_direction = [0, 0]  # [dash_x, dash_y]
@@ -264,7 +268,6 @@ class PhysicsPlayer:
             if self.dict_kb["key_noclip"] == 1:
                 self.noclip = False
 
-
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -458,6 +461,7 @@ class PhysicsPlayer:
                 self.dash_amt = self.dash_max_amt
 
             self.can_walljump["count"] = 0
+            self.superjump = False
 
             # Stop unintended horizontal movement if no input is given
             if self.get_direction("x") == 0 and not self.is_stunned and self.dashtime_cur == 0:
@@ -483,12 +487,14 @@ class PhysicsPlayer:
                 self.jumping = True
                 self.play_sound('jump', True)
 
-                # Tech
+                # Superjump
                 if self.dashtime_cur != 0:
                     self.dashtime_cur = 0
                     self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.4)
                     self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 2
                     self.velocity[1] = self.velocity[1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                    self.superjump = True
+
 
             # Walljump
             elif not self.holding_jump and \
@@ -516,6 +522,13 @@ class PhysicsPlayer:
                     self.play_sound('wall_jump', True)
                     self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
+
+        if self.superjump:
+            self.dash_ghost_trail()
+            self.update_ghost_trail()
+
+        if self.jumping and (self.collision["left"] or self.collision["right"]):
+            self.jumping = False
 
     def jump_logic_helper(self):
         """Avoid code redundancy"""
@@ -685,7 +698,7 @@ class PhysicsPlayer:
                     # --- HORIZONTAL CORNER CORRECTION ---
                     # If hitting a wall, try to nudge the player Up or Down to bypass the corner
                     nudged = False
-                    if rect not in self.game.doors_rects:
+                    if rect not in self.game.doors_rects and self.dashtime_cur:
                         for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                             # 1. Try nudging UP (Useful for stepping onto a ledge automatically)
                             if not any(
@@ -759,8 +772,10 @@ class PhysicsPlayer:
 
         if self.collision["right"]:
             self.collision_check_walljump_helper(1)
+            self.superjump = False
         if self.collision["left"]:
             self.collision_check_walljump_helper(-1)
+            self.superjump = False
 
         if not( not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
@@ -800,6 +815,10 @@ class PhysicsPlayer:
             "angle": self.rotation_angle
         }
 
+        if self.superjump:
+            ghost["color"] = (224, 239, 162, 70)
+            ghost["lifetime"] = 50
+
         # Add to list of ghost images
         self.ghost_images.append(ghost)
 
@@ -822,7 +841,7 @@ class PhysicsPlayer:
 
             # Apply transparency
             ghost_surf.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
-            ghost_surf.fill((109, 156, 159, 70), special_flags=pygame.BLEND_RGBA_MIN)
+            ghost_surf.fill((109, 156, 159, 70) if "color" not in ghost else ghost["color"], special_flags=pygame.BLEND_RGBA_MIN)
             ghost_surf.set_alpha(alpha)
 
             # Rotate Ghost

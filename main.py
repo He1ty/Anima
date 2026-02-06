@@ -417,7 +417,7 @@ class Game:
             checkpoint["state"] = 0
             img = self.assets['checkpoint/0'].copy()[0]
             self.display.blit(img, (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
-            if (pos[0] <= self.player.pos[0] <= pos[0] + 16 and
+            if ((pos[0] <= self.player.pos[0] <= pos[0] + self.tile_size or pos[0] <= self.player.pos[0] + 16 <= pos[0] + self.tile_size) and
                     pos[1] >= self.player.pos[1] >= pos[1] - 16 and
                     self.current_checkpoint != checkpoint):
 
