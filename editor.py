@@ -329,7 +329,8 @@ class Editor:
         # Creates a deep copy of the current map state
         return {
             'tilemap': copy.deepcopy(self.tilemap.tilemap),
-            'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles)
+            'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles),
+            'background': copy.deepcopy(self.tilemap.background)
         }
 
     def save_action(self):
@@ -353,6 +354,7 @@ class Editor:
         # 1. Load data
         self.tilemap.tilemap = copy.deepcopy(snapshot['tilemap'])
         self.tilemap.offgrid_tiles = copy.deepcopy(snapshot['offgrid'])
+        self.tilemap.background = copy.deepcopy(snapshot['background'])
 
         # 2. Refresh derived ID sets (Doors, Levers, etc.)
         self.levers_ids = set()

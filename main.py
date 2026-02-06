@@ -486,6 +486,7 @@ class Game:
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
 
         display_level_bg(self, self.level)
+        self.tilemap.render_background_tiles(self.display, offset=render_scroll)
         return render_scroll
 
 

@@ -19,9 +19,10 @@ AUTOTILE_MAP = {
 
 }
 
-PHYSICS_TILES = {'grass','stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass'}
+PHYSICS_TILES = {'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass', 'mossy_stone_gluy'}
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
-AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone'}
+AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy'}
+AUTOTILE_COMPATIBILITY = {'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
 LEVER_TILES = {'lever': [0, 1]}
 LAYER_0 = {'vine_transp_back','dark_vine'}
 
@@ -135,29 +136,18 @@ class Tilemap:
         self.background = map_data['background']
 
     def autotile(self):
-        for loc in self.tilemap:
-            tile = self.tilemap[loc]
-            neighbors = set()
-            for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
-                check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
-                if check_loc in self.tilemap:
-                    if self.tilemap[check_loc]['type'] == tile['type']:
-                        neighbors.add(shift)
-            neighbors = tuple(sorted(neighbors))
-            if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
-                tile['variant'] = AUTOTILE_MAP[neighbors]
-        for loc in self.background:
-            tile = self.background[loc]
-            neighbors = set()
-            for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
-                check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
-                if check_loc in self.background:
-                    if self.background[check_loc]['type'] == tile['type']:
-                        neighbors.add(shift)
-            neighbors = tuple(sorted(neighbors))
-            if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
-                tile['variant'] = AUTOTILE_MAP[neighbors]
-
+        for space in [self.tilemap, self.background]:
+            for loc in space:
+                tile = space[loc]
+                neighbors = set()
+                for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
+                    check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
+                    if check_loc in space:
+                        if space[check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and space[check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
+                            neighbors.add(shift)
+                neighbors = tuple(sorted(neighbors))
+                if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
+                    tile['variant'] = AUTOTILE_MAP[neighbors]
 
     def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))
