@@ -43,6 +43,15 @@ class PhysicsPlayer:
 
         self.dash_max_amt = 1
 
+        # Slime physics constants
+        self.visual_scale = [1.0, 1.0]
+        self.spring_velocity = [0.0, 0.0]  # Internal "jiggle" velocity
+        self.stiffness = 0.15  # How fast it snaps back
+        self.damping = 0.8  # How much it wobbles (lower = more wobbly)
+        self.last_velocity = [0, 0]  # To catch velocity right before collision
+
+        self.dash_border_radius = 0
+
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
 
@@ -216,19 +225,22 @@ class PhysicsPlayer:
         if self.is_on_floor():
             self.jumping = False
 
-        if not self.is_on_floor() and self.can_walljump["sliding"] == False:
-            # Spin speed (Adjust "8" to make it faster/slower)
-            rotation_speed = 6.5
-
+        rotation_speed = 4.5
+        if not self.is_on_floor():
+            # Spin speed (Adjust "8" to make it faster/slower
             # Spin based on direction (Clockwise if facing right, CCW if left)
             # We use last_direction so you keep spinning even if you stop pressing keys in mid-air
-            if self.last_direction == 1:
-                self.rotation_angle -= rotation_speed  # Negative is clockwise in Pygame
-            else:
-                self.rotation_angle += rotation_speed
+
+
+            if not self.can_walljump["sliding"] or self.rotation_angle % 90 != 0:
+                if self.last_direction == 1:
+                    self.rotation_angle -= rotation_speed # Negative is clockwise in Pygame
+                else:
+                    self.rotation_angle += rotation_speed
 
             # Keep angle within 0-360 for cleanliness (optional)
             self.rotation_angle %= 360
+
         else:
             # Snap back to 0 when on the ground
             # You can also use a 'lerp' here if you want a smooth landing animation
@@ -256,6 +268,7 @@ class PhysicsPlayer:
             self.apply_animations()
             self.apply_particle()
             self.animation.update()
+            self.update_slime_deformation()
 
             # Mise à jour des sons
             self.update_sounds()
@@ -543,6 +556,8 @@ class PhysicsPlayer:
         else:
             self.force_movement_direction["r"] = [True, 22]
             self.force_movement_direction["l"] = [False, 0]
+            self.visual_scale = [0.6, 1.4]
+            self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
 
     def dash(self):
         """Handles player dash."""
@@ -576,6 +591,8 @@ class PhysicsPlayer:
     def dash_momentum(self):
         """Applies momentum from dash. Manage momentum when dash ends."""
         if self.dashtime_cur > 0:
+            if not self.collision["left"] and not self.collision["right"]:
+                self.dash_border_radius += 1
             self.dash_ghost_trail()
             self.dashtime_cur -= 1
             move_x = self.dash_direction[0]
@@ -781,6 +798,9 @@ class PhysicsPlayer:
             "blocks_around"]):
             self.can_walljump["sliding"] = False
 
+        if self.is_on_floor() or self.collision["right"] or self.collision["left"]:
+            self.dash_border_radius = max(self.dash_border_radius - 2, 0)
+
         if not self.is_stunned:
             if self.is_on_floor():
                 self.air_time = 0
@@ -808,6 +828,7 @@ class PhysicsPlayer:
     def dash_ghost_trail(self):
         """Creates ghost images that fade out over time."""
         # Store current position and image with a timer
+
         ghost = {
             "pos": [self.rect().centerx, self.rect().centery],  # Assuming self.pos is a list or has a copy method
             "img": self.animation.img().copy(),  # Create a copy of the current image
@@ -833,11 +854,54 @@ class PhysicsPlayer:
             if ghost["lifetime"] <= 0:
                 self.ghost_images.remove(ghost)
 
+    def update_slime_deformation(self):
+        # 1. Friction/Spring Physics: Move scale back to 1.0 like a spring
+
+        if 1 <= self.visual_scale[0] <= 1.2:
+            self.visual_scale[0] = 1
+        if 1 <= self.visual_scale[1] <= 1.2:
+            self.visual_scale[1] = 1
+
+
+        # Force = -k * x
+        force_x = -self.stiffness * (self.visual_scale[0] - 1.0)
+        force_y = -self.stiffness * (self.visual_scale[1] - 1.0)
+
+        # Acceleration = Force (mass is 1)
+        self.spring_velocity[0] = (self.spring_velocity[0] + force_x) * self.damping
+        self.spring_velocity[1] = (self.spring_velocity[1] + force_y) * self.damping
+
+        self.visual_scale[0] += self.spring_velocity[0]
+        self.visual_scale[1] += self.spring_velocity[1]
+
+        # 2. Impact Detection (The "Splash")
+        # Landing on Floor
+        if self.is_on_floor() and self.last_velocity[1] > 2:
+            impact = self.last_velocity[1] * 0.08
+            self.visual_scale = [1.0 + impact, 1.0 - impact]  # Widen and flatten
+
+        # Hitting a Wall (Wall Splash)
+        '''if (self.collision['left'] or self.collision['right']) and abs(self.last_velocity[0]) > 1:
+            impact = abs(self.last_velocity[0]) * 0.1
+            self.visual_scale = [1.0 - impact, 1.0 + impact]  # Thin and tall'''
+
+        # 3. Jumping Stretch
+        if self.jumping and abs(self.velocity[1]) > 4:
+            self.visual_scale = [0.8, 1.3]  # Stretch upward when leaving ground
+
+        # Capture velocity for the next frame's impact calculation
+        self.last_velocity = list(self.velocity)
+
     def render(self, surf, offset=(0, 0)):
         # 1. Draw Ghosts
         for ghost in self.ghost_images[:]:
             alpha = int(255 * (ghost["lifetime"] / 20) ** 2)
             ghost_surf = ghost["img"].copy()
+            size = ghost_surf.get_size()
+            rect_img = pg.Surface(size, pg.SRCALPHA)
+            pg.draw.rect(rect_img, (255, 255, 255), (0, 0, *size), border_radius=20)
+
+            ghost_surf.blit(rect_img, (0, 0), None, pg.BLEND_RGBA_MIN)
 
             # Apply transparency
             ghost_surf.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
@@ -863,15 +927,37 @@ class PhysicsPlayer:
 
             surf.blit(ghost_surf, ghost_rect)
 
-        # 2. Draw Player
         img = self.animation.img().convert_alpha()
 
+        # Apply current slime scaling
+        new_w = int(self.size[0] * self.visual_scale[0])
+        new_h = int(self.size[1] * self.visual_scale[1])
+        scaled_img = pygame.transform.scale(img, (new_w, new_h))
+
+        size = scaled_img.get_size()
+        rect_img = pg.Surface(size, pg.SRCALPHA)
+        pg.draw.rect(rect_img, (255, 255, 255), (0, 0, *size), border_radius=self.dash_border_radius)
+
+        scaled_img.blit(rect_img, (0, 0), None, pg.BLEND_RGBA_MIN)
+
+        # Calculate base position (centered horizontally, bottom-aligned)
+        render_x = self.pos[0] - offset[0] - (new_w - self.size[0]) // 2
+        render_y = self.pos[1] - offset[1] - (new_h - self.size[1])
+
+        # Adjust anchor if touching a wall to make it look like it's splashing AGAINST it
+        if self.collision['left']:
+            render_x = self.pos[0] - offset[0]  # Pin to left side
+        elif self.collision['right']:
+            render_x = self.pos[0] - offset[0] - (new_w - self.size[0])  # Pin to right side
+
+        # Invert for Ceiling gravity
         if self.GRAVITY_DIRECTION == -1:
-            img = pygame.transform.flip(img, False, True)
+            scaled_img = pygame.transform.flip(scaled_img, False, True)
+            render_y = self.pos[1] - offset[1]
 
         if self.can_walljump['count'] >= 1:
             # Create a red surface the same size as the image
-            red_mask = pygame.Surface(img.get_size()).convert_alpha()
+            red_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
 
             # Update color depending on fatigue level (based on walljump count)
             removal_factor = 255 * ((self.can_walljump["count"]-1)/self.max_walljumps)
@@ -879,11 +965,11 @@ class PhysicsPlayer:
             red_mask.fill(color)
 
             # It keeps the alpha channel of the original sprite so only the player turns red.
-            img.blit(red_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+            scaled_img.blit(red_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
 
         if self.rotation_angle != 0:
             # Rotate the image
-            rotated_img = pygame.transform.rotate(img, self.rotation_angle)
+            rotated_img = pygame.transform.rotate(scaled_img, self.rotation_angle)
 
             # Calculate the center of the hitbox relative to the screen
             center_x = self.pos[0] - offset[0] + self.size[0] // 2
@@ -896,7 +982,7 @@ class PhysicsPlayer:
             surf.blit(rotated_img, new_rect)
         else:
             # Standard drawing if no rotation
-            surf.blit(img, (self.pos[0] - offset[0], self.pos[1] - offset[1]))
+            surf.blit(scaled_img, (render_x, render_y))
 
         if self.show_hitbox:
             debug_rect = self.rect().copy()
