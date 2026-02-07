@@ -352,7 +352,14 @@ class Game:
             self.doors.append(
                 Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))
 
-        #Checks if any door should be open
+        if hasattr(self, "opened_doors"):
+            for door in self.doors:
+                if door.id in self.opened_doors:
+                    door.opened = True
+            delattr(self, "opened_doors")
+
+
+        #From save datas: Checks if any door should be open and camera position
         current_save = self.save_system.get_current_save(self.current_slot)
         if current_save:
             saved_doors = current_save["doors"]
@@ -361,13 +368,18 @@ class Game:
                     if str(door.id) in saved_doors:
                         door.opened = True
 
+        # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
+        target_x = self.player.rect().centerx - self.display.get_width() / 2
+        min_x, max_x = self.scroll_limits[self.level]["x"]
+        target_x = max(min_x, min(target_x, max_x))
+        target_y = self.player.rect().centery - self.display.get_height() / 2
+        min_y, max_y = self.scroll_limits[self.level]["y"]
+        target_y = max(min_y, min(target_y, max_y))
+
+        self.scroll = [target_x, target_y]
+
 
         self.transitions = self.tilemap.extract([("transition", 0)])
-
-
-        #Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
-        if not hasattr(self, "scroll"):
-            self.scroll = [self.player.pos[0] - self.display.get_width()/2 , self.player.pos[1] - self.display.get_height()/2]
 
         # Reset VFX and interaction pools
         self.interactable = self.throwable.copy() + self.activators.copy()
@@ -694,7 +706,6 @@ class Game:
         The core gameplay loop. Handles physics, collision, rendering order,
         entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
         """
-
         render_scroll = self.prerender_update()
 
         self.tilemap.render(self.display, offset=render_scroll)

@@ -8,6 +8,7 @@ from scripts.entities import DistanceEnemy, Enemy, Throwable
 from scripts.sound import set_game_volume
 from scripts.activators import Activator
 from scripts.doors import Door
+from scripts.display import move_visual
 
 
 class Save:
@@ -60,6 +61,7 @@ class Save:
             "player": {
                 "position": self.game.spawn_point["pos"].copy(),
                 "spawn_point": self.game.spawn_point,
+                "current_checkpoint": self.game.current_checkpoint,
             },
             "doors": [],
             "level": self.game.level,
@@ -129,28 +131,21 @@ class Save:
             self.game.level = level
             self.game.current_slot = slot
             # --- Finalize Load ---
-            # Set scroll to player position
-            if "player" in save_data and "position" in save_data["player"]:
-                self.game.scroll = list(save_data["player"]["position"])
             # Load the actual map tiles and background
-            self.game.load_level(level, transition_effect=False)
-
-
-            if len(save_data["doors"]):
-                for door in self.game.doors:
-                    print(save_data["doors"])
-                    if str(door.id) in save_data["doors"]:
-                        print('accadendo')
-                        door.opened = True
-
-            # Override player stats with saved stats
             if "player" in save_data:
                 if "position" in save_data["player"]:
                     self.game.player.pos = save_data["player"]["position"]
-                    self.game.scroll = [self.game.player.pos[0] - self.game.display.get_width()/2, self.game.player.pos[1] - self.game.display.get_height()]
                 if "spawn_point" in save_data["player"]:
                     self.game.spawn_point = save_data["player"]["spawn_point"]
+                if "current_checkpoint" in save_data["player"]:
+                    self.game.current_checkpoint = save_data["player"]["current_checkpoint"]
+
+            if "doors" in save_data:
+                self.game.opened_doors = save_data["doors"]
+
             self.game.playtime = save_data["playtime"]
+
+            self.game.load_level(level, transition_effect=False)
 
             print(f"Game loaded successfully from {save_path}")
             return True
