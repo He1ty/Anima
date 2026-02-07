@@ -614,37 +614,6 @@ class Game:
 
         #self.spark_update(render_scroll)
 
-        # --- Input Handling ---
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.menu.menu_display()
-                    for key in self.dict_kb.keys(): self.dict_kb[key] = 0
-                if event.key == pygame.K_e:
-                    # Interact with items or levers
-                    update_throwable_objects_action(self)
-                    if not self.player_grabbing: update_activators_actions(self, self.level)
-                if event.key == pygame.K_F11: toggle_fullscreen(self)
-                if event.key == pygame.K_f and not self.holding_attack:
-                    self.dict_kb["key_attack"] = 1
-                    self.holding_attack = True
-                if event.key == pygame.K_h:
-                    self.toggle_hitboxes()
-                if event.key == pygame.K_r:
-                    kill_player(self, self.screen, self.spawn_point["pos"], self.spawn_point["level"], animation=False, transition=True)
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_f:
-                    self.dict_kb["key_attack"] = 0
-                    self.holding_attack = False
-            # Generic keyboard state mapping
-            if event.type in (pygame.KEYDOWN, pygame.KEYUP):
-                state = 1 if event.type == pygame.KEYDOWN else 0
-                key_map = self.get_key_map()
-                if event.key in key_map: self.dict_kb[key_map[event.key]] = state
-
         # --- Final UI Blits ---
         update_bottom_text(self)
         if self.cutscene:
@@ -684,6 +653,38 @@ class Game:
             self.game_initialized = True
             if not os.path.exists(f"saves/save_{self.current_slot}.json"):
                 save_game(self, self.current_slot)
+
+        # --- Input Handling ---
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.menu.menu_display()
+                    for key in self.dict_kb.keys(): self.dict_kb[key] = 0
+                if event.key == pygame.K_e:
+                    # Interact with items or levers
+                    update_throwable_objects_action(self)
+                    if not self.player_grabbing: update_activators_actions(self, self.level)
+                if event.key == pygame.K_F11: toggle_fullscreen(self)
+                if event.key == pygame.K_f and not self.holding_attack:
+                    self.dict_kb["key_attack"] = 1
+                    self.holding_attack = True
+                if event.key == pygame.K_h:
+                    self.toggle_hitboxes()
+                if event.key == pygame.K_r:
+                    kill_player(self, self.screen, self.spawn_point["pos"], self.spawn_point["level"],
+                                animation=False, transition=True)
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_f:
+                    self.dict_kb["key_attack"] = 0
+                    self.holding_attack = False
+            # Generic keyboard state mapping
+            if event.type in (pygame.KEYDOWN, pygame.KEYUP):
+                state = 1 if event.type == pygame.KEYDOWN else 0
+                key_map = self.get_key_map()
+                if event.key in key_map: self.dict_kb[key_map[event.key]] = state
 
         self.clock.tick(60)
 
@@ -735,6 +736,7 @@ class Game:
 
             elif self.state == "PLAYING":
                 # Dynamic music based on level ID
+
                 change_music(self, "assets/sounds/" + f"map_{str(self.level)}" + ".wav")
                 self.main_game_logic()
 

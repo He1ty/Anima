@@ -315,8 +315,9 @@ class Menu:
                 elif text == "QUIT":
                     self.game.menu_time += time.time() - self.menu_time_start
                     self.game.save_system.update_playtime(self.game.current_slot)
-                    py.quit()
-                    sys.exit()
+                    save_game(self.game, self.game.current_slot)
+                    self.game.__init__()
+                    return False
                 elif text == "BACK":
                     self.options_visible = False
                     save_settings(self.game)

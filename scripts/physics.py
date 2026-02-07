@@ -87,6 +87,7 @@ class PhysicsPlayer:
         self.dash_cooldown_cur = 0
         self.noclip = False
         self.noclip_buffer = False
+        self.holding_n = False
 
         self.is_stunned = False
         self.last_stun_time = 0
@@ -246,10 +247,14 @@ class PhysicsPlayer:
             # You can also use a 'lerp' here if you want a smooth landing animation
             self.rotation_angle = 0
 
-        if not self.noclip:
-            if self.dict_kb["key_noclip"] == 1 and self.allowNoClip:
-                self.noclip = True
+        if self.dict_kb["key_noclip"] == 1 and self.allowNoClip and not self.holding_n:
+            self.noclip = not self.noclip
+            self.holding_n = True
 
+        if self.dict_kb["key_noclip"] == 0:
+            self.holding_n = False
+
+        if not self.noclip:
             self.air_time += 1
             direction = self.get_direction("x")
             if direction != 0:
@@ -276,10 +281,6 @@ class PhysicsPlayer:
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
-
-
-            if self.dict_kb["key_noclip"] == 1:
-                self.noclip = False
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -445,8 +446,13 @@ class PhysicsPlayer:
         if not self.is_on_floor() and not self.dashtime_cur > 0:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
-                if self.acceleration[1] == 0.42:
-                    self.velocity[1] = max(0, self.velocity[1] - 1.5)
+                # First deceleration
+                if abs(self.acceleration[1]) == 0.42:
+                    if self.GRAVITY_DIRECTION == 1:
+                        self.velocity[1] = max(0, self.velocity[1] - 1.5)
+                    else:
+                        self.velocity[1] = min(0, self.velocity[1] + 1.5)
+
                 if self.can_walljump["count"] < self.max_walljumps - 1:
                     if self.velocity[1] == 0:
                         self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
@@ -857,6 +863,7 @@ class PhysicsPlayer:
     def update_slime_deformation(self):
         # 1. Friction/Spring Physics: Move scale back to 1.0 like a spring
 
+        # Stabilizes the spring effect in order to low its duration (so it doesn't spring during 80000 years)
         if 1 <= self.visual_scale[0] <= 1.2:
             self.visual_scale[0] = 1
         if 1 <= self.visual_scale[1] <= 1.2:
@@ -876,8 +883,8 @@ class PhysicsPlayer:
 
         # 2. Impact Detection (The "Splash")
         # Landing on Floor
-        if self.is_on_floor() and self.last_velocity[1] > 2:
-            impact = self.last_velocity[1] * 0.08
+        if self.is_on_floor() and abs(self.last_velocity[1]) > 2:
+            impact = abs(self.last_velocity[1]) * 0.05
             self.visual_scale = [1.0 + impact, 1.0 - impact]  # Widen and flatten
 
         # Hitting a Wall (Wall Splash)
@@ -887,7 +894,8 @@ class PhysicsPlayer:
 
         # 3. Jumping Stretch
         if self.jumping and abs(self.velocity[1]) > 4:
-            self.visual_scale = [0.8, 1.3]  # Stretch upward when leaving ground
+            self.visual_scale = [0.8, 1.2]  # Stretch upward when leaving ground
+
 
         # Capture velocity for the next frame's impact calculation
         self.last_velocity = list(self.velocity)
@@ -934,11 +942,10 @@ class PhysicsPlayer:
         new_h = int(self.size[1] * self.visual_scale[1])
         scaled_img = pygame.transform.scale(img, (new_w, new_h))
 
-        size = scaled_img.get_size()
+        '''size = scaled_img.get_size()
         rect_img = pg.Surface(size, pg.SRCALPHA)
         pg.draw.rect(rect_img, (255, 255, 255), (0, 0, *size), border_radius=self.dash_border_radius)
-
-        scaled_img.blit(rect_img, (0, 0), None, pg.BLEND_RGBA_MIN)
+        scaled_img.blit(rect_img, (0, 0), None, pg.BLEND_RGBA_MIN)'''
 
         # Calculate base position (centered horizontally, bottom-aligned)
         render_x = self.pos[0] - offset[0] - (new_w - self.size[0]) // 2

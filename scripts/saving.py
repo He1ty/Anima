@@ -44,7 +44,7 @@ class Save:
         try:
             with open(save_path, 'w') as save_file:
                 json.dump(save_data, save_file, indent=4)
-            print(f"Game saved successfully to {save_path}")
+            print(f"Playtime saved successfully to {save_path}")
             return True
         except Exception as e:
             print(f"Error saving game: {e}")
@@ -94,7 +94,7 @@ class Save:
         save_path = os.path.join(self.save_folder, f"save_{slot}.json")
 
         if not os.path.exists(save_path):
-            print(f"No save found in {save_path}")
+            print(f"(get_current_save() function) : No save found in {save_path}")
             return False
 
         try:
@@ -218,10 +218,10 @@ class Save:
         try:
             with open(save_path, 'w') as save_file:
                 json.dump(save_data, save_file, indent=4)
-            print(f"Game saved successfully to {save_path}")
+            print(f"Settings saved successfully to {save_path}")
             return True
         except Exception as e:
-            print(f"Error saving game: {e}")
+            print(f"Error saving settings: {e}")
             return False
 
     def load_settings(self):
