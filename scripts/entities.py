@@ -524,9 +524,10 @@ def death_animation(screen):
 def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition=True):
     # Handle player death, respawn them at the proper position
     game.cutscene = False
-
     if animation:
         death_animation(screen)
+    if game.level != spawn_level:
+        game.player.pos = game.spawn_point["pos"].copy()
     game.level = spawn_level
     game.load_level(spawn_level, transition_effect=animation or transition)
     update_light(game)
@@ -534,6 +535,7 @@ def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition
     game.player.dashtime_cur = 0
     game.player.pos[0] = spawn_pos[0]
     game.player.pos[1] = spawn_pos[1]
+
 
 
 def deal_dmg(game, source, target, att_dmg=5, att_time=1):

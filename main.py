@@ -371,9 +371,11 @@ class Game:
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         target_x = self.player.rect().centerx - self.display.get_width() / 2
         min_x, max_x = self.scroll_limits[self.level]["x"]
+        max_x -= self.display.get_width()
         target_x = max(min_x, min(target_x, max_x))
         target_y = self.player.rect().centery - self.display.get_height() / 2
         min_y, max_y = self.scroll_limits[self.level]["y"]
+        max_y -= self.display.get_height()
         target_y = max(min_y, min(target_y, max_y))
 
         self.scroll = [target_x, target_y]
