@@ -50,8 +50,6 @@ class PhysicsPlayer:
         self.damping = 0.8  # How much it wobbles (lower = more wobbly)
         self.last_velocity = [0, 0]  # To catch velocity right before collision
 
-        self.dash_border_radius = 0
-
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
 
@@ -597,8 +595,6 @@ class PhysicsPlayer:
     def dash_momentum(self):
         """Applies momentum from dash. Manage momentum when dash ends."""
         if self.dashtime_cur > 0:
-            if not self.collision["left"] and not self.collision["right"]:
-                self.dash_border_radius += 1
             self.dash_ghost_trail()
             self.dashtime_cur -= 1
             move_x = self.dash_direction[0]
@@ -804,9 +800,6 @@ class PhysicsPlayer:
             "blocks_around"]):
             self.can_walljump["sliding"] = False
 
-        if self.is_on_floor() or self.collision["right"] or self.collision["left"]:
-            self.dash_border_radius = max(self.dash_border_radius - 2, 0)
-
         if not self.is_stunned:
             if self.is_on_floor():
                 self.air_time = 0
@@ -905,11 +898,6 @@ class PhysicsPlayer:
         for ghost in self.ghost_images[:]:
             alpha = int(255 * (ghost["lifetime"] / 20) ** 2)
             ghost_surf = ghost["img"].copy()
-            size = ghost_surf.get_size()
-            rect_img = pg.Surface(size, pg.SRCALPHA)
-            pg.draw.rect(rect_img, (255, 255, 255), (0, 0, *size), border_radius=20)
-
-            ghost_surf.blit(rect_img, (0, 0), None, pg.BLEND_RGBA_MIN)
 
             # Apply transparency
             ghost_surf.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
@@ -941,11 +929,6 @@ class PhysicsPlayer:
         new_w = int(self.size[0] * self.visual_scale[0])
         new_h = int(self.size[1] * self.visual_scale[1])
         scaled_img = pygame.transform.scale(img, (new_w, new_h))
-
-        '''size = scaled_img.get_size()
-        rect_img = pg.Surface(size, pg.SRCALPHA)
-        pg.draw.rect(rect_img, (255, 255, 255), (0, 0, *size), border_radius=self.dash_border_radius)
-        scaled_img.blit(rect_img, (0, 0), None, pg.BLEND_RGBA_MIN)'''
 
         # Calculate base position (centered horizontally, bottom-aligned)
         render_x = self.pos[0] - offset[0] - (new_w - self.size[0]) // 2

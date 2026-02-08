@@ -210,6 +210,7 @@ class Save:
             }
 
         save_path = os.path.join(self.save_folder, f"settings.json")
+
         try:
             with open(save_path, 'w') as save_file:
                 json.dump(save_data, save_file, indent=4)

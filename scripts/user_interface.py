@@ -6,6 +6,8 @@ import numpy as np
 import cv2
 import os
 import datetime
+
+from scripts.display import toggle_fullscreen
 from scripts.sound import set_game_volume
 from scripts.utils import load_images, load_image
 from scripts.text import load_game_font
@@ -45,6 +47,64 @@ class Menu:
 
         self.button_font.set_bold(True)
 
+        self.settings_categories = {
+                                    "Game" :
+                                        {"Language":
+                                             {
+                                                 "type": "multiple_choices",
+                                                 "choices": self.languages,
+                                                 "current": self.selected_language
+                                             }
+                                        },
+
+                                    "Audio":
+                                        {"Main Sound":
+                                            {
+                                                "type": "drag",
+                                                "current": self.volume
+                                            },
+                                        "Music":
+                                            {
+                                                "type": "drag",
+                                                "current": self.volume
+                                            },
+                                        "Effects":
+                                            {
+                                                "type": "drag",
+                                                "current": self.volume
+                                            }
+                                        },
+
+                                    "Video":
+                                        {"Full_Screen":
+                                             {"type" : "switch",
+                                              "current": "On"},
+                                        "Resolution" :
+                                             {
+                                                 "type" : "multiple_choices",
+                                                 "choices" : 1
+                                             },
+                                        "Brightness" :
+                                             {
+                                                 "type": "drag",
+                                                 "current": 0.5
+                                             }
+                                        },
+
+                                    "Keyboard":
+                                        {"Layout":
+                                             {
+                                                 "type":"multiple_choices",
+                                                 "choices": ["AZERTY", "QWERTY"],
+                                                 "current" : self.keyboard_layout
+                                             },
+                                        "Binds":
+                                            {
+                                                "type":"binds"
+                                            }
+                                         }
+                                    }
+
         self.thumbs = {}
         for i in range(3):
             try:
@@ -63,9 +123,9 @@ class Menu:
             "dimmed": (255, 255, 255, 80)
         }
 
-    def update_settings_from_game(self):#Takes the saved settings to apply them to our keyboard and language(which is not graphycally working for the moment)
+    def update_settings_from_game(self): #Takes the saved settings to apply them to our keyboard and language (which is not graphycally working for the moment)
         self.volume = self.game.volume
-        self.keyboard_layout = self.game.keyboard_layout
+        self.keyboard_layout = self.game.keyboard_layout.upper()
         if self.game.selected_language in self.languages:
             self.selected_language = self.game.selected_language
 
@@ -96,11 +156,11 @@ class Menu:
             buttons["RESUME"] = py.Rect(button_x, start_y, self.BUTTON_WIDTH, self.BUTTON_HEIGHT)
             buttons["OPTIONS"] = py.Rect(button_x, start_y + (self.BUTTON_HEIGHT + 20) * 1, self.BUTTON_WIDTH,
                                          self.BUTTON_HEIGHT)
-            buttons["QUIT"] = py.Rect(button_x, start_y + (self.BUTTON_HEIGHT + 20) * 2, self.BUTTON_WIDTH,
+            buttons["SAVE AND QUIT"] = py.Rect(button_x, start_y + (self.BUTTON_HEIGHT + 20) * 2, self.BUTTON_WIDTH,
                                       self.BUTTON_HEIGHT)
 
             bottom_image_x = (current_screen_size[0] - bottom_image.get_width()) // 2
-            bottom_image_y = buttons["QUIT"].bottom + 10
+            bottom_image_y = buttons["SAVE AND QUIT"].bottom + 10
 
             self.top_image = top_image
             self.bottom_image = bottom_image
@@ -312,11 +372,11 @@ class Menu:
                 elif text == "OPTIONS":
                     self.options_visible = True
                     return True
-                elif text == "QUIT":
+                elif text == "SAVE AND QUIT":
                     self.game.menu_time += time.time() - self.menu_time_start
                     self.game.save_system.update_playtime(self.game.current_slot)
                     save_game(self.game, self.game.current_slot)
-                    self.game.__init__()
+                    self.game.__init__(full_setup=False)
                     return False
                 elif text == "BACK":
                     self.options_visible = False
@@ -715,7 +775,11 @@ def start_menu(game):
         size = (1000, 600)
     else:
         size = py.display.get_window_size()
-    screen = py.display.set_mode(size, py.RESIZABLE)
+
+    if py.display.is_fullscreen():
+        screen = py.display.set_mode(size, py.FULLSCREEN)
+    else:
+        screen = py.display.set_mode(size)
     # Increase font size for better visibility on buttons
     font = py.font.Font(None, 24)
     font.set_italic(True)

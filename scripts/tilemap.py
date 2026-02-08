@@ -33,6 +33,7 @@ class Tilemap:
         self.tilemap = {}
         self.offgrid_tiles = []
         self.background = {}
+        self.invisible = {}
         self.show_collisions = False
 
     def extract(self, id_pairs, keep=False):
@@ -54,6 +55,19 @@ class Tilemap:
                 matches[-1]['pos'][1] *= self.tile_size
                 if not keep:
                     del self.tilemap[loc]
+        return matches
+
+    def extract_from_invisible(self, id_pairs, keep=False):
+        matches = []
+        for loc in self.invisible.copy():
+            zone = self.invisible[loc]
+            if (zone['type'], zone['variant']) in id_pairs:
+                matches.append(zone.copy())
+                matches[-1]['pos'] = list(matches[-1]['pos']).copy()
+                matches[-1]['pos'][0] *= self.tile_size
+                matches[-1]['pos'][1] *= self.tile_size
+                if not keep:
+                    del self.invisible[loc]
         return matches
 
     def neighbor_offset(self, size):

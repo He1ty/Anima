@@ -32,20 +32,21 @@ class Game:
     asset loading, level streaming, and the rendering pipeline (lighting, particles, UI).
     """
 
-    def __init__(self):
+    def __init__(self, full_setup=True):
         """
         Initializes the Pygame context, display settings, and global game variables.
         Loads all base assets and prepares the internal state for the first level.
         """
-        pygame.init()
+        if full_setup:
+            pygame.init()
 
-        # --- Window Setup ---
-        pygame.display.set_caption("Anima")
-        # The actual window size
-        self.screen = pygame.display.set_mode((960, 576), pygame.RESIZABLE)
-        # The internal rendering surface (half size for a pixel-art aesthetic)
-        self.display = pygame.Surface((480, 288))
-        self.clock = pygame.time.Clock()
+            # --- Window Setup ---
+            pygame.display.set_caption("Anima")
+            # The actual window size
+            self.screen = pygame.display.set_mode((960, 576), pygame.RESIZABLE)
+            # The internal rendering surface (half size for a pixel-art aesthetic)
+            self.display = pygame.Surface((480, 288))
+            self.clock = pygame.time.Clock()
 
         # --- State Management ---
         # Controls which 'loop' the game is currently running
@@ -96,7 +97,7 @@ class Game:
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to per level
         self.scroll_limits = {
-            0: {"x": (16, 656), "y": (-112, 1744)},
+            0: {"x": (16, 656), "y": (-176, 1744)},
             1: {"x": (-48, 16), "y": (-80, 400)},
             2: {"x": (-48, 280), "y": (-192, -80)},
             3: {"x": (16, 190400), "y": (0, 20000000)},
@@ -286,7 +287,8 @@ class Game:
             :param transition_effect:
         """
         self.tilemap.load("data/maps/" + str(map_id) + ".json")
-        self.display = pygame.Surface((480, 288))
+        mult=0.5
+        self.display = pygame.Surface((960*mult, 576*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
 
@@ -373,7 +375,7 @@ class Game:
         min_x, max_x = self.scroll_limits[self.level]["x"]
         max_x -= self.display.get_width()
         target_x = max(min_x, min(target_x, max_x))
-        target_y = self.player.rect().centery - self.display.get_height() / 2
+        target_y = self.player.rect().centery - 3*self.tile_size
         min_y, max_y = self.scroll_limits[self.level]["y"]
         max_y -= self.display.get_height()
         target_y = max(min_y, min(target_y, max_y))
@@ -399,7 +401,6 @@ class Game:
                 self.level = transition["destination"]
                 self.load_level(self.level, transition_effect=False)
                 self.player.pos = [transition["dest_pos"][0] * 16, transition["dest_pos"][1] * 16]
-                self.scroll = [self.player.pos[0], self.player.pos[1]]
 
     def update_teleport(self, render_scroll):
         for checkpoint in self.checkpoints:
