@@ -117,6 +117,8 @@ class Tilemap:
         for layer in self.tilemap:
             if layer == {}:
                 del self.tilemap[layer]
+        # Add a system which order and shifts all the value in order to make 0 first layer
+
         json.dump({'tilemap': self.tilemap,
                    'tilesize': self.tile_size},
                   f)

@@ -1068,7 +1068,7 @@ class Editor:
                     if event.key == pygame.K_LEFT:
                         self.level_manager.change_level((self.level - 1) % self.sizeofmaps())
                     if event.key == pygame.K_DOWN:
-                        self.current_layer = str(max(int(self.current_layer) - 1, 0))
+                        self.current_layer = str(int(self.current_layer) - 1)
                         if self.current_layer not in self.tilemap.tilemap:
                             self.tilemap.tilemap[self.current_layer] = {}
                     if event.key == pygame.K_UP:
