@@ -232,7 +232,8 @@ class Editor:
 
         self.category_changed = False
         self.activators_categories_shown = False
-        self.current_activator_category = "All"
+        self.current_infos_tile_category = "All"
+        self.selecting_infos_tile_category = False
 
         self.edited_tile = None
         self.edited_tile_category = None
@@ -267,6 +268,8 @@ class Editor:
 
         self.tilemap = Tilemap(self, self.tile_size)
 
+        self.showing_all_layers = False
+
         try:
             self.tilemap.load('data/maps/' + str(self.level) + '.json')
         except FileNotFoundError:
@@ -285,6 +288,7 @@ class Editor:
         self.holding_i = False
         self.holding_b = False
         self.holding_y = False
+        self.holding_tab = False
         self.window_mode = False
         self.showing_properties_window = False
 
@@ -570,60 +574,72 @@ class Editor:
         self.underbar = pygame.Surface((self.screen.get_size()[0] - SIDEBAR_WIDTH, UNDERBAR_HEIGHT))
         self.underbar.fill((35, 35, 35))
 
-        category_text = self.font.render(self.current_activator_category, True, (255, 255, 255))
+        category_text = self.font.render(self.current_infos_tile_category, True, (255, 255, 255))
         category_button = Button(20, 10, 100, 20, self.clicking)
 
-        activators = self.activators[self.current_activator_category] if self.current_activator_category != "All" else \
-            self.activators["Levers"] | self.activators["Teleporters"] | self.activators["Buttons"]
+
+        infos_tiles = []
+        for tile_pos in self.tilemap.tilemap[self.current_layer]:
+            tile = self.tilemap.tilemap[self.current_layer][tile_pos]
+            if "infos_type" in tile:
+                infos_tiles.append(tile)
+
 
         r = c = 0
         cell_width = 150
         cell_h_offset = 15
         cell_height = 40
         cell_v_offset = 50
+        for info_tile in infos_tiles:
+            if self.get_infos_tile_category(info_tile) == self.current_infos_tile_category or self.current_infos_tile_category == "All":
+                act_button = Button(cell_h_offset + (cell_width + cell_h_offset) * c,
+                                    cell_v_offset + (cell_height + 10) * r, cell_width, cell_height, self.clicking)
 
-        for activator in activators:
-            act_button = Button(cell_h_offset + (cell_width + cell_h_offset) * c,
-                                cell_v_offset + (cell_height + 10) * r, cell_width, cell_height, self.clicking)
-            if self.activators_categories_shown:
-                act_button.activated = False
-            act_button.draw(self.underbar, (60, 60, 60), mpos)
-            info_r = 0
-            for info in ["id", "pos"]:
-                info_name = self.small_font.render(info + ":", True, (255, 255, 255))
-                info_value = self.small_font.render(str(activators[activator][info]), True, (255, 255, 255))
+                if self.waiting_for_click_release or self.selecting_infos_tile_category:
+                    act_button.activated = False
+
+                act_button.draw(self.underbar, (60, 60, 60), mpos)
+
+                info_name = self.small_font.render("pos" + ":", True, (255, 255, 255))
+                info_value = self.small_font.render(str(info_tile["pos"]), True, (255, 255, 255))
                 self.underbar.blit(info_name, (
-                    20 + (cell_width + cell_h_offset) * c, cell_v_offset + 5 + (cell_height + 10) * r + 18 * info_r))
+                    20 + (cell_width + cell_h_offset) * c, cell_v_offset + 5 + (cell_height + 10) * r))
                 self.underbar.blit(info_value, (
                     20 + (cell_width + cell_h_offset) * c + info_name.get_width() + 2,
-                    cell_v_offset + 5 + (cell_height + 10) * r + 18 * info_r))
-                info_r += 1
-            c += 1
-            if cell_h_offset + (cell_width + cell_h_offset) * c + cell_width > self.underbar.get_width():
-                c = 0
-                r += 1
-            if act_button.pressed(mpos):
-                self.move_visual_to(activators[activator]["pos"])
+                    cell_v_offset + 5 + (cell_height + 10) * r))
+                c += 1
+
+                if cell_h_offset + (cell_width + cell_h_offset) * c + cell_width > self.underbar.get_width():
+                    c = 0
+                    r += 1
+
+
+
+                if act_button.pressed(mpos) and act_button.activated:
+                    self.move_visual_to(info_tile["pos"])
 
         category_button.draw(self.underbar, (50, 50, 50), mpos)
         self.underbar.blit(category_text, ((140 - category_text.get_width()) / 2, 13))
 
-        if self.activators_categories_shown:
-            categories = ["All", "Levers", "Teleporters", "Buttons"]
-            categories.remove(self.current_activator_category)
-            for category in categories:
-                c_text = self.font.render(category, True, (255, 255, 255))
-                c_button = Button(20, 10 + 20 * (categories.index(category) + 1), 100, 20, self.clicking)
-                c_button.draw(self.underbar, (50, 50, 50), mpos)
-                self.underbar.blit(c_text,
-                                   ((140 - c_text.get_width()) / 2, 13 + 20 * (categories.index(category) + 1)))
-                if c_button.pressed(mpos):
-                    self.current_activator_category = category
-
         if category_button.pressed(mpos):
-            self.activators_categories_shown = True
-        elif self.clicking:
-            self.activators_categories_shown = False
+            self.selecting_infos_tile_category = True
+
+        categories = ["All"]
+        categories += list(self.infos_per_type_per_category.keys())
+        categories.remove(self.current_infos_tile_category)
+
+        if self.selecting_infos_tile_category:
+            for tile_category in categories:
+                    c_text = self.font.render(tile_category, True, (255, 255, 255))
+                    c_button = Button(20, 10 + 20 * (categories.index(tile_category) + 1), 100, 20, self.clicking)
+                    c_button.draw(self.underbar, (50, 50, 50), mpos)
+                    self.underbar.blit(c_text,
+                                       ((140 - c_text.get_width()) / 2, 13 + 20 * (categories.index(tile_category) + 1)))
+                    if c_button.pressed(mpos):
+                        self.current_infos_tile_category = tile_category
+                        self.selecting_infos_tile_category = False
+                        self.waiting_for_click_release = True
+
 
     def set_window_mode(self):
         if not self.window_mode:
@@ -640,8 +656,10 @@ class Editor:
 
     def setup_edit_window(self, tile_category, tile):
         self.set_window_mode()
-        self.edited_tile = {"pos" : tile["pos"]}
+        self.edited_tile = tile
         self.edited_tile_category = tile_category
+        if "infos_type" in tile:
+            self.edited_type = tile["infos_type"]
         self.showing_properties_window = True
         self.clicking = False
 
@@ -661,10 +679,10 @@ class Editor:
         different_types = self.infos_per_type_per_category[self.edited_tile_category].copy()
         current_type = self.edited_type
         if current_type is not None:
-            infos = {"type": self.edited_type}
+            infos = {"infos_type": self.edited_type}
             infos.update(different_types[current_type])
         else:
-            infos = {"type"}
+            infos = {"infos_type"}
 
 
         # Render Position (Read only)
@@ -682,12 +700,12 @@ class Editor:
 
             # Display value
             if self.edited_info == info:
-                if info == "type":
+                if info == "infos_type":
                     val_str = self.edited_type
                 else:
                     val_str = self.edited_value
             else:
-                if info == "type":
+                if info == "infos_type":
                     val_str = "" if self.edited_type is None else self.edited_type
 
                 elif info in self.edited_tile:
@@ -711,8 +729,8 @@ class Editor:
 
                 # Type selection logic
                 # Checks if it is changing type, if it does, loop doesn't go forward (stops here)
-                if info == "type":
-                    self.edited_info = "type"
+                if info == "infos_type":
+                    self.edited_info = "infos_type"
 
                 # SPECIAL HANDLING FOR DEST_POS
                 elif info == "dest_pos":
@@ -755,7 +773,7 @@ class Editor:
 
 
 
-            if self.edited_info == "type":
+            if self.edited_info == "infos_type":
                 type_r = 0
                 available_types = list(different_types.keys())
                 if self.edited_type:
@@ -773,7 +791,9 @@ class Editor:
                         type_rect.x, type_rect.y))
                     if type_rect.pressed(mpos):
                         self.edited_type = t
+                        self.edited_tile["infos_type"] = t
                         self.edited_info = None
+                        break
                     type_r += 1
 
 
@@ -817,6 +837,11 @@ class Editor:
         self.current_category = 0
         self.current_category_name = list(self.categories.keys())[self.current_category]
 
+    def get_infos_tile_category(self, tile):
+        for tile_category in self.infos_per_type_per_category:
+            if tile_category.lower()[:-1] in tile["type"]:
+                return tile_category
+
     def main_editor_logic(self):
         self.display.fill((0, 0, 0))
 
@@ -828,7 +853,7 @@ class Editor:
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
         self.tilemap.render(self.display, offset=render_scroll,
-                            mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255, precise_layer=self.current_layer)
+                            mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255, precise_layer=self.current_layer if not self.showing_all_layers else None)
 
         current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
         current_tile_img.set_alpha(100)
@@ -887,9 +912,7 @@ class Editor:
                 else:
                     tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
                     if tile_loc in self.tilemap.tilemap[self.current_layer]:
-                        if self.tilemap.tilemap[self.current_layer][tile_loc]["type"] in self.present_activators_types[
-                            self.current_activator_category] or self.tilemap.tilemap[self.current_layer][tile_loc][
-                            "type"] == "transition" and not self.clicking:
+                        if "infos_type" in self.tilemap.tilemap[self.current_layer][tile_loc] and not self.clicking:
                             element = self.tilemap.tilemap[self.current_layer][tile_loc]["type"]
                             shining_image = \
                                 self.assets[self.tile_list[self.tile_list.index(element)]][
@@ -927,6 +950,7 @@ class Editor:
                             self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
                                 [("spawners", 0)], keep=True):
                             print("Player aspawner alredy placed in this map")
+
                         else:
                             t = self.tile_list[self.tile_group]
                             self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
@@ -936,11 +960,14 @@ class Editor:
 
                             tile = self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]
 
-                            '''
-                            if t in self.activators_types:
-                                category = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
-                                self.setup_edit_window(category, tile)
+                            if "spike" in t:
+                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]["rotation"] = self.rotation
 
+                            elif "lever" in t:
+                                tile_category = self.get_infos_tile_category(tile)
+                                self.setup_edit_window(tile_category, tile)
+
+                            '''
                             if self.tile_list[self.tile_group] in (d[0] for d in self.doors):
                                 iD = int(input("Enter the door id: "))
                                 while iD in self.doors_ids:
@@ -952,16 +979,16 @@ class Editor:
                                     'variant': self.tile_variant,
                                     'pos': tile_pos,
                                     'id': iD}
-
-                            elif "spike" in self.tile_list[self.tile_group] :
-                                self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])]["rotation"] = self.rotation
                             '''
 
                     else:
-                        pass
-                        '''tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                        if tile_loc in self.tilemap.tilemap:
-                            t = self.tilemap.tilemap[tile_loc]["type"]
+                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                        if tile_loc in self.tilemap.tilemap[self.current_layer]:
+                            tile = self.tilemap.tilemap[self.current_layer][tile_loc]
+                            tile_category = self.get_infos_tile_category(tile)
+                            self.setup_edit_window(tile_category, tile)
+                        '''
+                        
                             if t in self.present_activators_types[self.current_activator_category]:
                                 self.set_window_mode()
                                 self.showing_properties_window = True
@@ -1057,75 +1084,105 @@ class Editor:
                             self.undo()
                         if event.key == pygame.K_y:
                             self.redo()
+                        if event.key == pygame.K_DOWN:
+                            if self.current_layer == "0":
+                                print("Layer 0, can't go down")
+                            else:
+                                self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[str(int(self.current_layer) - 1)]\
+                                    = self.tilemap.tilemap[str(int(self.current_layer) - 1)], self.tilemap.tilemap[self.current_layer]
+                                self.current_layer = str(int(self.current_layer) - 1)
+                                print(f"Current layer moved to layer {self.current_layer}")
+                        if event.key == pygame.K_UP:
+                            if self.tilemap.tilemap[self.current_layer] == {} and str(int(self.current_layer) + 1) not in self.tilemap.tilemap:
+                                print("This layer is the last layer, can't go up")
+                            else:
+                                self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[str(int(self.current_layer) + 1)]\
+                                    = self.tilemap.tilemap[str(int(self.current_layer) + 1)], self.tilemap.tilemap[self.current_layer]
+                                self.current_layer = str(int(self.current_layer) + 1)
+                                print(f"Current layer moved to layer {self.current_layer}")
 
-                    if event.key == pygame.K_i and not self.holding_i:
-                        self.edit_properties_mode_on = not self.edit_properties_mode_on
-                        self.holding_i = True
-                    if event.key == pygame.K_q:
-                        self.movement[0] = True
-                    if event.key == pygame.K_RIGHT:
-                        self.level_manager.change_level((self.level + 1) % self.sizeofmaps())
-                    if event.key == pygame.K_LEFT:
-                        self.level_manager.change_level((self.level - 1) % self.sizeofmaps())
-                    if event.key == pygame.K_DOWN:
-                        self.current_layer = str(int(self.current_layer) - 1)
-                        if self.current_layer not in self.tilemap.tilemap:
-                            self.tilemap.tilemap[self.current_layer] = {}
-                    if event.key == pygame.K_UP:
-                        self.current_layer = str(int(self.current_layer) + 1)
-                        if self.current_layer not in self.tilemap.tilemap:
-                            self.tilemap.tilemap[self.current_layer] = {}
+                    else:
+                        if event.key == pygame.K_i and not self.holding_i:
+                            self.edit_properties_mode_on = not self.edit_properties_mode_on
+                            self.holding_i = True
+                        if event.key == pygame.K_q:
+                            self.movement[0] = True
+                        if event.key == pygame.K_RIGHT:
+                            self.level_manager.change_level((self.level + 1) % self.sizeofmaps())
+                        if event.key == pygame.K_LEFT:
+                            self.level_manager.change_level((self.level - 1) % self.sizeofmaps())
+                        if event.key == pygame.K_DOWN:
+                            if self.current_layer == "0":
+                                print("Layer 0, can't make any new layer under this one")
+                            else:
+                                self.current_layer = str(int(self.current_layer) - 1)
+                                print(f"Current layer : {self.current_layer}")
+                            if self.current_layer not in self.tilemap.tilemap:
+                                self.tilemap.tilemap[self.current_layer] = {}
 
-                    if event.key == pygame.K_b and not self.holding_b:
-                        self.edit_background_mode_on = not self.edit_background_mode_on
-                        self.holding_b = True
-                    if event.key == pygame.K_d:
-                        self.movement[1] = True
-                    if event.key == pygame.K_z:
-                        self.movement[2] = True
-                    if event.key == pygame.K_s:
-                        self.movement[3] = True
-                    if event.key == pygame.K_g:
-                        self.ongrid = not self.ongrid
-                    if event.key == pygame.K_t:
-                        self.tilemap.autotile()
-                        self.save_action()
-                    if event.key == pygame.K_LSHIFT:
-                        self.shift = True
-                    if event.key == pygame.K_o:
-                        self.level_manager.full_save()
-                    if event.key == pygame.K_c:
-                        print((tile_pos[0] * 16, tile_pos[1] * 16))
-                    if event.key == pygame.K_r:
-                        self.rotation = (self.rotation + 1)%4
-                    # Make tiles invisible
-                    if event.key == pygame.K_y and not self.holding_y:
-                        self.make_background_invisible = not self.make_background_invisible
-                        self.holding_y = True
-                    if not self.edit_background_mode_on:
-                        # Shortcut for placing camera setup
-                        if event.key == pygame.K_k:
-                            pass
+                        if event.key == pygame.K_UP:
+                            if int(self.current_layer)+1 == len(self.tilemap.tilemap.keys()) and self.tilemap.tilemap[self.current_layer] == {}:
+                                print("This layer is empty, can't make any new layer")
+                            else:
+                                self.current_layer = str(int(self.current_layer) + 1)
+                                print(f"Current layer : {self.current_layer}")
+
+                            if self.current_layer not in self.tilemap.tilemap:
+                                self.tilemap.tilemap[self.current_layer] = {}
+                        if event.key == pygame.K_TAB and not self.holding_tab:
+                            self.showing_all_layers = not self.showing_all_layers
+                            self.holding_tab = True
+
+                        if event.key == pygame.K_b and not self.holding_b:
+                            self.edit_background_mode_on = not self.edit_background_mode_on
+                            self.holding_b = True
+                        if event.key == pygame.K_d:
+                            self.movement[1] = True
+                        if event.key == pygame.K_z:
+                            self.movement[2] = True
+                        if event.key == pygame.K_s:
+                            self.movement[3] = True
+                        if event.key == pygame.K_g:
+                            self.ongrid = not self.ongrid
+                        if event.key == pygame.K_t:
+                            self.tilemap.autotile()
                             self.save_action()
-                        # Shortcut for placing transitions
-                        if event.key == pygame.K_p:
-                            dest = 0  # Default value
-                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': "transition",
-                                'variant': self.tile_variant,
-                                'pos': tile_pos,
-                                'destination': dest,
-                                'dest_pos': [0, 0]}
-                            self.save_action()
-                        # Shortcut for placing checkpoints
-                        if event.key == pygame.K_j:
-                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': "checkpoint",
-                                'variant': 0,
-                                'pos': tile_pos,
-                                'state': 0
-                            }
-                            self.save_action()
+                        if event.key == pygame.K_LSHIFT:
+                            self.shift = True
+                        if event.key == pygame.K_o:
+                            self.level_manager.full_save()
+                        if event.key == pygame.K_c:
+                            print((tile_pos[0] * 16, tile_pos[1] * 16))
+                        if event.key == pygame.K_r:
+                            self.rotation = (self.rotation + 1)%4
+                        # Make tiles invisible
+                        if event.key == pygame.K_y and not self.holding_y:
+                            self.make_background_invisible = not self.make_background_invisible
+                            self.holding_y = True
+                        if not self.edit_background_mode_on:
+                            # Shortcut for placing camera setup
+                            if event.key == pygame.K_k:
+                                pass
+                                self.save_action()
+                            # Shortcut for placing transitions
+                            if event.key == pygame.K_p:
+                                dest = 0  # Default value
+                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                    'type': "transition",
+                                    'variant': self.tile_variant,
+                                    'pos': tile_pos,
+                                    'destination': dest,
+                                    'dest_pos': [0, 0]}
+                                self.save_action()
+                            # Shortcut for placing checkpoints
+                            if event.key == pygame.K_j:
+                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                    'type': "checkpoint",
+                                    'variant': 0,
+                                    'pos': tile_pos,
+                                    'state': 0
+                                }
+                                self.save_action()
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_y:
@@ -1142,6 +1199,8 @@ class Editor:
                         self.movement[2] = False
                     if event.key == pygame.K_s:
                         self.movement[3] = False
+                    if event.key == pygame.K_TAB :
+                        self.holding_tab = False
                     if event.key == pygame.K_LSHIFT:
                         self.shift = False
             else:
@@ -1152,14 +1211,18 @@ class Editor:
                         self.right_clicking = True
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        infos = self.infos_per_type_per_category[self.edited_tile_category][self.edited_type]
-                        if self.edited_info:
-                            self.edited_info = ""
-                        elif (info in self.edited_tile for info in infos):
-                            self.window_mode = False
-                            self.showing_properties_window = False
-                            self.edited_tile = None
-                            self.edited_tile_category = None
+                        if self.edited_type:
+                            infos = self.infos_per_type_per_category[self.edited_tile_category][self.edited_type]
+                            if self.edited_info:
+                                self.edited_info = ""
+                            elif (info in self.edited_tile for info in infos):
+                                self.window_mode = False
+                                self.showing_properties_window = False
+                                self.edited_tile = None
+                                self.edited_tile_category = None
+                                self.edited_type = None
+                            else:
+                                print("All the infos have to be filled!")
                         else:
                             print("All the infos have to be filled!")
 
