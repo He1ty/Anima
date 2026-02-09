@@ -235,7 +235,7 @@ class Editor:
         self.current_infos_tile_category = "All"
         self.selecting_infos_tile_category = False
 
-        self.edited_tile = None
+        self.edited_tile = {}
         self.edited_tile_category = None
 
         self.edited_type = None #Type in self.infos_per_type_per_category[edited_tile_category]
@@ -260,6 +260,15 @@ class Editor:
                 "transition": {"destination": int,
                                "dest_pos": list}
             },
+            "Camera": {
+                "horizontal": {"center":list,
+                              "x_limits": list,
+                              "y_limits": list},
+                "vertical": {"center":list,
+                              "x_limits": list,
+                              "y_limits": list}
+            },
+
         }
         self.types_per_categories = {t: set(self.infos_per_type_per_category[t].keys()) for t in
                                      self.infos_per_type_per_category}
@@ -709,11 +718,11 @@ class Editor:
                     val_str = "" if self.edited_type is None else self.edited_type
 
                 elif info in self.edited_tile:
-                    val_str = self.edited_tile[self.edited_info]
+                    val_str = self.edited_tile[info]
                 else:
                     if infos[info] == int:
                         val_str = str(0)
-                    elif infos[info] == list[int]:
+                    elif infos[info] == list:
                         val_str = "[ , ]"
                     else:
                         val_str = ""
@@ -747,7 +756,7 @@ class Editor:
                             self.waiting_for_click_release = True
                             self.window_mode = False
                             self.showing_properties_window = False
-                            self.edited_tile = None
+                            self.edited_tile = {}
 
                             return  # <--- CRITICAL FIX: STOP RENDERING IMMEDIATELY
 
@@ -767,9 +776,9 @@ class Editor:
                             self.edited_value_type = different_types[self.edited_type][info]
                             self.edited_value = str(0) if self.edited_value_type == int else ""
 
-                        # Special handling for list[int] type
-                        elif different_types[self.edited_type][info] == list[int]:
-                            self.edited_value = "[ , ]"
+                        # Special handling for list type
+                        elif different_types[self.edited_type][info] == list:
+                            self.edited_value = "0;0"
 
 
 
@@ -1027,6 +1036,15 @@ class Editor:
                         if tile_loc in self.tilemap.tilemap[self.current_layer]:
                             del self.tilemap.tilemap[self.current_layer][tile_loc]
 
+                        for tile in self.tilemap.offgrid_tiles.copy():
+                            tile_img = self.assets[tile['type']][tile['variant']]
+                            tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                                 tile['pos'][1] - self.scroll[1],
+                                                 tile_img.get_width(),
+                                                 tile_img.get_height())
+                            if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
+                                self.tilemap.offgrid_tiles.remove(tile)
+
 
         if not self.edit_properties_mode_on:
             self.display.blit(current_tile_img, (5, 5))
@@ -1218,13 +1236,41 @@ class Editor:
                             elif (info in self.edited_tile for info in infos):
                                 self.window_mode = False
                                 self.showing_properties_window = False
-                                self.edited_tile = None
+                                self.edited_tile = {}
                                 self.edited_tile_category = None
                                 self.edited_type = None
                             else:
                                 print("All the infos have to be filled!")
                         else:
                             print("All the infos have to be filled!")
+
+                    if event.key == pygame.K_RETURN:
+                        if self.edited_info:
+                            self.edited_tile[self.edited_info] = self.edited_value
+                            self.edited_value = None
+                            self.edited_info = ""
+
+                    if self.edited_info not in ["infos_type", ""]:
+
+                        if event.key == pygame.K_BACKSPACE:
+                            self.edited_value = self.edited_value[:-1]
+
+                        if 48 <= event.key <= 57 or event.key == 45 or event.key == 59:
+
+                            if self.edited_value_type == list:
+                                self.edited_value = str(int(self.edited_value + chr(event.key)))
+
+                            elif 48 <= event.key <= 57:
+
+                                if self.edited_info == "id":
+
+                                    if len(self.edited_value) < 3:
+                                        self.edited_value = str(int(self.edited_value + chr(event.key)))
+                                    else:
+                                        print("max id reached")
+
+                                else:
+                                    self.edited_value = str(int(self.edited_value + chr(event.key)))
 
 
             if event.type == pygame.MOUSEBUTTONUP:

@@ -29,6 +29,7 @@ class Tilemap:
         self.game = game
         self.tile_size = tile_size
         self.tilemap = {}
+        self.offgrid_tiles = []
         self.show_collisions = False
 
     def extract(self, id_pairs, keep=False):
@@ -36,6 +37,11 @@ class Tilemap:
         extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
         where 0 <= n < len(id_pairs)"""
         matches = []
+        for tile in self.offgrid_tiles.copy():
+            if (tile['type'], tile['variant']) in id_pairs:
+                matches.append(tile.copy())
+                if not keep:
+                    self.offgrid_tiles.remove(tile)
         for layer in self.tilemap:
             for loc in self.tilemap[layer].copy():
                 tile = self.tilemap[layer][loc]
@@ -116,6 +122,7 @@ class Tilemap:
         f = open(path, 'w')
 
         json.dump({'tilemap': self.tilemap,
+                        'offgrid':self.offgrid_tiles,
                    'tilesize': self.tile_size},
                   f, indent=1)
         f.close()
@@ -185,6 +192,11 @@ class Tilemap:
                    offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
 
     def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None):
+        for tile in self.offgrid_tiles:
+            img = self.game.assets[tile['type']][tile['variant']].copy()
+            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
+            surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
+
         for layer in self.tilemap:
             for x in range(offset[0]// self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
