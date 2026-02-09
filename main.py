@@ -501,7 +501,6 @@ class Game:
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
 
         display_level_bg(self, self.level)
-        self.tilemap.render_background_tiles(self.display, offset=render_scroll)
         return render_scroll
 
 
@@ -714,8 +713,6 @@ class Game:
         self.tilemap.render(self.display, offset=render_scroll)
 
         self.prerender_over_update(render_scroll)
-
-        self.tilemap.render_over(self.display, offset=render_scroll)
 
         self.post_render_update(render_scroll)
 

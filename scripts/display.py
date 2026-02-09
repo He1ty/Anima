@@ -165,7 +165,7 @@ def update_camera(game):
 
         else:
             target_x = game.player.rect().centerx - game.display.get_width() / 2
-            target_y = game.player.rect().centery - game.display.get_height() / 2
+            target_y = game.player.rect().centery - game.display.get_height() + game.tile_size*3
 
             if game.level in game.scroll_limits:
                 level_limits = game.scroll_limits[game.level]

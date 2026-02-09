@@ -23,17 +23,12 @@ PHYSICS_TILES = {'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass'
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
 AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone'}
 AUTOTILE_COMPATIBILITY = {'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
-LEVER_TILES = {'lever': [0, 1]}
-LAYER_0 = {'vine_transp_back','dark_vine'}
 
 class Tilemap:
     def __init__(self, game, tile_size = 16):
         self.game = game
         self.tile_size = tile_size
         self.tilemap = {}
-        self.offgrid_tiles = []
-        self.background = {}
-        self.invisible = {}
         self.show_collisions = False
 
     def extract(self, id_pairs, keep=False):
@@ -41,33 +36,17 @@ class Tilemap:
         extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
         where 0 <= n < len(id_pairs)"""
         matches = []
-        for tile in self.offgrid_tiles.copy():
-            if (tile['type'], tile['variant']) in id_pairs:
-                matches.append(tile.copy())
-                if not keep:
-                    self.offgrid_tiles.remove(tile)
-        for loc in self.tilemap.copy():
-            tile = self.tilemap[loc]
-            if (tile['type'], tile['variant']) in id_pairs:
-                matches.append(tile.copy())
-                matches[-1]['pos'] = list(matches[-1]['pos']).copy()
-                matches[-1]['pos'][0] *= self.tile_size
-                matches[-1]['pos'][1] *= self.tile_size
-                if not keep:
-                    del self.tilemap[loc]
-        return matches
+        for layer in self.tilemap:
+            for loc in self.tilemap[layer].copy():
+                tile = self.tilemap[layer][loc]
+                if (tile['type'], tile['variant']) in id_pairs:
+                    matches.append(tile.copy())
+                    matches[-1]['pos'] = list(matches[-1]['pos']).copy()
+                    matches[-1]['pos'][0] *= self.tile_size
+                    matches[-1]['pos'][1] *= self.tile_size
+                    if not keep:
+                        del self.tilemap[layer][loc]
 
-    def extract_from_invisible(self, id_pairs, keep=False):
-        matches = []
-        for loc in self.invisible.copy():
-            zone = self.invisible[loc]
-            if (zone['type'], zone['variant']) in id_pairs:
-                matches.append(zone.copy())
-                matches[-1]['pos'] = list(matches[-1]['pos']).copy()
-                matches[-1]['pos'][0] *= self.tile_size
-                matches[-1]['pos'][1] *= self.tile_size
-                if not keep:
-                    del self.invisible[loc]
         return matches
 
     def neighbor_offset(self, size):
@@ -112,8 +91,9 @@ class Tilemap:
                                   (tile_loc[1] + offset[1]) * self.tile_size - int(self.game.scroll[1]),
                                   16,
                                   16))
-            if check_loc in self.tilemap:
-                tiles.append(self.tilemap[check_loc])
+            for layer in self.tilemap:
+                if check_loc in self.tilemap[layer]:
+                    tiles.append(self.tilemap[layer][check_loc])
         return tiles
 
     def tiles_under(self, pos, size, gravity_dir):
@@ -127,16 +107,19 @@ class Tilemap:
                                   (u_tile_loc[1] + offset[1]) * self.tile_size - int(self.game.scroll[1]),
                                   16,
                                   16))
-            if check_loc in self.tilemap:
-                u_tiles.append(self.tilemap[check_loc])
+            for layer in self.tilemap:
+                if check_loc in self.tilemap[layer]:
+                    u_tiles.append(self.tilemap[layer][check_loc])
         return u_tiles
 
     def save(self, path):
         f = open(path, 'w')
+        for layer in self.tilemap:
+            if layer == {}:
+                del self.tilemap[layer]
         json.dump({'tilemap': self.tilemap,
-                   'tilesize': self.tile_size,
-                   'offgrid': self.offgrid_tiles,
-                   'background': self.background},f)
+                   'tilesize': self.tile_size},
+                  f)
         f.close()
 
     def load(self, path):
@@ -146,18 +129,16 @@ class Tilemap:
 
         self.tilemap = map_data['tilemap']
         self.tile_size = map_data['tilesize']
-        self.offgrid_tiles = map_data['offgrid']
-        self.background = map_data['background']
 
     def autotile(self):
-        for space in [self.tilemap, self.background]:
-            for loc in space:
-                tile = space[loc]
+        for layer in self.tilemap:
+            for loc in self.tilemap[layer]:
+                tile = self.tilemap[layer][loc]
                 neighbors = set()
                 for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
                     check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
-                    if check_loc in space:
-                        if space[check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and space[check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
+                    if check_loc in self.tilemap[layer]:
+                        if self.tilemap[layer][check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and self.tilemap[layer][check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
                             neighbors.add(shift)
                 neighbors = tuple(sorted(neighbors))
                 if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
@@ -165,12 +146,13 @@ class Tilemap:
 
     def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))
-        if tile_loc in self.tilemap:
-            tile = self.tilemap[tile_loc]
-            if tile["type"] in PHYSICS_TILES:
-                return self.tilemap[tile_loc]
-            elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
-                return self.tilemap[tile_loc]
+        for layer in self.tilemap:
+            if tile_loc in self.tilemap[layer]:
+                tile = self.tilemap[layer][tile_loc]
+                if tile["type"] in PHYSICS_TILES:
+                    return self.tilemap[layer][tile_loc]
+                elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
+                    return self.tilemap[layer][tile_loc]
 
     def physics_rects_around(self, pos, size):
         rects = []
@@ -189,59 +171,35 @@ class Tilemap:
         return u_rects
 
     def get_type_from_rect(self, rect):
-        for tile in self.tilemap:
-            if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
-                return self.tilemap[tile]["type"]
+        for layer in self.tilemap:
+            for tile in self.tilemap[layer]:
+                if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
+                    return self.tilemap[layer][tile]["type"]
 
     def get_variant_from_rect(self, rect):
-        for tile in self.tilemap:
-            if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
-                return self.tilemap[tile]["variant"]
+        for layer in self.tilemap:
+            for tile in self.tilemap[layer]:
+                if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
+                    return self.tilemap[layer][tile]["variant"]
 
     def pos_visible(self, surf, pos, offset = (0, 0), additional_offset=(0, 0)):
            return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
                    offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
 
-    def render_background_tiles(self, surf, offset = (0, 0), mask_opacity=255, exception=()):
-        for x in range(offset[0]// self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
-            for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
-                loc = str(x) + ";" + str(y)
-                if loc in self.background:
-                    tile = self.background[loc]
-                    img = self.game.assets[tile['type']][tile['variant']].copy()
-                    img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
-                    surf.blit(img, (
-                    tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
-
-    def render(self, surf, offset = (0, 0), mask_opacity=255, exception=()):
-        for tile in self.offgrid_tiles:
-            img = self.game.assets[tile['type']][tile['variant']].copy()
-            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
-            surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1] ))
-
-        for x in range(offset[0]// self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
-            for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
-                loc = str(x) + ";" + str(y)
-                if loc in self.tilemap:
-                    tile = self.tilemap[loc]
-                    if tile['type'] in LAYER_0:
+    def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None):
+        for layer in self.tilemap:
+            for x in range(offset[0]// self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
+                for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
+                    loc = str(x) + ";" + str(y)
+                    if loc in self.tilemap[layer]:
+                        tile = self.tilemap[layer][loc]
                         img = self.game.assets[tile['type']][tile['variant']].copy()
+                        if precise_layer is not None:
+                            if layer != precise_layer:
+                                mask_opacity = 80
+                            else:
+                                mask_opacity = 255
                         img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
-                        surf.blit(img, (
-                        tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
-
-    def render_over(self, surf, offset = (0, 0), mask_opacity=255, exception=()):
-        # In order to make the render more optimized, we make blocks render only if they are visible on the screen
-        for x in range(offset[0] // self.tile_size - 3, (offset[0] + surf.get_width()) // self.tile_size + 4):
-            # There the coordinates are only in those seen on the screen
-            for y in range(offset[1] // self.tile_size - 3, (offset[1] + surf.get_height()) // self.tile_size + 4):
-                loc = str(x) + ";" + str(y)
-                if loc in self.tilemap:
-                    tile = self.tilemap[loc]
-                    if tile['type'] not in LAYER_0:
-                        img = self.game.assets[tile['type']][tile['variant']].copy()
-                        img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity),
-                                 special_flags=BLEND_RGBA_MULT)
                         if 'rotation' in tile:
                             img = pygame.transform.rotate(img, tile['rotation'] * -90)
                         surf.blit(img, (
