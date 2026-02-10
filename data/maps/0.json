@@ -3537,29 +3537,6 @@
     "infos_type": "non_interactable",
     "id": "0",
     "opening_time": "2"
-   },
-   "10;6": {
-    "type": "green_cave_lever",
-    "variant": 0,
-    "pos": [
-     10,
-     6
-    ],
-    "infos_type": "visual_and_door",
-    "id": "1",
-    "visual_duration": "2",
-    "door_id": "1"
-   },
-   "15;3": {
-    "type": "vines_door_v",
-    "variant": 0,
-    "pos": [
-     15,
-     3
-    ],
-    "infos_type": "non_interactable",
-    "id": "1",
-    "opening_time": "1"
    }
   },
   "2": {

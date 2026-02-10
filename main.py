@@ -524,8 +524,6 @@ class Game:
 
         # 5. Player & Physics
         # attacking_update(self)
-        self.player.physics_process(self.tilemap, self.dict_kb)
-        self.player.render(self.display, offset=render_scroll)
 
 
     def throwable_update(self, render_scroll):
@@ -698,6 +696,7 @@ class Game:
         render_scroll = self.prerender_update()
 
         self.tilemap.render(self.display, offset=render_scroll)
+        self.player.physics_process(self.tilemap, self.dict_kb)
 
         self.prerender_over_update(render_scroll)
 

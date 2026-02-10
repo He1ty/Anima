@@ -862,7 +862,8 @@ class Editor:
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
         self.tilemap.render(self.display, offset=render_scroll,
-                            mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255, precise_layer=self.current_layer if not self.showing_all_layers else None)
+                            mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255, precise_layer=self.current_layer if not self.showing_all_layers else None,
+                            with_player=False)
 
         current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
         current_tile_img.set_alpha(100)

@@ -23,6 +23,7 @@ PHYSICS_TILES = {'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass'
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
 AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone'}
 AUTOTILE_COMPATIBILITY = {'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
+PLAYER_LAYER = "1"
 
 class Tilemap:
     def __init__(self, game, tile_size = 16):
@@ -191,14 +192,13 @@ class Tilemap:
            return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
                    offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
 
-    def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None):
-        for tile in self.offgrid_tiles:
-            img = self.game.assets[tile['type']][tile['variant']].copy()
-            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
-            surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
+    def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None, with_player = True):
 
         for layer in self.tilemap:
-            for x in range(offset[0]// self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
+            if layer == PLAYER_LAYER and with_player:
+                self.game.player.render(surf, offset=offset)
+
+            for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
                     loc = str(x) + ";" + str(y)
                     if loc in self.tilemap[layer]:
@@ -214,3 +214,8 @@ class Tilemap:
                             img = pygame.transform.rotate(img, tile['rotation'] * -90)
                         surf.blit(img, (
                             tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
+
+        for tile in self.offgrid_tiles:
+            img = self.game.assets[tile['type']][tile['variant']].copy()
+            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
+            surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
