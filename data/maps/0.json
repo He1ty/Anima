@@ -3515,6 +3515,54 @@
    }
   },
   "1": {
+   "2;94": {
+    "type": "green_cave_lever",
+    "variant": 0,
+    "pos": [
+     2,
+     94
+    ],
+    "infos_type": "visual_and_door",
+    "id": "0",
+    "visual_duration": "0",
+    "door_id": "0"
+   },
+   "10;91": {
+    "type": "vines_door_h",
+    "variant": 0,
+    "pos": [
+     10,
+     91
+    ],
+    "infos_type": "non_interactable",
+    "id": "0",
+    "opening_time": "2"
+   },
+   "10;6": {
+    "type": "green_cave_lever",
+    "variant": 0,
+    "pos": [
+     10,
+     6
+    ],
+    "infos_type": "visual_and_door",
+    "id": "1",
+    "visual_duration": "2",
+    "door_id": "1"
+   },
+   "15;3": {
+    "type": "vines_door_v",
+    "variant": 0,
+    "pos": [
+     15,
+     3
+    ],
+    "infos_type": "non_interactable",
+    "id": "1",
+    "opening_time": "1"
+   }
+  },
+  "2": {
    "6;7": {
     "type": "mossy_stone",
     "variant": 1,
@@ -19565,24 +19613,6 @@
     ],
     "rotation": 3
    },
-   "10;91": {
-    "type": "vines_door_h",
-    "variant": 0,
-    "pos": [
-     10,
-     91
-    ],
-    "id": 0
-   },
-   "2;94": {
-    "type": "green_cave_lever",
-    "variant": 0,
-    "pos": [
-     2,
-     94
-    ],
-    "id": 0
-   },
    "9;99": {
     "type": "mossy_stone",
     "variant": 3,
@@ -31241,7 +31271,7 @@
     ]
    }
   },
-  "2": {}
+  "3": {}
  },
  "offgrid": [],
  "tilesize": 16

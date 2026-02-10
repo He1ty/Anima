@@ -157,13 +157,14 @@ class Game:
 
         self.tilemap = Tilemap(self, self.tile_size)
         self.level = 0
+        #Start level
         self.default_level = self.level
 
         self.active_checkpoint_anim = None
 
         self.activators = []
         self.projectiles = []
-        self.activators_actions = load_activators_actions()
+        self.activators_actions = load_activators_actions(self.level)
         self.spawner_pos = {}
 
         self.checkpoints = []
@@ -284,6 +285,7 @@ class Game:
 
         Args:
             map_id (int): The index of the level to load.
+            :param map_id:
             :param transition_effect:
         """
         self.tilemap.load("data/maps/" + str(map_id) + ".json")
@@ -291,6 +293,7 @@ class Game:
         self.display = pygame.Surface((960*mult, 576*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
+        self.activators_actions = load_activators_actions(self.level)
 
         # --- Checkpoints & Traps ---
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
@@ -349,26 +352,10 @@ class Game:
         self.doors = []
         for door in self.tilemap.extract(self.doors_id_pairs):
             door_type = door["type"]
-            speed = 0.01 if door_type == 'breakable_stalactite' else 1
-            door_id = None if door_type == 'breakable_stalactite' else door["id"]
+            speed = int(door["opening_time"])
+            door_id = door["id"]
             self.doors.append(
                 Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))
-
-        if hasattr(self, "opened_doors"):
-            for door in self.doors:
-                if door.id in self.opened_doors:
-                    door.opened = True
-            delattr(self, "opened_doors")
-
-
-        #From save datas: Checks if any door should be open and camera position
-        current_save = self.save_system.get_current_save(self.current_slot)
-        if current_save:
-            saved_doors = current_save["doors"]
-            if len(saved_doors):
-                for door in self.doors:
-                    if str(door.id) in saved_doors:
-                        door.opened = True
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         target_x = self.player.rect().centerx - self.display.get_width() / 2

@@ -64,16 +64,26 @@ class Save:
                 "current_checkpoint": self.game.current_checkpoint,
             },
             "doors": [],
+            "activators":{},
             "level": self.game.level,
             "timestamp": time.time(),
             "playtime": time.time() - self.game.start_time + self.game.playtime - self.game.menu_time,
         }
 
-        #Only the opened doors' id is saved in save_data
+        #Only the opened doors' and activated activators' ids are saved in save_data
         if hasattr(self.game, "doors"):
             for door in self.game.doors:
                 if door.opened:
                     save_data["doors"].append(str(door.id))
+
+        if hasattr(self.game, "activators"):
+            for activator in self.game.activators:
+                if activator.state == 1 and not activator.activated:
+                    print('a')
+                    if activator.type in save_data["activators"]:
+                        save_data["activators"][activator.type].append(activator.id)
+                    else:
+                        save_data["activators"][activator.type] = [activator.id]
 
 
         py.image.save(self.game.screen, f"saves/slot_{slot}_thumb.png")
@@ -131,7 +141,8 @@ class Save:
             self.game.level = level
             self.game.current_slot = slot
             # --- Finalize Load ---
-            # Load the actual map tiles and background
+
+            #Update players infos
             if "player" in save_data:
                 if "position" in save_data["player"]:
                     self.game.player.pos = save_data["player"]["position"]
@@ -140,12 +151,24 @@ class Save:
                 if "current_checkpoint" in save_data["player"]:
                     self.game.current_checkpoint = save_data["player"]["current_checkpoint"]
 
-            if "doors" in save_data:
-                self.game.opened_doors = save_data["doors"]
-
             self.game.playtime = save_data["playtime"]
 
+            #Load level
             self.game.load_level(level, transition_effect=False)
+
+            #Update doors and activators state
+            if "doors" in save_data:
+                for door in self.game.doors:
+                    if door.id in save_data["doors"]:
+                        door.opened = True
+
+            if "activators" in save_data:
+                for activator in self.game.activators:
+                    if activator.type in save_data["activators"]:
+                        if activator.id in save_data["activators"][activator.type]:
+                            activator.state = 1
+                            activator.activated = False
+
 
             print(f"Game loaded successfully from {save_path}")
             return True

@@ -5,6 +5,8 @@ import random
 from scripts.particle import Particle
 from scripts.display import move_visual, screen_shake
 
+ACTIVATORS_LAYER = "1"
+
 class Activator:
     def __init__(self, game, pos, a_type, size=(16, 16), i=0):#Define basic attributes, that will be useful to track multiple elements from the lever(Position, activated, etc)
         self.game = game
@@ -33,11 +35,11 @@ class Activator:
     def render(self, surface, offset=(0, 0)):#Just display the marvellous lever design of our dear designer
         surface.blit(self.game.assets[self.type][self.state], (self.pos[0] - offset[0], self.pos[1] - offset[1]))
 
-def load_activators_actions():
+def load_activators_actions(map_id):
     try:
-        with open("data/activators.json", "r") as file:
+        with open(f"data/maps/{map_id}.json", "r") as file:
             actions_data = json.load(file)
-            return actions_data
+            return actions_data["tilemap"][ACTIVATORS_LAYER]
 
     except Exception as e:
         print(f"Error loading activators actions: {e}")
@@ -61,32 +63,31 @@ def update_teleporter(game, t_id):
 def update_activators_actions(game, level):
     for activator in game.activators:
         if activator.can_interact(game.player.rect()):
-            activator_id = str(activator.id)
-            if activator_id in game.activators_actions[str(level)][activator.type.rsplit('_', 1)[-1]+'s']:
-                action = game.activators_actions[str(level)][activator.type.rsplit('_', 1)[-1]+'s'][activator_id]
+            activator_pos = f"{activator.pos[0]//game.tile_size};{activator.pos[1]//game.tile_size}"
+            action = game.activators_actions[activator_pos]
+            if action["infos_type"] == "visual_and_door":
+                for door in game.doors:
+                    if door.id == action["door_id"]:
+                        activator.toggle()
+                        move_visual(game, int(action["visual_duration"]), door.pos)
+                        activator.activated = False
+                        door.open()
+                        screen_shake(game, 10)
+                        break
 
-                if action["type"] == "visual_and_door":
-                    for door in game.doors:
-                        if door.id == int(action["door_id"]):
-                            activator.toggle()
-                            move_visual(game, int(action["visual_duration"]), door.pos)
-                            activator.activated = False
-                            door.open()
-                    screen_shake(game, 10)
+            if action["infos_type"] == "improve_tp_progress":
+                teleporters = [tp for tp in game.activators if "teleporter" in tp.type]
+                for tp in teleporters:
+                    if tp.id == action["tp_id"]:
+                        activator.toggle()
+                        move_visual(game, 1, tp.pos)
+                        activator.activated = False
+                        tp.state += int(action["amount"])
+                        if tp.state == 4:
+                            tp.activated = True
+                        break
 
-                if action["type"] == "improve_tp_progress":
-                    teleporters = [tp for tp in game.activators if "teleporter" in tp.type]
-                    for tp in teleporters:
-                        if tp.id == action["tp_id"]:
-                            activator.toggle()
-                            move_visual(game, 1, tp.pos)
-                            activator.activated = False
-                            tp.state += int(action["amount"])
-                            if tp.state == 4:
-                                tp.activated = True
-                            break
-
-                if action["type"] in ("normal_tp", "progressive_tp"):
-                    game.last_teleport_time = time.time()
-                    game.teleporting = True
-                    game.tp_id = activator_id
+            if action["infos_type"] in ("normal_tp", "progressive_tp"):
+                game.last_teleport_time = time.time()
+                game.teleporting = True
+                game.tp_id = str(activator.id)

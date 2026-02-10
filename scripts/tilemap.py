@@ -32,7 +32,7 @@ class Tilemap:
         self.offgrid_tiles = []
         self.show_collisions = False
 
-    def extract(self, id_pairs, keep=False):
+    def extract(self, id_pairs, keep=False, layers=()):
         """dict, bool -> list
         extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
         where 0 <= n < len(id_pairs)"""
@@ -42,7 +42,7 @@ class Tilemap:
                 matches.append(tile.copy())
                 if not keep:
                     self.offgrid_tiles.remove(tile)
-        for layer in self.tilemap:
+        for layer in (layers if layers else self.tilemap):
             for loc in self.tilemap[layer].copy():
                 tile = self.tilemap[layer][loc]
                 if (tile['type'], tile['variant']) in id_pairs:

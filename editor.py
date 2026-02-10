@@ -126,7 +126,6 @@ class LevelManager:
         # 1. Save current map state first
         current_file_id = self.get_file_id(self.editor.level)
         self.editor.tilemap.save('data/maps/' + str(current_file_id) + '.json')
-        self.editor.save_edited_values()
 
         # 2. Create a mapping of Old File ID -> New File ID (0, 1, 2...)
         id_mapping = {}
@@ -246,21 +245,21 @@ class Editor:
         # Added Transitions to the info structure
         self.infos_per_type_per_category = {
             "Levers": {
-                "visual_and_door": {"visual_duration": int, "door_id": int},
-                "test": {"info 1": int, "info 2": str}
+                "visual_and_door": {"id": int, "visual_duration": int, "door_id": int},
+                "test": {"id": int, "info 1": int, "info 2": str}
             },
             "Teleporters": {
-                "normal_tp": {"dest": str, "time": int},
-                "progressive_tp": {"dest": str, "time": int}
+                "normal_tp": {"id": int, "dest": str, "time": int},
+                "progressive_tp": {"id": int, "dest": str, "time": int}
             },
             "Buttons": {
-                "improve_tp_progress": {"amount": int, "tp_id": int},
+                "improve_tp_progress": {"id": int, "amount": int, "tp_id": int},
             },
             "Transitions": {
                 "transition": {"destination": int,
                                "dest_pos": list}
             },
-            "Camera": {
+            "Cameras": {
                 "horizontal": {"center":list,
                               "x_limits": list,
                               "y_limits": list},
@@ -268,6 +267,8 @@ class Editor:
                               "x_limits": list,
                               "y_limits": list}
             },
+            "Doors": {"non_interactable":{"id":int,
+                                          "opening_time": int}}
 
         }
         self.types_per_categories = {t: set(self.infos_per_type_per_category[t].keys()) for t in
@@ -720,9 +721,7 @@ class Editor:
                 elif info in self.edited_tile:
                     val_str = self.edited_tile[info]
                 else:
-                    if infos[info] == int:
-                        val_str = str(0)
-                    elif infos[info] == list:
+                    if infos[info] == list:
                         val_str = "[ , ]"
                     else:
                         val_str = ""
@@ -774,7 +773,7 @@ class Editor:
                     else:
                         if different_types[self.edited_type][info] in (int, str):
                             self.edited_value_type = different_types[self.edited_type][info]
-                            self.edited_value = str(0) if self.edited_value_type == int else ""
+                            self.edited_value = ""
 
                         # Special handling for list type
                         elif different_types[self.edited_type][info] == list:
@@ -821,19 +820,6 @@ class Editor:
 
             info_r += 1
 
-    def load_edited_values(self):
-        pass
-
-    def save_edited_values(self):
-        with open("data/activators.json", "r") as file:
-            try:
-                actions_data = json.load(file)
-            except json.JSONDecodeError:
-                actions_data = {}
-
-        with open("data/activators.json", "w") as f:
-            json.dump(actions_data, f, indent=4)
-
     def get_categories(self):
         self.categories["Blocks"] = [b for b in list(load_tiles(self.get_environment(self.level)).keys()) if
                                      "decor" not in b]
@@ -850,6 +836,20 @@ class Editor:
         for tile_category in self.infos_per_type_per_category:
             if tile_category.lower()[:-1] in tile["type"]:
                 return tile_category
+
+    #Notice : it is important to keep all the infos_tiles (at least from the same category or those who work together, ex: levers and doors)
+    # in the same layer in order to make the id check work properly
+
+    def id_available(self, tile_category, tile_id):
+        ids = []
+        for pos in self.tilemap.tilemap[self.current_layer]:
+            curr_tile = self.tilemap.tilemap[self.current_layer][pos]
+            if "id" not in curr_tile:
+                continue
+            if self.get_infos_tile_category(curr_tile) == tile_category:
+                ids.append(curr_tile["id"])
+        return tile_id not in ids
+
 
     def main_editor_logic(self):
         self.display.fill((0, 0, 0))
@@ -952,81 +952,80 @@ class Editor:
             self.save_action()
 
         if self.clicking and self.ongrid and mpos_in_mainarea:
-            if not self.edit_background_mode_on:
-                if not self.window_mode:
-                    if not self.edit_properties_mode_on:
-                        if self.tile_list[
-                            self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
-                                [("spawners", 0)], keep=True):
-                            print("Player aspawner alredy placed in this map")
-
-                        else:
-                            t = self.tile_list[self.tile_group]
-                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': self.tile_list[self.tile_group],
-                                'variant': self.tile_variant,
-                                'pos': tile_pos}
-
-                            tile = self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]
-
-                            if "spike" in t:
-                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]["rotation"] = self.rotation
-
-                            elif "lever" in t:
-                                tile_category = self.get_infos_tile_category(tile)
-                                self.setup_edit_window(tile_category, tile)
-
-                            '''
-                            if self.tile_list[self.tile_group] in (d[0] for d in self.doors):
-                                iD = int(input("Enter the door id: "))
-                                while iD in self.doors_ids:
-                                    print("id already used")
-                                    iD = int(input("Enter the door id: "))
-                                self.doors_ids.add(iD)
-                                self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                    'type': self.tile_list[self.tile_group],
-                                    'variant': self.tile_variant,
-                                    'pos': tile_pos,
-                                    'id': iD}
-                            '''
+            if not self.window_mode:
+                if not self.edit_properties_mode_on:
+                    if self.tile_list[
+                        self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
+                            [("spawners", 0)], keep=True):
+                        print("Player aspawner alredy placed in this map")
 
                     else:
-                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                        if tile_loc in self.tilemap.tilemap[self.current_layer]:
-                            tile = self.tilemap.tilemap[self.current_layer][tile_loc]
-                            tile_category = self.get_infos_tile_category(tile)
-                            self.setup_edit_window(tile_category, tile)
+                        t = self.tile_list[self.tile_group]
+                        self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                            'type': self.tile_list[self.tile_group],
+                            'variant': self.tile_variant,
+                            'pos': tile_pos}
+
+                        tile = self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]
+
+
+                        if "spike" in t:
+                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]["rotation"] = self.rotation
+
+
+                        else:
+                            for c in self.infos_per_type_per_category:
+                                if c.lower()[:-1] in t:
+                                    tile_category = self.get_infos_tile_category(tile)
+                                    self.setup_edit_window(tile_category, tile)
+                                    break
+
                         '''
-                        
-                            if t in self.present_activators_types[self.current_activator_category]:
-                                self.set_window_mode()
-                                self.showing_properties_window = True
-                                self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
-                                self.selected_activator = {"image": self.assets[t][0],
-                                                           "infos": self.activators[self.selected_activator_type][
-                                                               tile_loc]}
-                                self.clicking = False
-                            elif t == "transition":
-                                self.set_window_mode()
-                                self.showing_properties_window = True
-                                self.selected_activator_type = "Transitions"
-                                # Manual construction of info for transitions
-                                self.selected_activator = {
-                                    "image": self.assets[t][0],
-                                    "infos": {
-                                        "type": "transition",
-                                        "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
-                                        "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0, 0]),
-                                        "pos": self.tilemap.tilemap[tile_loc]['pos']
-                                    }
+                        if self.tile_list[self.tile_group] in (d[0] for d in self.doors):
+                            iD = int(input("Enter the door id: "))
+                            while iD in self.doors_ids:
+                                print("id already used")
+                                iD = int(input("Enter the door id: "))
+                            self.doors_ids.add(iD)
+                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': self.tile_list[self.tile_group],
+                                'variant': self.tile_variant,
+                                'pos': tile_pos,
+                                'id': iD}
+                        '''
+
+                else:
+                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                    if tile_loc in self.tilemap.tilemap[self.current_layer]:
+                        tile = self.tilemap.tilemap[self.current_layer][tile_loc]
+                        tile_category = self.get_infos_tile_category(tile)
+                        self.setup_edit_window(tile_category, tile)
+                    '''
+                    
+                        if t in self.present_activators_types[self.current_activator_category]:
+                            self.set_window_mode()
+                            self.showing_properties_window = True
+                            self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
+                            self.selected_activator = {"image": self.assets[t][0],
+                                                       "infos": self.activators[self.selected_activator_type][
+                                                           tile_loc]}
+                            self.clicking = False
+                        elif t == "transition":
+                            self.set_window_mode()
+                            self.showing_properties_window = True
+                            self.selected_activator_type = "Transitions"
+                            # Manual construction of info for transitions
+                            self.selected_activator = {
+                                "image": self.assets[t][0],
+                                "infos": {
+                                    "type": "transition",
+                                    "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
+                                    "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0, 0]),
+                                    "pos": self.tilemap.tilemap[tile_loc]['pos']
                                 }
-                                self.clicking = False
-                            '''
-            else:
-                self.tilemap.background[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                    'type': self.tile_list[self.tile_group],
-                    'variant': self.tile_variant,
-                    'pos': tile_pos}
+                            }
+                            self.clicking = False
+                        '''
 
         if self.right_clicking and mpos_in_mainarea:
             if not self.window_mode:
@@ -1245,10 +1244,29 @@ class Editor:
                             print("All the infos have to be filled!")
 
                     if event.key == pygame.K_RETURN:
+
                         if self.edited_info:
-                            self.edited_tile[self.edited_info] = self.edited_value
-                            self.edited_value = None
-                            self.edited_info = ""
+                            if self.edited_info == "id":
+
+                                if self.id_available(self.edited_tile_category, self.edited_value):
+                                    self.edited_tile[self.edited_info] = self.edited_value
+                                    self.edited_value = None
+                                    self.edited_info = ""
+                                else:
+                                    print("id already in use")
+
+                            elif "_id" in self.edited_info:
+                                checked_category = self.get_infos_tile_category({"type": self.edited_info[:-3]})
+                                if not self.id_available(checked_category, self.edited_value):
+                                    self.edited_tile[self.edited_info] = self.edited_value
+                                    self.edited_value = None
+                                    self.edited_info = ""
+                                else:
+                                    print(f"No {self.edited_info[:-3]} with this id")
+                            else:
+                                self.edited_tile[self.edited_info] = self.edited_value
+                                self.edited_value = None
+                                self.edited_info = ""
 
                     if self.edited_info not in ["infos_type", ""]:
 

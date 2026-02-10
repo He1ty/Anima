@@ -308,7 +308,7 @@ def screen_shake(game, strenght):
 def toggle_fullscreen(game):
     game.fullscreen = not game.fullscreen
     if game.fullscreen:
-        game.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME)
+        game.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME, vsync=1)
     else:
         game.screen = pygame.display.set_mode((960, 576), pygame.RESIZABLE)
 
