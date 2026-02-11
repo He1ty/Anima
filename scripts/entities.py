@@ -3,8 +3,7 @@ import pygame
 import random
 import math
 
-from pygame.transform import rotate
-
+from scripts.saving import load_game
 from scripts.display import update_light
 
 
@@ -526,15 +525,10 @@ def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition
     game.cutscene = False
     if animation:
         death_animation(screen)
-    if game.level != spawn_level:
-        game.player.pos = game.spawn_point["pos"].copy()
-    game.level = spawn_level
-    update_light(game)
+    load_game(game, game.current_slot)
     game.transition = -30
     game.player.velocity = [0, 0]
     game.player.dashtime_cur = 0
-    game.player.pos[0] = spawn_pos[0]
-    game.player.pos[1] = spawn_pos[1]
 
 
 

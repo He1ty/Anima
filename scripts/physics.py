@@ -632,8 +632,8 @@ class PhysicsPlayer:
 
             if self.can_walljump["timer"] == 0:
                 self.can_walljump["sliding"] = False
-
             for rect in tilemap.physics_rects_under(self.pos, self.size, self.GRAVITY_DIRECTION) + self.game.doors_rects:
+                #print(f"[{rect.x},{rect.y}]")
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
                         # --- GROUND CORNER CORRECTION ---

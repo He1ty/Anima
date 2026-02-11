@@ -773,10 +773,10 @@ class Editor:
                 else:
                     self.edited_info = info
                     print('modifing: ' + self.edited_info)
+                    self.edited_value_type = different_types[self.edited_type][info]
                     if self.edited_info in self.edited_tile:
                         self.edited_value = self.edited_tile[self.edited_info]
                     else:
-                        self.edited_value_type = different_types[self.edited_type][info]
                         if different_types[self.edited_type][info] in (int, str):
                             self.edited_value = ""
 

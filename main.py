@@ -330,7 +330,7 @@ class Game:
                     self.spawners[str(map_id)] = spawner["pos"].copy()
                     self.spawner_pos[str(map_id)] = spawner["pos"]
                     self.player.pos = spawner["pos"].copy()
-                    self.spawn_point = {"pos": spawner["pos"].copy(), "level": map_id}
+                    self.spawn_point = {"pos": spawner["pos"].copy(), "level": map_id, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
             elif spawner['variant'] == 1:
                 self.enemies.append(Enemy(self, "picko", spawner['pos'], (16, 16), 100,
                                           {"attack_distance": 20, "attack_dmg": 10, "attack_time": 1.5}))
@@ -426,7 +426,14 @@ class Game:
 
                 if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
                     continue
-                self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level}
+                self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
+                for camera in self.camera_setup:
+                    if camera.initial_state != camera.scroll_limits:
+                        self.spawn_point["cameras"][str(camera.initial_state)] = {}
+                        self.spawn_point["cameras"][str(camera.initial_state)][
+                            "scroll_limits"] = camera.scroll_limits
+                        if hasattr(camera, "center"):
+                            self.spawn_point["cameras"][str(camera.initial_state)]["center"] = camera.center
                 save_game(self, self.current_slot)
 
     def update_pickups(self, render_scroll):

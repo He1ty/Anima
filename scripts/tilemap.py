@@ -51,7 +51,7 @@ class Tilemap:
                     check = (tile['type'], tile["variant"]) in id_pairs
                 else:
                     check = (tile['type'] in id_pairs)
-                if  check:
+                if check:
                     matches.append(tile.copy())
                     matches[-1]['pos'] = list(matches[-1]['pos']).copy()
                     matches[-1]['pos'][0] *= self.tile_size
@@ -110,7 +110,7 @@ class Tilemap:
 
     def tiles_under(self, pos, size, gravity_dir):
         u_tiles = []
-        u_tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1]+size[0]/2) // self.tile_size))
+        u_tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1] + size[0]/2) // self.tile_size))
         for offset in self.under_offset(size, gravity_dir):
             check_loc = str(u_tile_loc[0] + offset[0]) + ';' + str(u_tile_loc[1] + offset[1])
             if self.show_collisions:
@@ -123,6 +123,15 @@ class Tilemap:
                 if check_loc in self.tilemap[layer]:
                     u_tiles.append(self.tilemap[layer][check_loc])
         return u_tiles
+
+    def render_tiles_under(self, pos, size, gravity_dir):
+        u_tile_loc = (int((pos[0] + size[0] / 2) // self.tile_size), int((pos[1] + size[0]/2) // self.tile_size))
+        for offset in self.under_offset(size, gravity_dir):
+            pygame.draw.rect(self.game.display, (0, 0, 255),
+                                 ((u_tile_loc[0] + offset[0]) * self.tile_size - int(self.game.scroll[0]),
+                                  (u_tile_loc[1] + offset[1]) * self.tile_size - int(self.game.scroll[1]),
+                                  16,
+                                  16))
 
     def save(self, path):
         f = open(path, 'w')
@@ -139,6 +148,7 @@ class Tilemap:
         f.close()
 
         self.tilemap = map_data['tilemap']
+        self.offgrid_tiles = map_data['offgrid']
         self.tile_size = map_data['tilesize']
 
     def autotile(self):
@@ -200,7 +210,9 @@ class Tilemap:
     def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None, with_player = True):
 
         for layer in self.tilemap:
+
             if layer == PLAYER_LAYER and with_player:
+                self.render_tiles_under(self.game.player.pos, self.game.player.size, 1)
                 self.game.player.render(surf, offset=offset)
 
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):

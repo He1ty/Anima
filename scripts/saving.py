@@ -4,7 +4,6 @@ import time
 import pygame as py
 
 # Removed Boss import to match the new main script
-from scripts.entities import DistanceEnemy, Enemy, Throwable
 from scripts.sound import set_game_volume
 from scripts.activators import Activator
 from scripts.doors import Door
@@ -64,9 +63,9 @@ class Save:
                 "current_checkpoint": self.game.current_checkpoint,
             },
             "camera": {
-                "scroll_limits":self.game.scroll_limits,
-                "center":self.game.camera_center,
-                "cameras": {}
+                "scroll_limits":self.game.spawn_point["scroll_limits"],
+                "center":self.game.spawn_point["camera_center"],
+                "cameras": self.game.spawn_point["cameras"]
             },
             "doors": [],
             "activators":{},
@@ -89,14 +88,6 @@ class Save:
                         save_data["activators"][activator.type].append(activator.id)
                     else:
                         save_data["activators"][activator.type] = [activator.id]
-
-        if hasattr(self.game, "camera_setup"):
-            for camera in self.game.camera_setup:
-                if camera.initial_state != camera.scroll_limits:
-                    save_data["camera"]["cameras"][str(camera.initial_state)] = {}
-                    save_data["camera"]["cameras"][str(camera.initial_state)]["scroll_limits"] = camera.scroll_limits
-                    if hasattr(camera, "center"):
-                        save_data["camera"]["cameras"][str(camera.initial_state)]["center"] = camera.center
 
 
         py.image.save(self.game.screen, f"saves/slot_{slot}_thumb.png")
@@ -195,8 +186,6 @@ class Save:
                             camera.scroll_limits = save_data["camera"]["cameras"][str(camera.initial_state)]["scroll_limits"]
                             if "center" in save_data["camera"]["cameras"][str(camera.initial_state)]:
                                 camera.center = save_data["camera"]["cameras"][str(camera.initial_state)]["center"]
-
-
 
             print(f"Game loaded successfully from {save_path}")
             return True
