@@ -63,6 +63,11 @@ class Save:
                 "spawn_point": self.game.spawn_point,
                 "current_checkpoint": self.game.current_checkpoint,
             },
+            "camera": {
+                "scroll_limits":self.game.scroll_limits,
+                "center":self.game.camera_center,
+                "cameras": {}
+            },
             "doors": [],
             "activators":{},
             "level": self.game.level,
@@ -84,6 +89,14 @@ class Save:
                         save_data["activators"][activator.type].append(activator.id)
                     else:
                         save_data["activators"][activator.type] = [activator.id]
+
+        if hasattr(self.game, "camera_setup"):
+            for camera in self.game.camera_setup:
+                if camera.initial_state != camera.scroll_limits:
+                    save_data["camera"]["cameras"][str(camera.initial_state)] = {}
+                    save_data["camera"]["cameras"][str(camera.initial_state)]["scroll_limits"] = camera.scroll_limits
+                    if hasattr(camera, "center"):
+                        save_data["camera"]["cameras"][str(camera.initial_state)]["center"] = camera.center
 
 
         py.image.save(self.game.screen, f"saves/slot_{slot}_thumb.png")
@@ -151,6 +164,12 @@ class Save:
                 if "current_checkpoint" in save_data["player"]:
                     self.game.current_checkpoint = save_data["player"]["current_checkpoint"]
 
+            if "camera" in save_data:
+                if "scroll_limits" in save_data["camera"]:
+                    self.game.scroll_limits = save_data["camera"]["scroll_limits"]
+                if "center" in save_data["camera"]:
+                    self.game.camera_center = save_data["camera"]["center"]
+
             self.game.playtime = save_data["playtime"]
 
             #Load level
@@ -168,6 +187,15 @@ class Save:
                         if activator.id in save_data["activators"][activator.type]:
                             activator.state = 1
                             activator.activated = False
+
+            if "camera" in save_data:
+                if "cameras" in save_data["camera"]:
+                    for camera in self.game.camera_setup:
+                        if str(camera.initial_state) in save_data["camera"]["cameras"]:
+                            camera.scroll_limits = save_data["camera"]["cameras"][str(camera.initial_state)]["scroll_limits"]
+                            if "center" in save_data["camera"]["cameras"][str(camera.initial_state)]:
+                                camera.center = save_data["camera"]["cameras"][str(camera.initial_state)]["center"]
+
 
 
             print(f"Game loaded successfully from {save_path}")

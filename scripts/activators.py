@@ -107,6 +107,8 @@ class CameraSetup:
 
         self.activated = True
         self.player_entry_side = None
+        self.initial_state = {"x":[int(x) for x in camera["x_limits"].split(";")],
+                              "y":[int(y) for y in camera["y_limits"].split(";")]}
 
     def get_player_entry_side(self):
         player_rect = self.game.player.rect()
