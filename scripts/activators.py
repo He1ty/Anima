@@ -91,3 +91,80 @@ def update_activators_actions(game, level):
                 game.last_teleport_time = time.time()
                 game.teleporting = True
                 game.tp_id = str(activator.id)
+
+class CameraSetup:
+    def __init__(self, game, camera):
+        self.game = game
+        self.type = camera["infos_type"]
+        self.scroll_limits = {"x":[int(x) for x in camera["x_limits"].split(";")],
+                              "y":[int(y) for y in camera["y_limits"].split(";")]}
+        self.size = [int(s) for s in camera["size"].split(";")]
+        self.pos = camera["pos"]
+        self.rect = pygame.Rect(self.pos[0], self.pos[1], self.size[0]*self.game.tile_size, self.size[1]*self.game.tile_size)
+        if "center" in camera:
+            self.center = [int(coordinate) for coordinate in camera["center"].split(";")]
+        self.previous_infos = {}
+
+        self.activated = True
+        self.player_entry_side = None
+
+    def get_player_entry_side(self):
+        player_rect = self.game.player.rect()
+
+
+        if self.is_colliding(player_rect) and self.player_entry_side is None:
+            #If player is on same camera_setup y level
+            if player_rect.bottom <= self.rect.bottom and player_rect.top >= self.rect.top:
+                if player_rect.left < self.rect.left <= player_rect.right:
+                    self.player_entry_side = "left"
+                elif player_rect.right > self.rect.right >= player_rect.left:
+                    self.player_entry_side = "right"
+            #Else
+            elif (player_rect.bottom <= self.rect.bottom and player_rect.top <= self.rect.top) or (player_rect.top >= self.rect.top and player_rect.bottom >= self.rect.bottom) :
+                if player_rect.top < self.rect.top <= player_rect.bottom:
+                    self.player_entry_side = "top"
+                elif player_rect.bottom > self.rect.bottom >= player_rect.top:
+                    self.player_entry_side = "bottom"
+        elif self.has_passed():
+            self.player_entry_side = None
+
+
+    def is_colliding(self, player_rect, interaction_distance = -1):  # Check if the player can "touch" the lever.
+        is_colliding = self.rect.colliderect(player_rect.inflate(interaction_distance, interaction_distance))
+        return is_colliding
+
+    def has_passed(self):
+        player_rect = self.game.player.rect()
+        if self.player_entry_side == "top" and player_rect.top > self.rect.bottom:
+            return True
+        if self.player_entry_side == "bottom" and player_rect.bottom < self.rect.top:
+            return True
+        if self.player_entry_side == "right" and player_rect.right < self.rect.left:
+            return True
+        if self.player_entry_side == "left" and player_rect.left > self.rect.right:
+            return True
+
+    def update(self):
+        if self.has_passed():
+            self.player_entry_side = None
+            #First of, save previous "room" camera settings
+            self.previous_infos["scroll_limits"] = self.game.scroll_limits.copy()
+            if self.game.camera_center is not None:
+                self.previous_infos["center"] = self.game.camera_center
+
+            self.game.scroll_limits = self.scroll_limits
+            if hasattr(self, "center"):
+                self.game.camera_center = self.center
+            else:
+                self.game.camera_center = None
+            self.scroll_limits = self.previous_infos["scroll_limits"]
+            if hasattr(self, "center"):
+                self.center = self.previous_infos["center"]
+            self.activated = False
+        else:
+            self.activated = True
+
+        self.get_player_entry_side()
+
+
+

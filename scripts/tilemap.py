@@ -43,10 +43,15 @@ class Tilemap:
                 matches.append(tile.copy())
                 if not keep:
                     self.offgrid_tiles.remove(tile)
+
         for layer in (layers if layers else self.tilemap):
             for loc in self.tilemap[layer].copy():
                 tile = self.tilemap[layer][loc]
-                if (tile['type'], tile['variant']) in id_pairs:
+                if "variant" in tile:
+                    check = (tile['type'], tile["variant"]) in id_pairs
+                else:
+                    check = (tile['type'] in id_pairs)
+                if  check:
                     matches.append(tile.copy())
                     matches[-1]['pos'] = list(matches[-1]['pos']).copy()
                     matches[-1]['pos'][0] *= self.tile_size
@@ -203,17 +208,19 @@ class Tilemap:
                     loc = str(x) + ";" + str(y)
                     if loc in self.tilemap[layer]:
                         tile = self.tilemap[layer][loc]
-                        img = self.game.assets[tile['type']][tile['variant']].copy()
-                        if precise_layer is not None:
-                            if layer != precise_layer:
-                                mask_opacity = 80
-                            else:
-                                mask_opacity = 255
-                        img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
-                        if 'rotation' in tile:
-                            img = pygame.transform.rotate(img, tile['rotation'] * -90)
-                        surf.blit(img, (
-                            tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
+                        if tile["type"] in self.game.assets:
+                            img = self.game.assets[tile['type']][tile['variant']].copy()
+                            if precise_layer is not None:
+                                if layer != precise_layer:
+                                    mask_opacity = 80
+                                else:
+                                    mask_opacity = 255
+                            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
+                            if 'rotation' in tile:
+                                img = pygame.transform.rotate(img, tile['rotation'] * -90)
+                            surf.blit(img, (
+                                tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
+
 
         for tile in self.offgrid_tiles:
             img = self.game.assets[tile['type']][tile['variant']].copy()

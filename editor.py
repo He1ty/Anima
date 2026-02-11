@@ -102,7 +102,6 @@ class LevelManager:
         current_file_id = self.get_file_id(self.editor.level)
         if self.editor.tilemap.tilemap != {}:
             self.editor.tilemap.save('data/maps/' + str(current_file_id) + '.json')
-            self.editor.save_edited_values()
 
         self.editor.level = new_level
 
@@ -260,14 +259,20 @@ class Editor:
                                "dest_pos": list}
             },
             "Cameras": {
-                "horizontal": {"center":list,
-                              "x_limits": list,
-                              "y_limits": list},
-                "vertical": {"center":list,
-                              "x_limits": list,
-                              "y_limits": list}
+                "non-static": {
+                                "size":list,
+                                "x_limits":list,
+                               "y_limits":list
+                               },
+                "static": {"size":list,
+                            "center":list,
+                           "x_limits": list,
+                           "y_limits": list
+                           }
             },
-            "Doors": {"non_interactable":{"id":int,
+            "Doors": {
+                "non_interactable":{
+                    "id":int,
                                           "opening_time": int}}
 
         }
@@ -293,7 +298,6 @@ class Editor:
 
         self.zoom = 1
         self.edit_properties_mode_on = False
-        self.edit_background_mode_on = False
         self.make_background_invisible = False
         self.holding_i = False
         self.holding_b = False
@@ -650,7 +654,6 @@ class Editor:
                         self.selecting_infos_tile_category = False
                         self.waiting_for_click_release = True
 
-
     def set_window_mode(self):
         if not self.window_mode:
             self.default_bg = self.screen.copy()
@@ -726,6 +729,8 @@ class Editor:
                     else:
                         val_str = ""
 
+            if type(val_str) == list:
+                val_str = str(val_str)
             info_value = self.font.render(val_str, True, txt_color)
 
             value_rect = Button(cell_h_offset + info_name.get_width() + 2,
@@ -771,14 +776,13 @@ class Editor:
                     if self.edited_info in self.edited_tile:
                         self.edited_value = self.edited_tile[self.edited_info]
                     else:
+                        self.edited_value_type = different_types[self.edited_type][info]
                         if different_types[self.edited_type][info] in (int, str):
-                            self.edited_value_type = different_types[self.edited_type][info]
                             self.edited_value = ""
 
                         # Special handling for list type
                         elif different_types[self.edited_type][info] == list:
                             self.edited_value = "0;0"
-
 
 
             if self.edited_info == "infos_type":
@@ -790,7 +794,7 @@ class Editor:
                     type_name = self.font.render(t, True, (255, 255, 255))
 
                     type_rect = Button(62,
-                                       75 + type_name.get_height() * (type_r+1),
+                                       cell_v_offset + 5 + type_name.get_height() * (type_r+1),
                                        type_name.get_width(),
                                        type_name.get_height(),
                                        self.clicking)
@@ -815,7 +819,7 @@ class Editor:
                                                      cell_v_offset + 5 + row_offset * info_r))
 
             # Draw Icon (Only if we still have a selected activator)
-            if self.edited_tile:
+            if self.edited_tile and self.edited_tile["type"] in self.assets:
                 self.properties_window.blit(pygame.transform.scale(self.assets[self.edited_tile["type"]][0], (48, 48)), (5, 0))
 
             info_r += 1
@@ -837,7 +841,7 @@ class Editor:
             if tile_category.lower()[:-1] in tile["type"]:
                 return tile_category
 
-    #Notice : it is important to keep all the infos_tiles (at least from the same category or those who work together, ex: levers and doors)
+    # Notice : it is important to keep all the infos_tiles (at least from the same category or those who interact together, ex: levers and doors)
     # in the same layer in order to make the id check work properly
 
     def id_available(self, tile_category, tile_id):
@@ -849,6 +853,16 @@ class Editor:
             if self.get_infos_tile_category(curr_tile) == tile_category:
                 ids.append(curr_tile["id"])
         return tile_id not in ids
+
+    def render_camera_setup_area(self, offset=(0,0)):
+        for pos in self.tilemap.tilemap[self.current_layer]:
+            tile = self.tilemap.tilemap[self.current_layer][pos]
+            if "infos_type" in tile:
+                if tile["type"] == "camera_setup" and "size" in tile:
+                    tile_pos = pos.split(";")
+                    tile_size = tile["size"].split(";")
+                    r = pygame.Rect(int(tile_pos[0])*self.tile_size - offset[0], int(tile_pos[1])*self.tile_size - offset[1], int(tile_size[0])*self.tile_size, int(tile_size[1])*self.tile_size)
+                    pygame.draw.rect(self.display, (255, 0, 0), r, 1)
 
 
     def main_editor_logic(self):
@@ -862,8 +876,10 @@ class Editor:
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
         self.tilemap.render(self.display, offset=render_scroll,
-                            mask_opacity=80 if self.edit_properties_mode_on or self.edit_background_mode_on else 255, precise_layer=self.current_layer if not self.showing_all_layers else None,
+                            mask_opacity=80 if self.edit_properties_mode_on else 255, precise_layer=self.current_layer if not self.showing_all_layers else None,
                             with_player=False)
+
+        self.render_camera_setup_area(offset=render_scroll)
 
         current_tile_img = self.assets[self.tile_list[self.tile_group]][self.tile_variant].copy()
         current_tile_img.set_alpha(100)
@@ -924,13 +940,14 @@ class Editor:
                     if tile_loc in self.tilemap.tilemap[self.current_layer]:
                         if "infos_type" in self.tilemap.tilemap[self.current_layer][tile_loc] and not self.clicking:
                             element = self.tilemap.tilemap[self.current_layer][tile_loc]["type"]
-                            shining_image = \
-                                self.assets[self.tile_list[self.tile_list.index(element)]][
-                                    self.tilemap.tilemap[self.current_layer][tile_loc]["variant"]].copy()
-                            shining_image.fill((255, 255, 255, 100), special_flags=pygame.BLEND_ADD)
-                            self.display.blit(shining_image, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
-                                                              tile_pos[1] * self.tilemap.tile_size - self.scroll[
-                                                                  1]))
+                            if element in self.tile_list:
+                                shining_image = \
+                                    self.assets[self.tile_list[self.tile_list.index(element)]][
+                                        self.tilemap.tilemap[self.current_layer][tile_loc]["variant"]].copy()
+                                shining_image.fill((255, 255, 255, 100), special_flags=pygame.BLEND_ADD)
+                                self.display.blit(shining_image, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
+                                                                  tile_pos[1] * self.tilemap.tile_size - self.scroll[
+                                                                      1]))
 
         if self.selecting_dest_pos and self.clicking and not self.waiting_for_click_release and mpos_in_mainarea:
             selected_pos = list(tile_pos)
@@ -1032,18 +1049,17 @@ class Editor:
             if not self.window_mode:
                 if not self.edit_properties_mode_on:
                     tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                    if not self.edit_background_mode_on:
-                        if tile_loc in self.tilemap.tilemap[self.current_layer]:
-                            del self.tilemap.tilemap[self.current_layer][tile_loc]
+                    if tile_loc in self.tilemap.tilemap[self.current_layer]:
+                        del self.tilemap.tilemap[self.current_layer][tile_loc]
 
-                        for tile in self.tilemap.offgrid_tiles.copy():
-                            tile_img = self.assets[tile['type']][tile['variant']]
-                            tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
-                                                 tile['pos'][1] - self.scroll[1],
-                                                 tile_img.get_width(),
-                                                 tile_img.get_height())
-                            if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
-                                self.tilemap.offgrid_tiles.remove(tile)
+                    for tile in self.tilemap.offgrid_tiles.copy():
+                        tile_img = self.assets[tile['type']][tile['variant']]
+                        tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                             tile['pos'][1] - self.scroll[1],
+                                             tile_img.get_width(),
+                                             tile_img.get_height())
+                        if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
+                            self.tilemap.offgrid_tiles.remove(tile)
 
 
         if not self.edit_properties_mode_on:
@@ -1151,8 +1167,9 @@ class Editor:
                             self.showing_all_layers = not self.showing_all_layers
                             self.holding_tab = True
 
+                        # Show camera setup zones
                         if event.key == pygame.K_b and not self.holding_b:
-                            self.edit_background_mode_on = not self.edit_background_mode_on
+                            self.showing_camera_setup_area = not self.showing_camera_setup_area
                             self.holding_b = True
                         if event.key == pygame.K_d:
                             self.movement[1] = True
@@ -1173,34 +1190,41 @@ class Editor:
                             print((tile_pos[0] * 16, tile_pos[1] * 16))
                         if event.key == pygame.K_r:
                             self.rotation = (self.rotation + 1)%4
-                        # Make tiles invisible
+                        #Unused key
                         if event.key == pygame.K_y and not self.holding_y:
-                            self.make_background_invisible = not self.make_background_invisible
-                            self.holding_y = True
-                        if not self.edit_background_mode_on:
-                            # Shortcut for placing camera setup
-                            if event.key == pygame.K_k:
-                                pass
-                                self.save_action()
-                            # Shortcut for placing transitions
-                            if event.key == pygame.K_p:
-                                dest = 0  # Default value
-                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                    'type': "transition",
-                                    'variant': self.tile_variant,
-                                    'pos': tile_pos,
-                                    'destination': dest,
-                                    'dest_pos': [0, 0]}
-                                self.save_action()
-                            # Shortcut for placing checkpoints
-                            if event.key == pygame.K_j:
-                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                    'type': "checkpoint",
-                                    'variant': 0,
-                                    'pos': tile_pos,
-                                    'state': 0
-                                }
-                                self.save_action()
+                            pass
+                        # Shortcut for placing camera setup
+                        if event.key == pygame.K_k:
+                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': "camera_setup",
+                                'pos': tile_pos
+                            }
+                            tile = self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]
+                            tile_category = self.get_infos_tile_category(tile)
+                            self.setup_edit_window(tile_category, tile)
+                            self.save_action()
+                        # Shortcut for placing transitions
+                        if event.key == pygame.K_p:
+                            dest = "0"  # Default value
+                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': "transition",
+                                'variant': self.tile_variant,
+                                'pos': tile_pos,
+                                'destination': dest,
+                                'dest_pos': [0,0]}
+                            tile = self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]
+                            tile_category = self.get_infos_tile_category(tile)
+                            self.setup_edit_window(tile_category, tile)
+                            self.save_action()
+                        # Shortcut for placing checkpoints
+                        if event.key == pygame.K_j:
+                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                'type': "checkpoint",
+                                'variant': 0,
+                                'pos': tile_pos,
+                                'state': 0
+                            }
+                            self.save_action()
 
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_y:
@@ -1277,7 +1301,7 @@ class Editor:
                         if 48 <= event.key <= 57 or event.key == 45 or event.key == 59:
 
                             if self.edited_value_type == list:
-                                self.edited_value = str(int(self.edited_value + chr(event.key)))
+                                self.edited_value = str(self.edited_value + chr(event.key))
 
                             elif 48 <= event.key <= 57:
 

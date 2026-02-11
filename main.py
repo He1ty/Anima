@@ -95,14 +95,9 @@ class Game:
         self.spawners = {}
 
         # --- Camera Constraints ---
-        # Defines min/max X and Y coordinates the camera can scroll to per level
-        self.scroll_limits = {
-            0: {"x": (16, 656), "y": (-176, 1744)},
-            1: {"x": (-48, 16), "y": (-80, 400)},
-            2: {"x": (-48, 280), "y": (-192, -80)},
-            3: {"x": (16, 190400), "y": (0, 20000000)},
-            4: {"x": (-64, -16), "y": (-288, -256)}
-        }
+        # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
+        self.scroll_limits = {"x": (16, 656), "y": (-176, 144)}
+        self.camera_center = None
 
         # --- Asset Loading ---
         self.assets = {
@@ -357,13 +352,17 @@ class Game:
             self.doors.append(
                 Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))
 
+        self.camera_setup = []
+        for camera in self.tilemap.extract(["camera_setup"]):
+            self.camera_setup.append(CameraSetup(self, camera))
+
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
-        target_x = self.player.rect().centerx - self.display.get_width() / 2
-        min_x, max_x = self.scroll_limits[self.level]["x"]
+        target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
+        min_x, max_x = self.scroll_limits["x"]
         max_x -= self.display.get_width()
         target_x = max(min_x, min(target_x, max_x))
-        target_y = self.player.rect().centery - 3*self.tile_size
-        min_y, max_y = self.scroll_limits[self.level]["y"]
+        target_y = (self.player.rect().centery if self.camera_center is None else self.camera_center[1]) - self.display.get_height()/2
+        min_y, max_y = self.scroll_limits["y"]
         max_y -= self.display.get_height()
         target_y = max(min_y, min(target_y, max_y))
 
@@ -385,7 +384,7 @@ class Game:
         for transition in self.transitions:
             if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
                     self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
-                self.level = transition["destination"]
+                self.level = int(transition["destination"])
                 self.load_level(self.level, transition_effect=False)
                 self.player.pos = [transition["dest_pos"][0] * 16, transition["dest_pos"][1] * 16]
 
@@ -483,7 +482,12 @@ class Game:
                 enemy.set_action("death")
                 if enemy.animation.done: self.enemies.remove(enemy)
 
+    def update_camera_setup(self):
+        for camera in self.camera_setup:
+            camera.update()
+
     def prerender_update(self):
+        self.update_camera_setup()
         update_camera(self)
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
 

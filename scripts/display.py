@@ -164,21 +164,20 @@ def update_camera(game):
                 game.moving_visual = False
 
         else:
-            target_x = game.player.rect().centerx - game.display.get_width() / 2
-            target_y = game.player.rect().centery - game.display.get_height() + game.tile_size*3
+            target_x = (game.player.rect().centerx if game.camera_center is None else game.camera_center[0]) - game.display.get_width() / 2
+            target_y = (game.player.rect().centery if game.camera_center is None else game.camera_center[1]) - game.display.get_height() / 2
 
-            if game.level in game.scroll_limits:
-                level_limits = game.scroll_limits[game.level]
+            level_limits = game.scroll_limits
 
-                if level_limits["x"]:
-                    min_x, max_x = level_limits["x"]
-                    max_x -= game.display.get_width()
-                    target_x = max(min_x, min(target_x, max_x))
+            if level_limits["x"]:
+                min_x, max_x = level_limits["x"]
+                max_x -= game.display.get_width()
+                target_x = max(min_x, min(target_x, max_x))
 
-                if level_limits["y"]:
-                    min_y, max_y = level_limits["y"]
-                    max_y -= game.display.get_height()
-                    target_y = max(min_y, min(target_y, max_y))
+            if level_limits["y"]:
+                min_y, max_y = level_limits["y"]
+                max_y -= game.display.get_height()
+                target_y = max(min_y, min(target_y, max_y))
 
             game.scroll[0] += (target_x - game.scroll[0]) / 20
             game.scroll[1] += (target_y - game.scroll[1]) / 20
