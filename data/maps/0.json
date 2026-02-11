@@ -6223,7 +6223,7 @@
    },
    "5;5": {
     "type": "mossy_stone",
-    "variant": 3,
+    "variant": 8,
     "pos": [
      5,
      5
@@ -6231,7 +6231,7 @@
    },
    "5;4": {
     "type": "mossy_stone",
-    "variant": 3,
+    "variant": 8,
     "pos": [
      5,
      4
@@ -32297,6 +32297,38 @@
      65
     ],
     "rotation": 0
+   },
+   "7;4": {
+    "type": "mossy_stone",
+    "variant": 2,
+    "pos": [
+     7,
+     4
+    ]
+   },
+   "6;4": {
+    "type": "mossy_stone",
+    "variant": 1,
+    "pos": [
+     6,
+     4
+    ]
+   },
+   "6;5": {
+    "type": "mossy_stone",
+    "variant": 5,
+    "pos": [
+     6,
+     5
+    ]
+   },
+   "7;5": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     7,
+     5
+    ]
    }
   },
   "3": {}

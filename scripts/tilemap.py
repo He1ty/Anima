@@ -82,11 +82,7 @@ class Tilemap:
         u_offset = []
         tiles_x = round_up(size[0] / self.tile_size) + 1
         tiles_y = round_up(size[1] / self.tile_size) + gravity_dir
-        if gravity_dir == 1:
-            r = range(tiles_y - 1, tiles_y)
-        elif gravity_dir == -1:
-            r = range(tiles_y - 1, tiles_y)
-
+        r = range(tiles_y - 1, tiles_y)
         for x in range(-1, tiles_x):
             for y in r:
                 u_offset.append((x, y))
@@ -110,7 +106,7 @@ class Tilemap:
 
     def tiles_under(self, pos, size, gravity_dir):
         u_tiles = []
-        u_tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1] + size[0]/2) // self.tile_size))
+        u_tile_loc = (int((pos[0] + size[0]/2) // self.tile_size), int((pos[1] + size[0]/2) // self.tile_size))
         for offset in self.under_offset(size, gravity_dir):
             check_loc = str(u_tile_loc[0] + offset[0]) + ';' + str(u_tile_loc[1] + offset[1])
             if self.show_collisions:
@@ -187,8 +183,12 @@ class Tilemap:
         for tile in self.tiles_under(pos, size, gravity_dir):
             if tile['type'] in PHYSICS_TILES:
                 u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
-            elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']] and gravity_dir == 1:
-                u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size,self.tile_size))
+            elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
+                if not self.game.player.collide_with_passable_blocks: #System in order to make collision with passable blocks more clean (bigger vertical collision offset)
+                    if pos[1] + size[1] <= tile["pos"][1]*self.tile_size:
+                        self.game.player.collide_with_passable_blocks = True
+                if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:
+                    u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size,self.tile_size))
         return u_rects
 
     def get_type_from_rect(self, rect):
@@ -212,7 +212,6 @@ class Tilemap:
         for layer in self.tilemap:
 
             if layer == PLAYER_LAYER and with_player:
-                self.render_tiles_under(self.game.player.pos, self.game.player.size, 1)
                 self.game.player.render(surf, offset=offset)
 
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
@@ -232,6 +231,9 @@ class Tilemap:
                                 img = pygame.transform.rotate(img, tile['rotation'] * -90)
                             surf.blit(img, (
                                 tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
+
+            if layer == "2" and with_player and self.show_collisions:
+                self.render_tiles_under(self.game.player.pos, self.game.player.size, 1)
 
 
         for tile in self.offgrid_tiles:

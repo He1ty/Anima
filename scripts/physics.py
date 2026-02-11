@@ -109,6 +109,7 @@ class PhysicsPlayer:
         self.get_block_on = {'left': False, 'right': False, 'top':False}
         self.air_time = 0
         self.disablePlayerInput = False
+        self.collide_with_passable_blocks = True
 
         # Système de son
         self.init_sound_system()
@@ -496,6 +497,9 @@ class PhysicsPlayer:
 
 
         if self.dict_kb["key_jump"] == 1:
+
+            self.collide_with_passable_blocks = False
+
             # Jumping
             if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
                 self.jump_logic_helper()
@@ -607,6 +611,7 @@ class PhysicsPlayer:
                 # Divide by magnitude to "normalize" the vector to a length of 1
                 self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
                 self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
+
             if self.dashtime_cur == 0:
                 self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
                 if self.collision["left"] or self.collision["right"]:
@@ -633,7 +638,6 @@ class PhysicsPlayer:
             if self.can_walljump["timer"] == 0:
                 self.can_walljump["sliding"] = False
             for rect in tilemap.physics_rects_under(self.pos, self.size, self.GRAVITY_DIRECTION) + self.game.doors_rects:
-                #print(f"[{rect.x},{rect.y}]")
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
                         # --- GROUND CORNER CORRECTION ---
@@ -663,7 +667,7 @@ class PhysicsPlayer:
                             elif self.GRAVITY_DIRECTION == -1:
                                 self.pos[1] = rect.bottom
                                 self.collision['top'] = True
-                            #self.velocity[1] = 0 #Not necessary since we already sets vertical velocity to 0 inside gravity function
+                            #self.velocity[1] = 0
                             self.can_walljump["buffer"] = True
                             self.can_walljump["sliding"] = False
 
