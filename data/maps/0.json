@@ -31056,15 +31056,6 @@
     ],
     "rotation": 3
    },
-   "22;1": {
-    "type": "spikes",
-    "variant": 2,
-    "pos": [
-     22,
-     1
-    ],
-    "rotation": 3
-   },
    "22;2": {
     "type": "spikes",
     "variant": 1,
@@ -32329,6 +32320,15 @@
      7,
      5
     ]
+   },
+   "22;1": {
+    "type": "spikes",
+    "variant": 1,
+    "pos": [
+     22,
+     1
+    ],
+    "rotation": 3
    }
   },
   "3": {}

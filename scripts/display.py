@@ -289,9 +289,9 @@ def draw_boss_health_bar(game, boss):
 
 def display_level_fg(game, map_id):
     if map_id in (0,1,2):
-        generate_fog(game.display, color=(24, 38, 31), opacity=130)
+        generate_fog(game.display, color=(24, 38, 31), opacity=90)
     if map_id == 3:
-        generate_fog(game.display, color=(28, 50, 73), opacity=130)
+        generate_fog(game.display, color=(28, 50, 73), opacity=90)
         
 def update_light(game):
     level_info = game.light_infos[game.level]
