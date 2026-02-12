@@ -285,9 +285,9 @@ class PhysicsPlayer:
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
             if self.force_movement_direction["l"][0]:
-                self.walk(-1,1.5)
+                self.walk(-1,1)
             else:
-                self.walk(1,1.5)
+                self.walk(1,1)
             if (-1 < self.force_movement_direction["l"][1] < 1 and self.force_movement_direction["l"][0]) or (self.force_movement_direction["r"][0] and -1 < self.force_movement_direction["r"][1] < 1) or self.is_on_floor():
                 self.force_movement_direction = {"r":[False,0],"l":[False,0]}
             elif self.force_movement_direction["l"][1] != -1 or self.force_movement_direction["r"][1] != -1:
@@ -541,7 +541,10 @@ class PhysicsPlayer:
 
                     # Jouer le son de wall jump
                     self.play_sound('wall_jump', True)
-                    self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
+                    if self.can_walljump["count"] >= self.max_walljumps:
+                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN + 5
+                    else:
+                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
 
         if self.superjump:
@@ -557,15 +560,16 @@ class PhysicsPlayer:
         self.holding_jump = True
 
     def wall_jump_logic_helper(self):
+        h_jump_speed = 1.5
+        v_boost = 0.5
         self.velocity[0] = 0
         if self.can_walljump["wall"] == 1:
-            self.force_movement_direction["l"] = [True, 22]
-            self.force_movement_direction["r"] = [False, 0]
+            self.velocity[0] += -h_jump_speed
         else:
-            self.force_movement_direction["r"] = [True, 22]
-            self.force_movement_direction["l"] = [False, 0]
+            self.velocity[0] += h_jump_speed
             self.visual_scale = [0.6, 1.4]
             self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
+        self.velocity[1] += -v_boost
 
     def dash(self):
         """Handles player dash."""
