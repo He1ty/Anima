@@ -189,7 +189,7 @@ class PhysicsPlayer:
         """Input : tilemap (map), dict_kb (dict)
         output : sends new coords for the PC to move to in accordance with player input and stage data (tilemap)"""
         self.dict_kb = dict_kb
-        self.force_player_movement_direction()
+        #self.force_player_movement_direction()
         self.force_player_movement()
 
 
@@ -492,6 +492,9 @@ class PhysicsPlayer:
     def jump(self):
         """Handles player jump and super/hyperdash tech"""
 
+        if self.jumping and (self.collision["left"] or self.collision["right"]):
+            self.jumping = False
+
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
 
@@ -521,13 +524,15 @@ class PhysicsPlayer:
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
                 "allowed"]:
+
+                self.jumping = True
                 if self.can_walljump["sliding"]:
                     self.jump_logic_helper()
 
                     # Jouer le son de wall jump
                     self.play_sound('wall_jump', True)
 
-                    if self.can_walljump["wall"] == self.get_direction("x") :  # Jumping into the wall direction
+                    if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
                         self.velocity[1] *= 1
                     else:  # Jumping away from the wall
@@ -550,9 +555,6 @@ class PhysicsPlayer:
         if self.superjump:
             self.dash_ghost_trail()
             self.update_ghost_trail()
-
-        if self.jumping and (self.collision["left"] or self.collision["right"]):
-            self.jumping = False
 
     def jump_logic_helper(self):
         """Avoid code redundancy"""
@@ -804,7 +806,8 @@ class PhysicsPlayer:
             self.collision_check_walljump_helper(-1)
             self.superjump = False
 
-        if not( not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and not self.is_on_floor() and self.can_walljump[
+
+        if not(not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
             self.can_walljump["sliding"] = False
 
