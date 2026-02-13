@@ -1,4 +1,5 @@
 {
  "tilemap": {},
- "tilesize": 16
+ "tilesize": 16,
+ "offgrid": []
 }

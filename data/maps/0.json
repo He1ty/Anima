@@ -4122,6 +4122,17 @@
      21,
      -13
     ]
+   },
+   "29;84": {
+    "type": "camera_setup",
+    "pos": [
+     29,
+     84
+    ],
+    "infos_type": "non-static",
+    "size": "3;1",
+    "x_limits": "16;1280",
+    "y_limits": "640;1728"
    }
   },
   "2": {

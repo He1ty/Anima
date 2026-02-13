@@ -1,13 +1,11 @@
 import json
 import os
 import time
+from typing import SupportsFloat
+
 import pygame as py
 
-# Removed Boss import to match the new main script
 from scripts.sound import set_game_volume
-from scripts.activators import Activator
-from scripts.doors import Door
-from scripts.display import move_visual
 
 
 class Save:
@@ -43,6 +41,7 @@ class Save:
 
         try:
             with open(save_path, 'w') as save_file:
+                # noinspection PyTypeChecker
                 json.dump(save_data, save_file, indent=4)
             print(f"Playtime saved successfully to {save_path}")
             return True
@@ -99,6 +98,7 @@ class Save:
         save_path = os.path.join(self.save_folder, f"save_{slot}.json")
         try:
             with open(save_path, 'w') as save_file:
+                # noinspection PyTypeChecker
                 json.dump(save_data, save_file, indent=4)
             print(f"Game saved successfully to {save_path}")
             return True
@@ -253,6 +253,7 @@ class Save:
 
         try:
             with open(save_path, 'w') as save_file:
+                # noinspection PyTypeChecker
                 json.dump(save_data, save_file, indent=4)
             print(f"Settings saved successfully to {save_path}")
             return True
