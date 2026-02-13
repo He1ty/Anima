@@ -281,6 +281,8 @@ class PhysicsPlayer:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
 
+        print(self.dash_direction[0])
+
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -515,7 +517,7 @@ class PhysicsPlayer:
                 if self.dashtime_cur != 0:
                     self.dashtime_cur = 0
                     self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.4)
-                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 2
+                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
                     self.velocity[1] = self.velocity[1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
                     self.superjump = True
 
@@ -620,6 +622,7 @@ class PhysicsPlayer:
 
             if self.dashtime_cur == 0:
                 self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
+                self.dash_direction = [0, 0]
                 if self.collision["left"] or self.collision["right"]:
                     self.velocity[0] = 0
 
@@ -649,9 +652,8 @@ class PhysicsPlayer:
                         # --- GROUND CORNER CORRECTION ---
                         # If falling and clipping a corner, try to nudge onto the ledge
                         nudged = False
-                        if rect not in self.game.doors_rects:
+                        if rect not in self.game.doors_rects and not self.is_on_floor():
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
-                                # Check Right nudge
                                 if not any(
                                         pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
                                         for r in tilemap.physics_rects_under([self.pos[0] + i, self.pos[1]], self.size, self.GRAVITY_DIRECTION)):
