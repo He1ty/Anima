@@ -32,6 +32,9 @@ class Tilemap:
         self.tilemap = {}
         self.offgrid_tiles = []
         self.show_collisions = False
+        self.fake_tile_opacity = 255
+        self.fake_tile_groups = []
+        self.fake_tile_colliding_group = []
 
     def extract(self, id_pairs, keep=False, layers=()):
         """dict, bool -> list
@@ -207,12 +210,38 @@ class Tilemap:
            return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
                    offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
 
+    def get_same_type_connected_tiles(self, tile, layer):
+        connected_tiles = [tile]
+        offsets = [(0,1), (0,-1), (1,0), (-1,0)]
+        for t in connected_tiles:
+            for offset in offsets:
+                check_loc = f"{t["pos"][0] + offset[0]};{t["pos"][1] + offset[1]}"
+                if check_loc in self.tilemap[layer]:
+                    checked_tile = self.tilemap[layer][check_loc].copy()
+                    if checked_tile["type"] != tile["type"]:
+                        continue
+                    if checked_tile not in connected_tiles:
+                        connected_tiles.append(checked_tile)
+        return connected_tiles
+
+    def fake_tile_render_condition(self, tile):
+        r = pygame.Rect(tile["pos"][0]*self.tile_size, tile["pos"][1]*self.tile_size, self.tile_size, self.tile_size)
+        return self.game.player.rect().colliderect(r)
+
     def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None, with_player = True):
+
+        tiles_opacity = mask_opacity
 
         for layer in self.tilemap:
 
             if layer == PLAYER_LAYER and with_player:
                 self.game.player.render(surf, offset=offset)
+
+            if precise_layer is not None:
+                if layer != precise_layer:
+                    tiles_opacity = 80
+                else:
+                    tiles_opacity = 255
 
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
@@ -221,14 +250,38 @@ class Tilemap:
                         tile = self.tilemap[layer][loc]
                         if tile["type"] in self.game.assets:
                             img = self.game.assets[tile['type']][tile['variant']].copy()
-                            if precise_layer is not None:
-                                if layer != precise_layer:
-                                    mask_opacity = 80
+
+                            if with_player:
+                                g_check = True
+                                for group in self.fake_tile_groups:
+                                    if tile in group:
+                                        g_check = False
+                                        if not self.fake_tile_colliding_group:
+                                            if self.fake_tile_render_condition(tile):
+                                                self.fake_tile_colliding_group = group.copy()
+                                        break
+                                if "fake" in tile["type"] and g_check:
+                                    group = self.get_same_type_connected_tiles(tile, layer)
+                                    if group not in self.fake_tile_groups:
+                                        self.fake_tile_groups.append(group)
+                                if tile in self.fake_tile_colliding_group:
+                                    self.fake_tile_opacity = max(0, self.fake_tile_opacity-1)
+                                    tiles_opacity = self.fake_tile_opacity
+                                    if self.fake_tile_opacity == 0:
+                                        self.fake_tile_colliding_group.remove(tile)
+                                        del self.tilemap[layer][loc]
+                                        continue
                                 else:
-                                    mask_opacity = 255
-                            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
+                                    tiles_opacity = 255
+                                if not self.fake_tile_colliding_group:
+                                    self.fake_tile_opacity = 255
+
+
+                            img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
+
                             if 'rotation' in tile:
                                 img = pygame.transform.rotate(img, tile['rotation'] * -90)
+
                             surf.blit(img, (
                                 tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
 
@@ -238,5 +291,5 @@ class Tilemap:
 
         for tile in self.offgrid_tiles:
             img = self.game.assets[tile['type']][tile['variant']].copy()
-            img.fill((255, 255, 255, 255 if tile['type'] in exception else mask_opacity), special_flags=BLEND_RGBA_MULT)
+            img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
             surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
