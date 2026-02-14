@@ -81,7 +81,8 @@ class LevelManager:
         self.editor.assets = self.editor.base_assets | load_tiles(new_env)
         self.editor.assets.update(load_doors('editor', new_env))
         self.editor.assets.update(load_activators(new_env))
-        self.editor.assets.update(load_pickups())
+
+        self.editor.assets.update(load_pickups(one_image=True))
 
         # ... (rest of function: update tile_list, ids, etc) ...
         self.editor.tile_list = list(self.editor.assets)
@@ -182,7 +183,6 @@ class Editor:
         self.screen_height = 576
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
         self.display = pygame.Surface((480, 288))
-
         self.clock = pygame.time.Clock()
 
         self.underbar = pygame.Surface((self.screen.get_size()[0] - SIDEBAR_WIDTH, UNDERBAR_HEIGHT))
@@ -225,7 +225,7 @@ class Editor:
         self.assets = self.base_assets | load_tiles(self.get_environment(self.level))
         self.assets.update(load_doors('editor', self.get_environment(self.level)))
         self.assets.update(load_activators(self.get_environment(self.level)))
-        self.assets.update(load_pickups())
+        self.assets.update(load_pickups(one_image=True))
         self.get_categories()
 
         self.category_changed = False
@@ -832,7 +832,7 @@ class Editor:
         self.categories["Doors"] = load_doors('editor', self.get_environment(self.level))
         self.categories["Activators"] = load_activators(self.get_environment(self.level))
         self.categories["Entities"] = self.base_assets["spawners"].copy()
-        self.categories["Pickups"] = load_pickups()
+        self.categories["Pickups"] = load_pickups(one_image=True)
         self.current_category = 0
         self.current_category_name = list(self.categories.keys())[self.current_category]
 

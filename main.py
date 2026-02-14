@@ -438,7 +438,7 @@ class Game:
 
     def update_pickups(self, render_scroll):
         for ball in self.pickups:
-            img = self.assets[ball["type"]].copy()[0]
+            img = self.assets[ball["type"]+"/idle"].copy().images[0]
             rect = pygame.Rect(ball["pos"][0], ball["pos"][1], 16, 16)
             self.display.blit(img, (ball["pos"][0] - render_scroll[0], ball["pos"][1] - render_scroll[1]))
             if rect.colliderect(self.player.rect().inflate(0, 0)):

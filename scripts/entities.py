@@ -527,6 +527,7 @@ def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition
         death_animation(screen)
     load_game(game, game.current_slot)
     game.transition = -30
+    game.player.dash_amt = 1
     game.player.velocity = [0, 0]
     game.player.dashtime_cur = 0
 

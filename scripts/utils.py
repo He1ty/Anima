@@ -79,10 +79,14 @@ def load_activators(env=None):
                 pass
     return tiles
 
-def load_pickups():
+def load_pickups(one_image=False):
     pickups = {}
     for pickup in sorted(os.listdir(BASE_IMG_PATH + 'pickups')):
-        pickups[pickup] = load_images('pickups/doubledashball')
+        if not one_image:
+            for animation in sorted(os.listdir(BASE_IMG_PATH + 'pickups/' + pickup)):
+                pickups[f"{pickup}/{animation}"] = Animation(load_images(f'pickups/{pickup}/{animation}'))
+        else:
+            pickups[pickup] = load_images(f'pickups/{pickup}/idle')
     return pickups
 
 def load_backgrounds(b_info):

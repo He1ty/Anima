@@ -243,6 +243,7 @@ class Tilemap:
                 else:
                     tiles_opacity = 255
 
+
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
                     loc = str(x) + ";" + str(y)
@@ -268,14 +269,15 @@ class Tilemap:
                                     self.fake_tile_opacity = max(0, self.fake_tile_opacity-1)
                                     tiles_opacity = self.fake_tile_opacity
                                     if self.fake_tile_opacity == 0:
-                                        self.fake_tile_colliding_group.remove(tile)
-                                        del self.tilemap[layer][loc]
-                                        continue
+                                        for c_tile in self.fake_tile_colliding_group:
+                                            self.fake_tile_colliding_group.remove(c_tile)
+                                            c_loc = f"{c_tile["pos"][0]};{c_tile["pos"][1]}"
+                                            del self.tilemap[layer][c_loc]
+
                                 else:
                                     tiles_opacity = 255
                                 if not self.fake_tile_colliding_group:
                                     self.fake_tile_opacity = 255
-
 
                             img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
 

@@ -37,7 +37,7 @@ class PhysicsPlayer:
         self.JUMPTIME = 10
         self.DASH_COOLDOWN = 18
         self.FIRST_JUMP_WALLJUMP_COOLDOWN = 0
-        self.WALLJUMP_COOLDOWN = 30
+        self.WALLJUMP_COOLDOWN = 15
 
         self.COLLISION_DODGED_PIXELS = 4 # Number of pixels collision can dodge (ledge snapping/corner correction)
 
@@ -281,6 +281,7 @@ class PhysicsPlayer:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
 
+
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -311,6 +312,8 @@ class PhysicsPlayer:
         if abs(self.velocity[0]) > self.SPEED:
             accel = 0.2
 
+        if self.can_walljump["cooldown"] != 0:
+            accel = 0.001
 
         if direction != 0 or self.dash_direction[0] != 0:
             # Gradually move current velocity toward target speed
@@ -445,6 +448,8 @@ class PhysicsPlayer:
         if not self.is_on_floor() and not self.dashtime_cur > 0:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
+                if self.dashtime_cur == 0:
+                    self.dash_direction = [0, 0]
                 # First deceleration
                 if abs(self.acceleration[1]) == 0.42:
                     if self.GRAVITY_DIRECTION == 1:
@@ -519,7 +524,6 @@ class PhysicsPlayer:
                     self.velocity[1] = self.velocity[1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
                     self.superjump = True
 
-
             # Walljump
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
@@ -547,7 +551,7 @@ class PhysicsPlayer:
                     # Jouer le son de wall jump
                     self.play_sound('wall_jump', True)
                     if self.can_walljump["count"] >= self.max_walljumps:
-                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN + 5
+                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN + 20
                     else:
                         self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
@@ -571,6 +575,7 @@ class PhysicsPlayer:
             self.velocity[0] += h_jump_speed
             self.visual_scale = [0.6, 1.4]
             self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
+        self.last_direction = -self.last_direction
         self.velocity[1] += -v_boost
 
     def dash(self):
@@ -620,7 +625,6 @@ class PhysicsPlayer:
 
             if self.dashtime_cur == 0:
                 self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
-                self.dash_direction = [0, 0]
                 if self.collision["left"] or self.collision["right"]:
                     self.velocity[0] = 0
 
@@ -814,7 +818,10 @@ class PhysicsPlayer:
         if not self.is_stunned:
             if self.is_on_floor():
                 self.air_time = 0
-                # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)
+
+                if self.dashtime_cur == 0:
+                    self.dash_direction = [0, 0]
+                # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)'
                 if self.get_direction("x") == 0 and self.dashtime_cur == 0:
                     self.velocity[0] *= 0.8
             else:
