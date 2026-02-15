@@ -222,9 +222,10 @@ class Tilemap:
                         continue
                     if checked_tile not in connected_tiles:
                         connected_tiles.append(checked_tile)
+
         return connected_tiles
 
-    def fake_tile_render_condition(self, tile):
+    def fake_tile_colliding_with_player(self, tile):
         r = pygame.Rect(tile["pos"][0]*self.tile_size, tile["pos"][1]*self.tile_size, self.tile_size, self.tile_size)
         return self.game.player.rect().colliderect(r)
 
@@ -234,15 +235,18 @@ class Tilemap:
 
         for layer in self.tilemap:
 
-            if layer == PLAYER_LAYER and with_player:
-                self.game.player.render(surf, offset=offset)
-
             if precise_layer is not None:
                 if layer != precise_layer:
                     tiles_opacity = 80
                 else:
                     tiles_opacity = 255
 
+            if with_player:
+                if layer == PLAYER_LAYER:
+                    self.game.player.render(surf, offset=offset)
+                if layer == self.game.FAKE_TILES_LAYER:
+                    self.game.fake_tiles_render(offset=offset)
+                    continue
 
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
@@ -251,34 +255,6 @@ class Tilemap:
                         tile = self.tilemap[layer][loc]
                         if tile["type"] in self.game.assets:
                             img = self.game.assets[tile['type']][tile['variant']].copy()
-
-                            if with_player:
-                                g_check = True
-                                for group in self.fake_tile_groups:
-                                    if tile in group:
-                                        g_check = False
-                                        if not self.fake_tile_colliding_group:
-                                            if self.fake_tile_render_condition(tile):
-                                                self.fake_tile_colliding_group = group.copy()
-                                        break
-                                if "fake" in tile["type"] and g_check:
-                                    group = self.get_same_type_connected_tiles(tile, layer)
-                                    if group not in self.fake_tile_groups:
-                                        self.fake_tile_groups.append(group)
-                                if tile in self.fake_tile_colliding_group:
-                                    self.fake_tile_opacity = max(0, self.fake_tile_opacity - 2)
-                                    tiles_opacity = self.fake_tile_opacity
-                                    if self.fake_tile_opacity == 0:
-                                        for c_tile in self.fake_tile_colliding_group:
-                                            self.fake_tile_colliding_group.remove(c_tile)
-                                            c_loc = f"{c_tile["pos"][0]};{c_tile["pos"][1]}"
-                                            del self.tilemap[layer][c_loc]
-
-                                else:
-                                    tiles_opacity = 255
-                                if not self.fake_tile_colliding_group:
-                                    self.fake_tile_opacity = 255
-
                             img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
 
                             if 'rotation' in tile:

@@ -44,13 +44,16 @@ class Game:
             # --- Window Setup ---
             pygame.display.set_caption("Anima")
             # The actual window size
-            self.screen = pygame.display.set_mode((960, 576), pygame.RESIZABLE)
+            self.screen = pygame.display.set_mode((960, 576))
             # The internal rendering surface (half size for a pixel-art aesthetic)
             self.display = pygame.Surface((480, 288))
             self.clock = pygame.time.Clock()
 
         # --- State Management ---
         # Controls which 'loop' the game is currently running
+
+        self.FAKE_TILES_LAYER = "4"
+
         self.state = "START_SCREEN"
         self.game_initialized = False
 
@@ -196,6 +199,10 @@ class Game:
         self.light_soft_edge = 200
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
+
+        # --- Fake Tiles System ---
+        self.fake_tiles_opacity = 255
+        self.fake_tiles_colliding_group = []
 
         # Define light behaviors for different game objects
         self.light_properties = {
@@ -359,6 +366,29 @@ class Game:
         self.camera_setup = []
         for camera in self.tilemap.extract(["camera_setup"]):
             self.camera_setup.append(CameraSetup(self, camera))
+
+        self.fake_tile_groups = []
+
+        fake_tiles_id_pairs = []
+        for tile in sorted(os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}")):
+
+            if "fake" in tile:
+                for variant in sorted(os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}/{tile}")):
+                    fake_tiles_id_pairs.append((tile, int(variant[0])))
+
+        for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=(self.FAKE_TILES_LAYER,)):
+            fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // 16
+            fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // 16
+            g_check = True
+            for group in self.fake_tile_groups:
+                if fake_tile in group:
+                    g_check = False
+                    continue
+            if g_check:
+                group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.FAKE_TILES_LAYER)
+                if group not in self.fake_tile_groups:
+                    self.fake_tile_groups.append(group)
+        self.tilemap.extract(fake_tiles_id_pairs, layers=(self.FAKE_TILES_LAYER,))
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
@@ -564,6 +594,34 @@ class Game:
             else:
                 self.damage_flash_active = False
 
+    def fake_tiles_render(self, offset=(0, 0)):
+        group_to_remove = None
+        for group in self.fake_tile_groups:
+            opacity = 255
+            for fake_tile in group:
+
+                if self.tilemap.fake_tile_colliding_with_player(fake_tile):
+                    self.fake_tiles_colliding_group = group.copy()
+
+                if fake_tile in self.fake_tiles_colliding_group:
+                    self.fake_tiles_opacity = max(0, self.fake_tiles_opacity - 1)
+                    opacity = self.fake_tiles_opacity
+
+                if opacity == 0:
+                    group_to_remove=self.fake_tiles_colliding_group
+
+                img = self.assets[fake_tile["type"]][fake_tile['variant']].copy()
+                img.fill((255, 255, 255, opacity),special_flags=pygame.BLEND_RGBA_MULT)
+
+                self.display.blit(img, (
+                    fake_tile['pos'][0]*self.tile_size - offset[0], fake_tile['pos'][1]*self.tile_size - offset[1]))
+
+        if group_to_remove:
+            if group_to_remove in self.fake_tile_groups:
+                self.fake_tile_groups.remove(group_to_remove)
+            self.fake_tiles_opacity = 255
+            self.fake_tiles_colliding_group = []
+
     def prerender_update(self):
         self.update_camera_setup()
         update_camera(self)
@@ -579,7 +637,7 @@ class Game:
 
         self.update_transitions()
 
-        if self.transition < 0: self.transition += 1
+        if self.transition < 0: self.transition += 2
 
         self.update_teleport(render_scroll)
 
@@ -637,12 +695,15 @@ class Game:
 
         # Handle Circle Transition Effect
         if self.transition:
+            self.player.disablePlayerInput = True
             transition_surf = pygame.Surface(self.display.get_size())
             pygame.draw.circle(transition_surf, (255, 255, 255),
                                (self.display.get_width() // 2, self.display.get_height() // 2),
                                (30 - abs(self.transition)) * 8)
             transition_surf.set_colorkey((255, 255, 255))
             self.display.blit(transition_surf, (0, 0))
+        else:
+            self.player.disablePlayerInput = False
 
         # Scaling internal display to window size with screenshake
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2,
@@ -694,7 +755,7 @@ class Game:
                 key_map = self.get_key_map()
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
 
-        self.clock.tick(60)
+        self.clock.tick(20)
 
 
     def main_game_logic(self):
