@@ -536,6 +536,7 @@ class PhysicsPlayer:
                     # Jouer le son de wall jump
                     self.play_sound('wall_jump', True)
 
+
                     if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
                         self.velocity[1] *= 1
@@ -545,7 +546,7 @@ class PhysicsPlayer:
                     self.can_walljump["count"] += 1
                     self.can_walljump["sliding"] = False
 
-                else:
+                elif self.dashtime_cur == 0:
                     self.jump_logic_helper()
 
                     # Jouer le son de wall jump
@@ -570,8 +571,8 @@ class PhysicsPlayer:
             self.velocity[0] += -h_jump_speed
         else:
             self.velocity[0] += h_jump_speed
-            self.visual_scale = [0.6, 1.4]
-            self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
+        self.visual_scale = [0.6, 1.4]
+        self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
         self.last_direction = -self.last_direction
         self.velocity[1] += -v_boost
 
@@ -780,10 +781,28 @@ class PhysicsPlayer:
         elif self.can_walljump["wall"] != axis:
             self.can_walljump["wall"] = axis
 
+    def wall_jump_blocks_around_check(self):
+        check_right = (self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().y + 2), transparent_check=False) or
+                                              self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().bottom - 2), transparent_check=False))
+        check_left = (self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().y + 2), transparent_check=False) or
+                                              self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().bottom - 2), transparent_check=False))
+        if check_right and check_left:
+            self.can_walljump["blocks_around"] = (
+                        self.tilemap.solid_check((self.rect().centerx + 8.5 * self.last_direction, self.rect().y + 2),
+                                                 transparent_check=False) or
+                        self.tilemap.solid_check(
+                            (self.rect().centerx + 8.5 * self.last_direction, self.rect().bottom - 2),
+                            transparent_check=False))
+        else:
+            self.can_walljump["blocks_around"] = check_right or check_left
+
+
+
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
-        self.can_walljump["blocks_around"] = (self.tilemap.solid_check((self.rect().centerx + 8.5*self.last_direction, self.rect().y + 2), transparent_check=False) or
-                                              self.tilemap.solid_check((self.rect().centerx + 8.5*self.last_direction, self.rect().bottom - 2), transparent_check=False))
+
+
+        self.wall_jump_blocks_around_check()
 
         if int(self.velocity[0]) > 0 or not self.get_block_on["left"]:
             self.collision["left"] = False
@@ -800,11 +819,13 @@ class PhysicsPlayer:
         self.pos[1] += self.velocity[1]
         self.collision_check("y")
 
-        if self.collision["right"]:
-            self.collision_check_walljump_helper(1)
-            self.superjump = False
-        if self.collision["left"]:
-            self.collision_check_walljump_helper(-1)
+        if self.collision["right"] or self.collision["left"]:
+            if self.collision["right"]:
+                self.collision_check_walljump_helper(1)
+            if self.collision["left"]:
+                self.collision_check_walljump_helper(-1)
+            if self.dash_direction != [0,0]:
+                self.velocity[0] = 0
             self.superjump = False
 
 
