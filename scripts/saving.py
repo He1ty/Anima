@@ -82,7 +82,6 @@ class Save:
         if hasattr(self.game, "activators"):
             for activator in self.game.activators:
                 if activator.state == 1 and not activator.activated:
-                    print('a')
                     if activator.type in save_data["activators"]:
                         save_data["activators"][activator.type].append(activator.id)
                     else:

@@ -550,10 +550,7 @@ class PhysicsPlayer:
 
                     # Jouer le son de wall jump
                     self.play_sound('wall_jump', True)
-                    if self.can_walljump["count"] >= self.max_walljumps:
-                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN + 20
-                    else:
-                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
+                    self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
 
         if self.superjump:

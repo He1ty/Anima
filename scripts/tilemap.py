@@ -266,7 +266,7 @@ class Tilemap:
                                     if group not in self.fake_tile_groups:
                                         self.fake_tile_groups.append(group)
                                 if tile in self.fake_tile_colliding_group:
-                                    self.fake_tile_opacity = max(0, self.fake_tile_opacity-1)
+                                    self.fake_tile_opacity = max(0, self.fake_tile_opacity - 2)
                                     tiles_opacity = self.fake_tile_opacity
                                     if self.fake_tile_opacity == 0:
                                         for c_tile in self.fake_tile_colliding_group:

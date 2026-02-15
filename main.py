@@ -22,6 +22,7 @@ from scripts.text import load_game_texts, display_bottom_text, update_bottom_tex
 from scripts.spark import Spark
 from scripts.sound import set_game_volume, change_music
 from scripts.modes import *
+from scripts.pickup import Pickup
 
 
 class Game:
@@ -292,7 +293,10 @@ class Game:
 
         # --- Checkpoints & Traps ---
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
-        self.pickups = self.tilemap.extract([("doubledashball", 0)])
+
+        self.pickups = []
+        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(BASE_IMG_PATH + 'pickups'))]):
+            self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
 
         self.spikes = []
         spike_types = [("spikes", 0), ("spikes", 1)]
@@ -437,13 +441,10 @@ class Game:
                 save_game(self, self.current_slot)
 
     def update_pickups(self, render_scroll):
-        for ball in self.pickups:
-            img = self.assets[ball["type"]+"/idle"].copy().images[0]
-            rect = pygame.Rect(ball["pos"][0], ball["pos"][1], 16, 16)
-            self.display.blit(img, (ball["pos"][0] - render_scroll[0], ball["pos"][1] - render_scroll[1]))
-            if rect.colliderect(self.player.rect().inflate(0, 0)):
-                self.player.dash_amt = 2
-                self.pickups.remove(ball)
+        for pickup in self.pickups:
+            if self.tilemap.pos_visible(self.display, pickup.pos, render_scroll):
+                pickup.update()
+                pickup.render(self.display, render_scroll)
 
     def update_spawn(self):
         # Define respawn point based on current section or checkpoint
@@ -492,50 +493,6 @@ class Game:
     def update_camera_setup(self):
         for camera in self.camera_setup:
             camera.update()
-
-    def prerender_update(self):
-        self.update_camera_setup()
-        update_camera(self)
-        render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
-
-        display_level_bg(self, self.level)
-        return render_scroll
-
-
-    def prerender_over_update(self, render_scroll):
-
-        if not self.game_initialized:
-            self.start_time = time.time()
-
-        self.update_transitions()
-
-        if self.transition < 0: self.transition += 1
-
-        self.update_teleport(render_scroll)
-
-        if self.teleporting: update_teleporter(self, self.tp_id)
-
-        self.screenshake = max(0, self.screenshake - 1)
-
-        self.update_pickups(render_scroll)
-
-        self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
-
-        self.update_particles(render_scroll)
-
-
-        #Projectiles
-        #self.update_projectile(render_scroll)
-
-        # 4. Tilemap & Entities
-
-        for activator in self.activators: activator.render(self.display, offset=render_scroll)
-
-        # self.update_enemies(render_scroll)
-
-        # 5. Player & Physics
-        # attacking_update(self)
-
 
     def throwable_update(self, render_scroll):
         for o in self.throwable:
@@ -607,6 +564,47 @@ class Game:
             else:
                 self.damage_flash_active = False
 
+    def prerender_update(self):
+        self.update_camera_setup()
+        update_camera(self)
+        render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
+
+        display_level_bg(self, self.level)
+        return render_scroll
+
+    def prerender_over_update(self, render_scroll):
+
+        if not self.game_initialized:
+            self.start_time = time.time()
+
+        self.update_transitions()
+
+        if self.transition < 0: self.transition += 1
+
+        self.update_teleport(render_scroll)
+
+        if self.teleporting: update_teleporter(self, self.tp_id)
+
+        self.screenshake = max(0, self.screenshake - 1)
+
+        self.update_pickups(render_scroll)
+
+        self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
+
+        self.update_particles(render_scroll)
+
+
+        #Projectiles
+        #self.update_projectile(render_scroll)
+
+        # 4. Tilemap & Entities
+
+        for activator in self.activators: activator.render(self.display, offset=render_scroll)
+
+        # self.update_enemies(render_scroll)
+
+        # 5. Player & Physics
+        # attacking_update(self)
 
     def post_render_update(self, render_scroll):
 
