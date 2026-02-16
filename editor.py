@@ -1063,7 +1063,9 @@ class Editor:
 
 
         if not self.edit_properties_mode_on:
-            self.display.blit(current_tile_img, (5, 5))
+            m_pos_txt = self.font.render(str([tile_pos[0]*self.tile_size, tile_pos[1]*self.tile_size]), True, (255, 255, 255))
+            m_pos_txt = pygame.transform.scale(m_pos_txt, (m_pos_txt.get_width()*0.8, m_pos_txt.get_height()*0.8))
+            self.display.blit(m_pos_txt, (5, 5))
 
         if not self.selecting_dest_pos:
             self.render_sidebar()
@@ -1087,6 +1089,9 @@ class Editor:
                         self.zoom -= 0.1*event.y
                         self.zoom = max(0.2, min(self.zoom, 8.0))
                         self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
+                    else:
+                        self.tile_variant = (self.tile_variant + event.y) % len(
+                            self.assets[self.tile_list[self.tile_group]])
 
 
             if not self.window_mode :
@@ -1104,13 +1109,6 @@ class Editor:
                                                                    mpos_scaled[1] + self.scroll[1])})
                     if event.button == 3:
                         self.right_clicking = True
-                    if not self.shift and self.tile_group:
-                        if event.button == 4:
-                            self.tile_variant = (self.tile_variant - 1) % len(
-                                self.assets[self.tile_list[self.tile_group]])
-                        if event.button == 5:
-                            self.tile_variant = (self.tile_variant + 1) % len(
-                                self.assets[self.tile_list[self.tile_group]])
                 if event.type == pygame.KEYDOWN:
                     mods = pygame.key.get_mods()
                     if mods & pygame.KMOD_CTRL:

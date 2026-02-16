@@ -170,9 +170,6 @@ class Game:
         self.current_checkpoint = None
         self.sections = {0: (0, 1, 2)}
 
-        self.levels = {i:{} for i in range(len(os.listdir("data/maps")))}
-
-
         # --- Player Stats & Combat ---
         self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
         self.player_hp = 100
@@ -688,11 +685,6 @@ class Game:
         else:
             #draw_health_bar(self)
             pass
-
-        # Persist enemy and object state for the level
-        self.levels[self.level]["enemies"] = self.enemies.copy()
-        self.levels[self.level]["activators"] = self.activators.copy()
-        self.levels[self.level]["doors"] = self.doors.copy()
 
         # Handle Circle Transition Effect
         if self.transition:

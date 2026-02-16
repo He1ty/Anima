@@ -59,6 +59,7 @@ class PhysicsPlayer:
         self.tech_momentum_mult = 0
 
         self.superjump = False
+        self.jump_multiplier = 0
 
         self.last_on_floor_velocity = [0, 0]
 
@@ -101,6 +102,7 @@ class PhysicsPlayer:
         self.ghost_images = []
 
         self.jumping = False
+        self.wall_jumping = False
 
         self.facing = ""
         self.action = "idle"
@@ -224,9 +226,10 @@ class PhysicsPlayer:
 
         if self.is_on_floor():
             self.jumping = False
+            self.wall_jumping = False
 
         rotation_speed = 4.5
-        if not self.is_on_floor():
+        if not self.is_on_floor() and not self.can_walljump["sliding"]:
             # Spin speed (Adjust "8" to make it faster/slower
             # Spin based on direction (Clockwise if facing right, CCW if left)
             # We use last_direction so you keep spinning even if you stop pressing keys in mid-air
@@ -448,29 +451,33 @@ class PhysicsPlayer:
         if not self.is_on_floor() and not self.dashtime_cur > 0:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
+
                 if self.dashtime_cur == 0:
                     self.dash_direction = [0, 0]
                 # First deceleration
-                if abs(self.acceleration[1]) == 0.42:
+                if abs(self.acceleration[1]) in (0.42, 1):
                     if self.GRAVITY_DIRECTION == 1:
                         self.velocity[1] = max(0, self.velocity[1] - 1.5)
                     else:
                         self.velocity[1] = min(0, self.velocity[1] + 1.5)
-
                 if self.can_walljump["count"] < self.max_walljumps - 1:
                     if self.velocity[1] == 0:
                         self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
                 else:
                     self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (on wall)
             else:
-                self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION # Normal gravity acceleration
+                if not self.wall_jumping and not self.holding_jump and (self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[1] > 0 and self.GRAVITY_DIRECTION == -1) and not (self.collision["left"] and self.collision["right"]):
+                    self.acceleration[1] = self.GRAVITY_DIRECTION
+                else:
+                    #print("pre", self.velocity[1])
+                    self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION # Normal gravity acceleration
 
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
                 self.velocity[1] = min(7.0, self.velocity[1] + self.acceleration[1])
             else:
                 self.velocity[1] = max(-7.0, self.velocity[1] + self.acceleration[1])
-
+            #print("post", self.velocity[1])
         elif self.is_on_floor():
             self.pos[1] = int(self.pos[1]) # Take only the integer part in order to avoid some pixels overlap
             # (for example when we jump, if player stops at 80.399999, we make sure that player coordinate is at 80 before setting vertical velocity to 0)
@@ -499,6 +506,7 @@ class PhysicsPlayer:
 
         if self.jumping and (self.collision["left"] or self.collision["right"]):
             self.jumping = False
+            self.wall_jumping = False
 
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
@@ -530,6 +538,7 @@ class PhysicsPlayer:
                 "allowed"]:
 
                 self.jumping = True
+                self.wall_jumping = True
                 if self.can_walljump["sliding"]:
                     self.jump_logic_helper()
 
@@ -797,7 +806,6 @@ class PhysicsPlayer:
             self.can_walljump["blocks_around"] = check_right or check_left
 
 
-
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
 
@@ -826,6 +834,8 @@ class PhysicsPlayer:
                 self.collision_check_walljump_helper(-1)
             if self.dash_direction != [0,0]:
                 self.velocity[0] = 0
+
+            self.wall_jumping = False
             self.superjump = False
 
 
@@ -917,8 +927,8 @@ class PhysicsPlayer:
             self.visual_scale = [1.0 + impact, 1.0 - impact]  # Widen and flatten
 
         # Hitting a Wall (Wall Splash)
-        '''if (self.collision['left'] or self.collision['right']) and abs(self.last_velocity[0]) > 1:
-            impact = abs(self.last_velocity[0]) * 0.1
+        if not self.rotation_angle and (self.collision['left'] or self.collision['right']) and abs(self.last_velocity[0]) > 1:
+            impact = abs(self.last_velocity[0]) * 0.08
             self.visual_scale = [1.0 - impact, 1.0 + impact]  # Thin and tall'''
 
         # 3. Jumping Stretch
