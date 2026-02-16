@@ -262,7 +262,7 @@ class PhysicsPlayer:
             if direction != 0:
                 self.last_direction = direction
 
-            if not self.dashtime_cur > 0 and not self.prevent_walking:
+            if (not self.dashtime_cur > 0 or self.can_walljump["blocks_around"]) and not self.prevent_walking:
                 self.walk(direction)
 
             self.gravity()
@@ -283,7 +283,6 @@ class PhysicsPlayer:
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
-        print(self.velocity)
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -536,7 +535,6 @@ class PhysicsPlayer:
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
                 "allowed"]:
-                print('a')
                 self.dashtime_cur = 0
                 self.jumping = True
                 self.wall_jumping = True
@@ -628,8 +626,10 @@ class PhysicsPlayer:
 
             if magnitude > 0:
                 # Divide by magnitude to "normalize" the vector to a length of 1
-                self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
                 self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
+                if not self.velocity[1] or not self.can_walljump["blocks_around"]:
+                    self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
+
 
             if self.dashtime_cur == 0:
                 self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
@@ -662,7 +662,7 @@ class PhysicsPlayer:
                         # --- GROUND CORNER CORRECTION ---
                         # If falling and clipping a corner, try to nudge onto the ledge
                         nudged = False
-                        if rect not in self.game.doors_rects and not self.is_on_floor():
+                        if rect not in self.game.doors_rects and not self.is_on_floor() and (self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 if not any(
                                         pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
@@ -694,7 +694,7 @@ class PhysicsPlayer:
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] < 0) or (self.GRAVITY_DIRECTION == -1 and self.velocity[1] > 0):
                         # If jumping and hitting a head-block corner, nudge to the side
                         nudged = False
-                        if rect not in self.game.doors_rects:
+                        if rect not in self.game.doors_rects and (self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 # Try nudging Right
                                 if not any(
@@ -739,7 +739,7 @@ class PhysicsPlayer:
                     # --- HORIZONTAL CORNER CORRECTION ---
                     # If hitting a wall, try to nudge the player Up or Down to bypass the corner
                     nudged = False
-                    if rect not in self.game.doors_rects and self.dashtime_cur:
+                    if rect not in self.game.doors_rects and self.dashtime_cur and (self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                         for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                             # 1. Try nudging UP (Useful for stepping onto a ledge automatically)
                             if not any(
@@ -809,7 +809,6 @@ class PhysicsPlayer:
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
 
-
         self.wall_jump_blocks_around_check()
 
         if int(self.velocity[0]) > 0 or not self.get_block_on["left"]:
@@ -834,7 +833,6 @@ class PhysicsPlayer:
                 self.collision_check_walljump_helper(-1)
             self.wall_jumping = False
             self.superjump = False
-
 
         if not(not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
