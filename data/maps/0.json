@@ -4464,7 +4464,7 @@
    },
    "9;11": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      9,
      11
@@ -4472,7 +4472,7 @@
    },
    "10;11": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      10,
      11
@@ -4480,7 +4480,7 @@
    },
    "11;11": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      11,
      11
@@ -4488,7 +4488,7 @@
    },
    "12;11": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      12,
      11
@@ -4496,7 +4496,7 @@
    },
    "13;11": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      13,
      11
@@ -5440,7 +5440,7 @@
    },
    "20;5": {
     "type": "mossy_stone",
-    "variant": 8,
+    "variant": 1,
     "pos": [
      20,
      5
@@ -7617,14 +7617,6 @@
      29
     ]
    },
-   "6;27": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     6,
-     27
-    ]
-   },
    "6;22": {
     "type": "mossy_stone",
     "variant": 2,
@@ -7649,22 +7641,6 @@
      24
     ]
    },
-   "6;25": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     6,
-     25
-    ]
-   },
-   "6;26": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     6,
-     26
-    ]
-   },
    "6;12": {
     "type": "mossy_stone",
     "variant": 8,
@@ -7683,7 +7659,7 @@
    },
    "8;12": {
     "type": "mossy_stone",
-    "variant": 4,
+    "variant": 8,
     "pos": [
      8,
      12
@@ -9449,29 +9425,12 @@
      6
     ]
    },
-   "21;4": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     21,
-     4
-    ],
-    "rotation": 0
-   },
    "24;2": {
     "type": "mossy_stone",
     "variant": 8,
     "pos": [
      24,
      2
-    ]
-   },
-   "20;4": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     20,
-     4
     ]
    },
    "18;6": {
@@ -9645,8 +9604,8 @@
     "rotation": 1
    },
    "8;13": {
-    "type": "mossy_stone_decor",
-    "variant": 15,
+    "type": "mossy_stone",
+    "variant": 6,
     "pos": [
      8,
      13
@@ -9661,32 +9620,24 @@
     ]
    },
    "11;12": {
-    "type": "mossy_stone_decor",
-    "variant": 13,
+    "type": "mossy_stone",
+    "variant": 8,
     "pos": [
      11,
      12
     ]
    },
    "14;12": {
-    "type": "mossy_stone_decor",
-    "variant": 15,
+    "type": "vine_transp",
+    "variant": 5,
     "pos": [
      14,
      12
     ]
    },
-   "15;12": {
-    "type": "mossy_stone_decor",
-    "variant": 16,
-    "pos": [
-     15,
-     12
-    ]
-   },
    "17;12": {
-    "type": "mossy_stone_decor",
-    "variant": 17,
+    "type": "vine_transp",
+    "variant": 5,
     "pos": [
      17,
      12
@@ -9701,32 +9652,32 @@
     ]
    },
    "13;12": {
-    "type": "mossy_stone_decor",
-    "variant": 15,
+    "type": "mossy_stone",
+    "variant": 4,
     "pos": [
      13,
      12
     ]
    },
    "12;12": {
-    "type": "mossy_stone_decor",
-    "variant": 16,
+    "type": "mossy_stone",
+    "variant": 8,
     "pos": [
      12,
      12
     ]
    },
    "9;12": {
-    "type": "mossy_stone_decor",
-    "variant": 16,
+    "type": "mossy_stone",
+    "variant": 8,
     "pos": [
      9,
      12
     ]
    },
    "10;12": {
-    "type": "mossy_stone_decor",
-    "variant": 15,
+    "type": "mossy_stone",
+    "variant": 8,
     "pos": [
      10,
      12
@@ -11841,7 +11792,7 @@
     ]
    },
    "12;51": {
-    "type": "mossy_stone_gluy",
+    "type": "mossy_stone",
     "variant": 2,
     "pos": [
      12,
@@ -11849,7 +11800,7 @@
     ]
    },
    "11;51": {
-    "type": "mossy_stone_gluy",
+    "type": "mossy_stone",
     "variant": 1,
     "pos": [
      11,
@@ -12119,7 +12070,7 @@
     ]
    },
    "10;51": {
-    "type": "mossy_stone_gluy",
+    "type": "mossy_stone",
     "variant": 0,
     "pos": [
      10,
@@ -22344,14 +22295,6 @@
     ],
     "rotation": 0
    },
-   "10;50": {
-    "type": "stick_flowers_decor",
-    "variant": 0,
-    "pos": [
-     10,
-     50
-    ]
-   },
    "10;55": {
     "type": "allium_decor",
     "variant": 0,
@@ -23067,15 +23010,6 @@
      18,
      12
     ]
-   },
-   "22;4": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     22,
-     4
-    ],
-    "rotation": 0
    },
    "38;10": {
     "type": "mossy_stone",
@@ -27660,15 +27594,6 @@
      6
     ]
    },
-   "14;6": {
-    "type": "spikes",
-    "variant": 1,
-    "pos": [
-     14,
-     6
-    ],
-    "rotation": 0
-   },
    "19;6": {
     "type": "mossy_stone",
     "variant": 7,
@@ -27860,22 +27785,6 @@
     "pos": [
      3,
      38
-    ]
-   },
-   "11;50": {
-    "type": "yellow_flowers_decor",
-    "variant": 1,
-    "pos": [
-     11,
-     50
-    ]
-   },
-   "12;50": {
-    "type": "yellow_flowers_decor",
-    "variant": 2,
-    "pos": [
-     12,
-     50
     ]
    },
    "18;57": {
@@ -28264,7 +28173,7 @@
    },
    "16;-10": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      16,
      -10
@@ -28272,7 +28181,7 @@
    },
    "17;-10": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      17,
      -10
@@ -28280,7 +28189,7 @@
    },
    "18;-10": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      18,
      -10
@@ -28288,7 +28197,7 @@
    },
    "19;-10": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      19,
      -10
@@ -29450,24 +29359,6 @@
     ],
     "rotation": 0
    },
-   "16;22": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     16,
-     22
-    ],
-    "rotation": 0
-   },
-   "15;22": {
-    "type": "spikes",
-    "variant": 1,
-    "pos": [
-     15,
-     22
-    ],
-    "rotation": 0
-   },
    "14;23": {
     "type": "mossy_stone",
     "variant": 1,
@@ -29577,15 +29468,6 @@
     ],
     "rotation": 0
    },
-   "15;6": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     15,
-     6
-    ],
-    "rotation": 0
-   },
    "17;6": {
     "type": "purple_flowers_decor",
     "variant": 1,
@@ -29596,183 +29478,11 @@
    },
    "19;5": {
     "type": "mossy_stone",
-    "variant": 7,
+    "variant": 0,
     "pos": [
      19,
      5
     ]
-   },
-   "19;4": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     19,
-     4
-    ]
-   },
-   "19;3": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     19,
-     3
-    ]
-   },
-   "20;3": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     20,
-     3
-    ]
-   },
-   "19;2": {
-    "type": "mossy_stone",
-    "variant": 0,
-    "pos": [
-     19,
-     2
-    ]
-   },
-   "20;2": {
-    "type": "mossy_stone",
-    "variant": 2,
-    "pos": [
-     20,
-     2
-    ]
-   },
-   "23;1": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     23,
-     1
-    ]
-   },
-   "23;0": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     23,
-     0
-    ]
-   },
-   "23;-1": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     23,
-     -1
-    ]
-   },
-   "23;-2": {
-    "type": "mossy_stone",
-    "variant": 0,
-    "pos": [
-     23,
-     -2
-    ]
-   },
-   "24;-2": {
-    "type": "mossy_stone",
-    "variant": 1,
-    "pos": [
-     24,
-     -2
-    ]
-   },
-   "24;-1": {
-    "type": "mossy_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     -1
-    ]
-   },
-   "25;-1": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     25,
-     -1
-    ]
-   },
-   "25;0": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     25,
-     0
-    ]
-   },
-   "25;1": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     25,
-     1
-    ]
-   },
-   "24;1": {
-    "type": "mossy_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     1
-    ]
-   },
-   "24;0": {
-    "type": "mossy_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     0
-    ]
-   },
-   "25;-2": {
-    "type": "mossy_stone",
-    "variant": 2,
-    "pos": [
-     25,
-     -2
-    ]
-   },
-   "22;-2": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     22,
-     -2
-    ],
-    "rotation": 3
-   },
-   "22;-1": {
-    "type": "spikes",
-    "variant": 1,
-    "pos": [
-     22,
-     -1
-    ],
-    "rotation": 3
-   },
-   "22;0": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     22,
-     0
-    ],
-    "rotation": 3
-   },
-   "22;2": {
-    "type": "spikes",
-    "variant": 1,
-    "pos": [
-     22,
-     2
-    ],
-    "rotation": 3
    },
    "16;6": {
     "type": "purple_flowers_decor",
@@ -30217,7 +29927,7 @@
     ]
    },
    "16;18": {
-    "type": "mossy_stone",
+    "type": "hanging_vine",
     "variant": 1,
     "pos": [
      16,
@@ -30225,59 +29935,27 @@
     ]
    },
    "15;18": {
-    "type": "mossy_stone",
+    "type": "vine_transp_back",
     "variant": 1,
     "pos": [
      15,
      18
     ]
    },
-   "15;19": {
-    "type": "mossy_stone",
-    "variant": 5,
-    "pos": [
-     15,
-     19
-    ]
-   },
-   "16;19": {
-    "type": "mossy_stone",
-    "variant": 5,
-    "pos": [
-     16,
-     19
-    ]
-   },
    "17;18": {
-    "type": "mossy_stone",
+    "type": "hanging_vine",
     "variant": 2,
     "pos": [
      17,
      18
     ]
    },
-   "17;19": {
-    "type": "mossy_stone",
-    "variant": 4,
-    "pos": [
-     17,
-     19
-    ]
-   },
    "14;18": {
-    "type": "mossy_stone",
+    "type": "hanging_vine",
     "variant": 0,
     "pos": [
      14,
      18
-    ]
-   },
-   "14;19": {
-    "type": "mossy_stone",
-    "variant": 6,
-    "pos": [
-     14,
-     19
     ]
    },
    "17;25": {
@@ -30304,175 +29982,6 @@
      25
     ]
    },
-   "14;-1": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     14,
-     -1
-    ]
-   },
-   "15;-1": {
-    "type": "mossy_stone",
-    "variant": 8,
-    "pos": [
-     15,
-     -1
-    ]
-   },
-   "16;-1": {
-    "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     16,
-     -1
-    ]
-   },
-   "16;-2": {
-    "type": "mossy_stone",
-    "variant": 2,
-    "pos": [
-     16,
-     -2
-    ]
-   },
-   "15;-2": {
-    "type": "mossy_stone",
-    "variant": 1,
-    "pos": [
-     15,
-     -2
-    ]
-   },
-   "14;-2": {
-    "type": "mossy_stone",
-    "variant": 0,
-    "pos": [
-     14,
-     -2
-    ]
-   },
-   "16;0": {
-    "type": "mossy_stone",
-    "variant": 4,
-    "pos": [
-     16,
-     0
-    ]
-   },
-   "15;0": {
-    "type": "mossy_stone",
-    "variant": 5,
-    "pos": [
-     15,
-     0
-    ]
-   },
-   "14;0": {
-    "type": "mossy_stone",
-    "variant": 6,
-    "pos": [
-     14,
-     0
-    ]
-   },
-   "18;-5": {
-    "type": "hanging_vine",
-    "variant": 0,
-    "pos": [
-     18,
-     -5
-    ]
-   },
-   "19;-5": {
-    "type": "hanging_vine",
-    "variant": 1,
-    "pos": [
-     19,
-     -5
-    ]
-   },
-   "20;-5": {
-    "type": "hanging_vine",
-    "variant": 2,
-    "pos": [
-     20,
-     -5
-    ]
-   },
-   "18;-6": {
-    "type": "vine_transp",
-    "variant": 3,
-    "pos": [
-     18,
-     -6
-    ]
-   },
-   "18;-9": {
-    "type": "vine_transp",
-    "variant": 3,
-    "pos": [
-     18,
-     -9
-    ]
-   },
-   "20;-9": {
-    "type": "vine_transp",
-    "variant": 3,
-    "pos": [
-     20,
-     -9
-    ]
-   },
-   "20;-6": {
-    "type": "vine_transp",
-    "variant": 3,
-    "pos": [
-     20,
-     -6
-    ]
-   },
-   "18;-7": {
-    "type": "vine_transp",
-    "variant": 6,
-    "pos": [
-     18,
-     -7
-    ]
-   },
-   "18;-8": {
-    "type": "vine_transp",
-    "variant": 6,
-    "pos": [
-     18,
-     -8
-    ]
-   },
-   "20;-8": {
-    "type": "vine_transp",
-    "variant": 6,
-    "pos": [
-     20,
-     -8
-    ]
-   },
-   "20;-7": {
-    "type": "vine_transp",
-    "variant": 6,
-    "pos": [
-     20,
-     -7
-    ]
-   },
-   "13;6": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     13,
-     6
-    ],
-    "rotation": 0
-   },
    "8;-4": {
     "type": "purple_flowers_decor",
     "variant": 0,
@@ -30487,62 +29996,6 @@
     "pos": [
      9,
      -4
-    ]
-   },
-   "16;-3": {
-    "type": "purple_flowers_decor",
-    "variant": 2,
-    "pos": [
-     16,
-     -3
-    ]
-   },
-   "15;-3": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     15,
-     -3
-    ]
-   },
-   "20;1": {
-    "type": "purple_flowers_decor",
-    "variant": 2,
-    "pos": [
-     20,
-     1
-    ]
-   },
-   "19;1": {
-    "type": "grass_decor",
-    "variant": 0,
-    "pos": [
-     19,
-     1
-    ]
-   },
-   "23;-3": {
-    "type": "purple_flowers_decor",
-    "variant": 0,
-    "pos": [
-     23,
-     -3
-    ]
-   },
-   "24;-3": {
-    "type": "purple_flowers_decor",
-    "variant": 1,
-    "pos": [
-     24,
-     -3
-    ]
-   },
-   "25;-3": {
-    "type": "grass_decor",
-    "variant": 2,
-    "pos": [
-     25,
-     -3
     ]
    },
    "31;-5": {
@@ -30866,15 +30319,6 @@
      65
     ],
     "rotation": 0
-   },
-   "22;1": {
-    "type": "spikes",
-    "variant": 1,
-    "pos": [
-     22,
-     1
-    ],
-    "rotation": 3
    },
    "38;-12": {
     "type": "mossy_stone",
@@ -31543,14 +30987,6 @@
     ],
     "rotation": 1
    },
-   "14;-3": {
-    "type": "purple_flowers_decor",
-    "variant": 0,
-    "pos": [
-     14,
-     -3
-    ]
-   },
    "14;25": {
     "type": "mossy_stone",
     "variant": 8,
@@ -31705,7 +31141,7 @@
    },
    "13;26": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      13,
      26
@@ -31713,7 +31149,7 @@
    },
    "12;26": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      12,
      26
@@ -31721,7 +31157,7 @@
    },
    "11;26": {
     "type": "mossy_stone",
-    "variant": 6,
+    "variant": 7,
     "pos": [
      11,
      26
@@ -32415,31 +31851,28 @@
     ]
    },
    "11;27": {
-    "type": "spikes",
-    "variant": 0,
+    "type": "mossy_stone",
+    "variant": 7,
     "pos": [
      11,
      27
-    ],
-    "rotation": 2
+    ]
    },
    "12;27": {
-    "type": "spikes",
-    "variant": 0,
+    "type": "mossy_stone",
+    "variant": 8,
     "pos": [
      12,
      27
-    ],
-    "rotation": 2
+    ]
    },
    "13;27": {
-    "type": "spikes",
-    "variant": 0,
+    "type": "mossy_stone",
+    "variant": 3,
     "pos": [
      13,
      27
-    ],
-    "rotation": 2
+    ]
    },
    "14;27": {
     "type": "spikes",
@@ -32770,6 +32203,554 @@
     "pos": [
      21,
      39
+    ]
+   },
+   "11;28": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     11,
+     28
+    ]
+   },
+   "11;29": {
+    "type": "mossy_stone",
+    "variant": 6,
+    "pos": [
+     11,
+     29
+    ]
+   },
+   "12;29": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     12,
+     29
+    ]
+   },
+   "12;28": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     12,
+     28
+    ]
+   },
+   "13;28": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     13,
+     28
+    ]
+   },
+   "13;40": {
+    "type": "spikes",
+    "variant": 0,
+    "pos": [
+     13,
+     40
+    ],
+    "rotation": 1
+   },
+   "13;41": {
+    "type": "spikes",
+    "variant": 0,
+    "pos": [
+     13,
+     41
+    ],
+    "rotation": 1
+   },
+   "9;13": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     9,
+     13
+    ]
+   },
+   "9;14": {
+    "type": "mossy_stone",
+    "variant": 6,
+    "pos": [
+     9,
+     14
+    ]
+   },
+   "10;14": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     10,
+     14
+    ]
+   },
+   "10;13": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     10,
+     13
+    ]
+   },
+   "12;13": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     12,
+     13
+    ]
+   },
+   "11;13": {
+    "type": "mossy_stone",
+    "variant": 5,
+    "pos": [
+     11,
+     13
+    ]
+   },
+   "6;25": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     6,
+     25
+    ]
+   },
+   "6;26": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     6,
+     26
+    ]
+   },
+   "6;27": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     6,
+     27
+    ]
+   },
+   "14;17": {
+    "type": "vine_transp",
+    "variant": 5,
+    "pos": [
+     14,
+     17
+    ]
+   },
+   "14;16": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     14,
+     16
+    ]
+   },
+   "14;15": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     14,
+     15
+    ]
+   },
+   "14;14": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     14,
+     14
+    ]
+   },
+   "14;13": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     14,
+     13
+    ]
+   },
+   "17;17": {
+    "type": "vine_transp",
+    "variant": 5,
+    "pos": [
+     17,
+     17
+    ]
+   },
+   "17;16": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     17,
+     16
+    ]
+   },
+   "17;15": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     17,
+     15
+    ]
+   },
+   "17;14": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     17,
+     14
+    ]
+   },
+   "17;13": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     17,
+     13
+    ]
+   },
+   "15;22": {
+    "type": "spikes",
+    "variant": 0,
+    "pos": [
+     15,
+     22
+    ],
+    "rotation": 0
+   },
+   "16;22": {
+    "type": "spikes",
+    "variant": 0,
+    "pos": [
+     16,
+     22
+    ],
+    "rotation": 0
+   },
+   "15;12": {
+    "type": "vine_transp_back",
+    "variant": 3,
+    "pos": [
+     15,
+     12
+    ]
+   },
+   "15;13": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     15,
+     13
+    ]
+   },
+   "15;14": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     15,
+     14
+    ]
+   },
+   "15;15": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     15,
+     15
+    ]
+   },
+   "15;16": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     15,
+     16
+    ]
+   },
+   "15;17": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     15,
+     17
+    ]
+   },
+   "12;17": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     12,
+     17
+    ]
+   },
+   "12;16": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     12,
+     16
+    ]
+   },
+   "12;15": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     12,
+     15
+    ]
+   },
+   "12;14": {
+    "type": "vine_transp_back",
+    "variant": 3,
+    "pos": [
+     12,
+     14
+    ]
+   },
+   "15;19": {
+    "type": "vine_transp_back",
+    "variant": 3,
+    "pos": [
+     15,
+     19
+    ]
+   },
+   "12;19": {
+    "type": "vine_transp_back",
+    "variant": 3,
+    "pos": [
+     12,
+     19
+    ]
+   },
+   "12;18": {
+    "type": "vine_transp_back",
+    "variant": 4,
+    "pos": [
+     12,
+     18
+    ]
+   },
+   "12;20": {
+    "type": "hanging_vine",
+    "variant": 0,
+    "pos": [
+     12,
+     20
+    ]
+   },
+   "13;20": {
+    "type": "hanging_vine",
+    "variant": 1,
+    "pos": [
+     13,
+     20
+    ]
+   },
+   "14;20": {
+    "type": "hanging_vine",
+    "variant": 1,
+    "pos": [
+     14,
+     20
+    ]
+   },
+   "15;20": {
+    "type": "hanging_vine",
+    "variant": 2,
+    "pos": [
+     15,
+     20
+    ]
+   },
+   "23;1": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     23,
+     1
+    ]
+   },
+   "24;1": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     24,
+     1
+    ]
+   },
+   "25;1": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     25,
+     1
+    ]
+   },
+   "25;0": {
+    "type": "mossy_stone",
+    "variant": 2,
+    "pos": [
+     25,
+     0
+    ]
+   },
+   "24;0": {
+    "type": "mossy_stone",
+    "variant": 1,
+    "pos": [
+     24,
+     0
+    ]
+   },
+   "23;0": {
+    "type": "mossy_stone",
+    "variant": 0,
+    "pos": [
+     23,
+     0
+    ]
+   },
+   "16;-9": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     16,
+     -9
+    ]
+   },
+   "16;-8": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     16,
+     -8
+    ]
+   },
+   "16;-7": {
+    "type": "mossy_stone",
+    "variant": 6,
+    "pos": [
+     16,
+     -7
+    ]
+   },
+   "17;-4": {
+    "type": "mossy_stone",
+    "variant": 6,
+    "pos": [
+     17,
+     -4
+    ]
+   },
+   "17;-5": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     17,
+     -5
+    ]
+   },
+   "18;-5": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     18,
+     -5
+    ]
+   },
+   "18;-6": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     18,
+     -6
+    ]
+   },
+   "17;-6": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     17,
+     -6
+    ]
+   },
+   "17;-7": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     17,
+     -7
+    ]
+   },
+   "17;-8": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     17,
+     -8
+    ]
+   },
+   "17;-9": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     17,
+     -9
+    ]
+   },
+   "18;-8": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     18,
+     -8
+    ]
+   },
+   "18;-7": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     18,
+     -7
+    ]
+   },
+   "18;-9": {
+    "type": "mossy_stone",
+    "variant": 8,
+    "pos": [
+     18,
+     -9
+    ]
+   },
+   "18;-4": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     18,
+     -4
+    ]
+   },
+   "19;-9": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     19,
+     -9
+    ]
+   },
+   "19;-8": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     19,
+     -8
     ]
    }
   },

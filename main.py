@@ -60,7 +60,7 @@ class Game:
         # --- Icon Setup ---
         try:
             icon_img = pygame.image.load("assets/images/logo.png").convert_alpha()
-            icon_img = pygame.transform.smoothscale(icon_img, (32, 32))
+            icon_img = pygame.transform.smoothscale(icon_img, (16, 16))
             pygame.display.set_icon(icon_img)
         except FileNotFoundError:
             pass
@@ -292,6 +292,7 @@ class Game:
             :param transition_effect:
         """
         self.tilemap.load("data/maps/" + str(map_id) + ".json")
+        self.tilemap.tile_size = self.tile_size
         mult=0.5
         self.display = pygame.Surface((960*mult, 576*mult))
         self.light_emitting_tiles = []
@@ -367,27 +368,27 @@ class Game:
         for camera in self.tilemap.extract(["camera_setup"]):
             self.camera_setup.append(CameraSetup(self, camera))
 
-        self.fake_tile_groups = []
-
         fake_tiles_id_pairs = []
         for tile in sorted(os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}")):
-
             if "fake" in tile:
-                for variant in sorted(os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}/{tile}")):
+                for variant in sorted(
+                        os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}/{tile}")):
                     fake_tiles_id_pairs.append((tile, int(variant[0])))
 
-        for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=(self.FAKE_TILES_LAYER,)):
-            fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // 16
-            fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // 16
-            g_check = True
-            for group in self.fake_tile_groups:
-                if fake_tile in group:
-                    g_check = False
-                    continue
-            if g_check:
-                group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.FAKE_TILES_LAYER)
-                if group not in self.fake_tile_groups:
-                    self.fake_tile_groups.append(group)
+        if not hasattr(self, "fake_tile_groups"):
+            self.fake_tile_groups = []
+            for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=(self.FAKE_TILES_LAYER,)):
+                fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
+                fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
+                g_check = True
+                for group in self.fake_tile_groups:
+                    if fake_tile in group:
+                        g_check = False
+                        continue
+                if g_check:
+                    group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.FAKE_TILES_LAYER)
+                    if group not in self.fake_tile_groups:
+                        self.fake_tile_groups.append(group)
         self.tilemap.extract(fake_tiles_id_pairs, layers=(self.FAKE_TILES_LAYER,))
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
@@ -420,7 +421,7 @@ class Game:
                     self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
                 self.level = int(transition["destination"])
                 self.load_level(self.level, transition_effect=False)
-                self.player.pos = [transition["dest_pos"][0] * 16, transition["dest_pos"][1] * 16]
+                self.player.pos = [transition["dest_pos"][0] * self.tile_size, transition["dest_pos"][1] * self.tile_size]
 
     def update_teleport(self, render_scroll):
         for checkpoint in self.checkpoints:
@@ -599,17 +600,17 @@ class Game:
         for group in self.fake_tile_groups:
             opacity = 255
             for fake_tile in group:
-
                 if self.tilemap.fake_tile_colliding_with_player(fake_tile):
                     self.fake_tiles_colliding_group = group.copy()
+                    break
 
-                if fake_tile in self.fake_tiles_colliding_group:
-                    self.fake_tiles_opacity = max(0, self.fake_tiles_opacity - 1)
-                    opacity = self.fake_tiles_opacity
-
+            if group == self.fake_tiles_colliding_group:
+                self.fake_tiles_opacity = max(0, self.fake_tiles_opacity - 30)
+                opacity = self.fake_tiles_opacity
                 if opacity == 0:
                     group_to_remove=self.fake_tiles_colliding_group
 
+            for fake_tile in group:
                 img = self.assets[fake_tile["type"]][fake_tile['variant']].copy()
                 img.fill((255, 255, 255, opacity),special_flags=pygame.BLEND_RGBA_MULT)
 
