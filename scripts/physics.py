@@ -283,7 +283,7 @@ class PhysicsPlayer:
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
-
+        print(self.velocity)
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -466,7 +466,7 @@ class PhysicsPlayer:
                 else:
                     self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (on wall)
             else:
-                if not self.wall_jumping and not self.holding_jump and (self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[1] > 0 and self.GRAVITY_DIRECTION == -1) and not (self.collision["left"] and self.collision["right"]):
+                if not self.holding_jump and (self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[1] > 0 and self.GRAVITY_DIRECTION == -1) and not (self.collision["left"] and self.collision["right"]):
                     self.acceleration[1] = self.GRAVITY_DIRECTION
                 else:
                     #print("pre", self.velocity[1])
@@ -536,7 +536,8 @@ class PhysicsPlayer:
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
                 "allowed"]:
-
+                print('a')
+                self.dashtime_cur = 0
                 self.jumping = True
                 self.wall_jumping = True
                 if self.can_walljump["sliding"]:
@@ -780,7 +781,7 @@ class PhysicsPlayer:
     def collision_check_walljump_helper(self,axis):
         """Avoids redundancy"""
         #The condition checks if there is no buffer, if player is falling, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
-        if (not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and
+        if (not self.can_walljump["buffer"] and not self.holding_jump and
                 not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"]) and self.can_walljump["count"] < self.max_walljumps):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
@@ -797,14 +798,13 @@ class PhysicsPlayer:
                                               self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().bottom - 2), transparent_check=False))
         if check_right and check_left:
             self.can_walljump["blocks_around"] = (
-                        self.tilemap.solid_check((self.rect().centerx + 8.5 * self.last_direction, self.rect().y + 2),
+                        self.tilemap.solid_check((self.rect().centerx + 9 * self.last_direction, self.rect().y + 2),
                                                  transparent_check=False) or
                         self.tilemap.solid_check(
                             (self.rect().centerx + 8.5 * self.last_direction, self.rect().bottom - 2),
                             transparent_check=False))
         else:
             self.can_walljump["blocks_around"] = check_right or check_left
-
 
     def apply_momentum(self):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
@@ -832,14 +832,11 @@ class PhysicsPlayer:
                 self.collision_check_walljump_helper(1)
             if self.collision["left"]:
                 self.collision_check_walljump_helper(-1)
-            if self.dash_direction != [0,0]:
-                self.velocity[0] = 0
-
             self.wall_jumping = False
             self.superjump = False
 
 
-        if not(not self.can_walljump["buffer"] and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and not self.is_on_floor() and self.can_walljump[
+        if not(not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
             self.can_walljump["sliding"] = False
 
