@@ -724,8 +724,8 @@ class PhysicsPlayer:
 
                     self.stop_dash_momentum["y"] = True
 
-                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y - self.size[1] < rect.y < entity_rect.y and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width) or
-                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y < rect.y < entity_rect.y + self.size[1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
+                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y - self.size[1] <= rect.y < entity_rect.y and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width) or
+                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y <= rect.y < entity_rect.y + self.size[1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
                     b_t.add(True)
 
             self.get_block_on["top"] = bool(b_t)
@@ -770,10 +770,14 @@ class PhysicsPlayer:
                             #self.dash_cooldown = 5
                         self.pos[0] = entity_rect.x
                         self.stop_dash_momentum["x"] = True
-                if entity_rect.x - self.size[0] < rect.x < entity_rect.x:
-                    b_l.add(True)
-                if entity_rect.x + self.size[0] > rect.x > entity_rect.x:
-                    b_r.add(True)
+                if ((self.GRAVITY_DIRECTION == 1 and (entity_rect.y - self.size[1] < rect.y <= entity_rect.y or
+                                                      entity_rect.y + self.size[1] > rect.y >= entity_rect.y)) or
+                        (self.GRAVITY_DIRECTION == -1 and (entity_rect.y <= rect.y < entity_rect.y + self.size[1] or
+                                                           entity_rect.y >= rect.y > entity_rect.y + self.size[1]))):
+                    if entity_rect.x - self.size[0] < rect.x <= entity_rect.x:
+                        b_l.add(True)
+                    if entity_rect.x + self.size[0] >= rect.x > entity_rect.x:
+                        b_r.add(True)
 
             self.get_block_on["left"] = bool(b_l)
             self.get_block_on["right"] = bool(b_r)
@@ -810,7 +814,6 @@ class PhysicsPlayer:
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
 
         self.wall_jump_blocks_around_check()
-
         if int(self.velocity[0]) > 0 or not self.get_block_on["left"]:
             self.collision["left"] = False
         if int(self.velocity[0]) < 0 or not self.get_block_on["right"]:

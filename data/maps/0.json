@@ -31897,6 +31897,54 @@
      52
     ],
     "state": 0
+   },
+   "13;3": {
+    "type": "mossy_stone",
+    "variant": 0,
+    "pos": [
+     13,
+     3
+    ]
+   },
+   "13;4": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     13,
+     4
+    ]
+   },
+   "13;5": {
+    "type": "mossy_stone",
+    "variant": 6,
+    "pos": [
+     13,
+     5
+    ]
+   },
+   "14;5": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     14,
+     5
+    ]
+   },
+   "14;4": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     14,
+     4
+    ]
+   },
+   "14;3": {
+    "type": "mossy_stone",
+    "variant": 2,
+    "pos": [
+     14,
+     3
+    ]
    }
   },
   "3": {},
