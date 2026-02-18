@@ -39,10 +39,12 @@ class PhysicsPlayer:
         self.FIRST_JUMP_WALLJUMP_COOLDOWN = 0
         self.WALLJUMP_COOLDOWN = 15
 
-        self.DASH_STARTUP_FRAMES = 4
+        self.DASH_STARTUP_FRAMES = 3
         self.dash_startup_cur = 0
 
         self.COLLISION_DODGED_PIXELS = 4 # Number of pixels collision can dodge (ledge snapping/corner correction)
+
+        self.buffering_jump = False
 
         self.dash_max_amt = 1
 
@@ -512,12 +514,12 @@ class PhysicsPlayer:
 
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
+            self.buffering_jump = False
 
 
         if self.dict_kb["key_jump"] == 1:
 
             self.collide_with_passable_blocks = False
-
             # Jumping
             if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
                 self.jump_logic_helper()
@@ -527,7 +529,7 @@ class PhysicsPlayer:
                 self.play_sound('jump', True)
 
                 # Superjump
-                if self.dashtime_cur != 0:
+                if self.dashtime_cur != 0 and not self.buffering_jump:
                     self.dashtime_cur = 0
                     self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.4)
                     self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
@@ -564,6 +566,10 @@ class PhysicsPlayer:
                     self.play_sound('wall_jump', True)
                     self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
+
+
+            self.buffering_jump = True
+
 
         if self.superjump:
             self.dash_ghost_trail()
