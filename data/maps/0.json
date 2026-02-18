@@ -9899,7 +9899,7 @@
    },
    "12;6": {
     "type": "purple_flowers_decor",
-    "variant": 2,
+    "variant": 1,
     "pos": [
      12,
      6
@@ -25295,7 +25295,7 @@
    },
    "16;6": {
     "type": "purple_flowers_decor",
-    "variant": 0,
+    "variant": 1,
     "pos": [
      16,
      6
@@ -31898,52 +31898,28 @@
     ],
     "state": 0
    },
-   "13;3": {
-    "type": "mossy_stone",
-    "variant": 0,
+   "15;6": {
+    "type": "grass_decor",
+    "variant": 1,
     "pos": [
-     13,
-     3
+     15,
+     6
     ]
    },
-   "13;4": {
-    "type": "mossy_stone",
-    "variant": 7,
-    "pos": [
-     13,
-     4
-    ]
-   },
-   "13;5": {
-    "type": "mossy_stone",
-    "variant": 6,
-    "pos": [
-     13,
-     5
-    ]
-   },
-   "14;5": {
-    "type": "mossy_stone",
-    "variant": 4,
+   "14;6": {
+    "type": "grass_decor",
+    "variant": 1,
     "pos": [
      14,
-     5
+     6
     ]
    },
-   "14;4": {
-    "type": "mossy_stone",
-    "variant": 3,
+   "13;6": {
+    "type": "grass_decor",
+    "variant": 1,
     "pos": [
-     14,
-     4
-    ]
-   },
-   "14;3": {
-    "type": "mossy_stone",
-    "variant": 2,
-    "pos": [
-     14,
-     3
+     13,
+     6
     ]
    }
   },

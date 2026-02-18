@@ -39,6 +39,9 @@ class PhysicsPlayer:
         self.FIRST_JUMP_WALLJUMP_COOLDOWN = 0
         self.WALLJUMP_COOLDOWN = 15
 
+        self.DASH_STARTUP_FRAMES = 4
+        self.dash_startup_cur = 0
+
         self.COLLISION_DODGED_PIXELS = 4 # Number of pixels collision can dodge (ledge snapping/corner correction)
 
         self.dash_max_amt = 1
@@ -447,7 +450,7 @@ class PhysicsPlayer:
     def gravity(self):
         """Handles gravity. Gives downwards momentum (capped at 5) if in the air, negates momentum if on the ground, gives back a dash if the
         player is missing some. Stops movement if no input is given."""
-        if not self.is_on_floor() and not self.dashtime_cur > 0:
+        if not self.is_on_floor() and not self.dashtime_cur > 0 and not self.dash_startup_cur:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
 
@@ -586,6 +589,7 @@ class PhysicsPlayer:
 
     def dash(self):
         """Handles player dash."""
+        self.dash_startup_cur = max(self.dash_startup_cur - 1, 0)
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - 1, 0)
         if not self.anti_dash_buffer:
             if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0: #and self.dash_direction != [0, -1]:
@@ -599,9 +603,12 @@ class PhysicsPlayer:
                     self.stop_dash_momentum["y"], self.stop_dash_momentum["x"] = False, False
                     self.dash_amt -= 1
 
+                    self.velocity = [0, 0]
+
                     # Jouer le son de dash
                     self.play_sound('dash', force=True)
 
+                self.dash_startup_cur = self.DASH_STARTUP_FRAMES
                 self.anti_dash_buffer = True
                 self.dash_cooldown_cur = self.DASH_COOLDOWN
 
@@ -615,28 +622,29 @@ class PhysicsPlayer:
 
     def dash_momentum(self):
         """Applies momentum from dash. Manage momentum when dash ends."""
-        if self.dashtime_cur > 0:
-            self.dash_ghost_trail()
-            self.dashtime_cur -= 1
-            move_x = self.dash_direction[0]
-            move_y = -self.dash_direction[1]
+        if self.dash_startup_cur == 0:
+            if self.dashtime_cur > 0:
+                self.dash_ghost_trail()
+                self.dashtime_cur -= 1
+                move_x = self.dash_direction[0]
+                move_y = -self.dash_direction[1]
 
-            # Calculate the magnitude (length) of the direction
-            magnitude = math.sqrt(move_x ** 2 + move_y ** 2)
+                # Calculate the magnitude (length) of the direction
+                magnitude = math.sqrt(move_x ** 2 + move_y ** 2)
 
-            if magnitude > 0:
-                # Divide by magnitude to "normalize" the vector to a length of 1
-                self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
-                if not self.velocity[1] or not self.can_walljump["blocks_around"]:
-                    self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
+                if magnitude > 0:
+                    # Divide by magnitude to "normalize" the vector to a length of 1
+                    self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
+                    if not self.velocity[1] or not self.can_walljump["blocks_around"]:
+                        self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
 
 
-            if self.dashtime_cur == 0:
-                self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
-                if self.collision["left"] or self.collision["right"]:
-                    self.velocity[0] = 0
+                if self.dashtime_cur == 0:
+                    self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
+                    if self.collision["left"] or self.collision["right"]:
+                        self.velocity[0] = 0
 
-        self.update_ghost_trail()
+            self.update_ghost_trail()
 
     def collision_check(self, axe):
         """Checks for collision using tilemap"""

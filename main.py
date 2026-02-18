@@ -748,7 +748,7 @@ class Game:
                 key_map = self.get_key_map()
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
 
-        self.clock.tick(20)
+        self.clock.tick(60)
 
 
     def main_game_logic(self):
