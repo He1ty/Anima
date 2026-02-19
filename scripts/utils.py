@@ -84,7 +84,7 @@ def load_pickups(one_image=False):
     for pickup in sorted(os.listdir(BASE_IMG_PATH + 'pickups')):
         if not one_image:
             for animation in sorted(os.listdir(BASE_IMG_PATH + 'pickups/' + pickup)):
-                pickups[f"{pickup}/{animation}"] = Animation(load_images(f'pickups/{pickup}/{animation}'), loop = animation == "idle")
+                pickups[f"{pickup}/{animation}"] = Animation(load_images(f'pickups/{pickup}/{animation}'), loop = animation in ("idle", "taken"))
         else:
             pickups[pickup] = load_images(f'pickups/{pickup}/idle')
     return pickups

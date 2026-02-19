@@ -29,7 +29,10 @@ class Pickup:
                 self.state = "taking"
 
         elif self.state == "taking":
+            self.animation.img_duration = 1
             if self.animation.done:
+                self.animation.done = False
+                self.animation.frame = 0
                 self.state = "taken"
                 self.taking_time = time.time()
 
@@ -39,9 +42,10 @@ class Pickup:
 
         elif self.state == "appearing":
             if self.animation.done:
+                self.animation.done = False
+                self.animation.frame = 0
                 self.state = "idle"
 
-        self.animation = self.game.assets[self.type+"/"+self.state]
         self.animation.update()
 
     def rect(self):#is very useful because when the door is broken the player has to be able to go through the updated frame
@@ -51,5 +55,6 @@ class Pickup:
         return self.rect().colliderect(self.game.player.rect().inflate(0, 0))
 
     def render(self, surf, offset=(0, 0)): #display the animation
+        self.animation = self.game.assets[self.type + "/" + self.state]
         surf.blit(self.animation.img(),
                   (self.pos[0] - offset[0], self.pos[1] - offset[1]))
