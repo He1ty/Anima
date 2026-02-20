@@ -1164,7 +1164,8 @@ class Editor:
                         if event.key == pygame.K_TAB and not self.holding_tab:
                             self.showing_all_layers = not self.showing_all_layers
                             self.holding_tab = True
-
+                        if event.key == pygame.K_LSHIFT:
+                            self.shift = True
                         # Show camera setup zones
                         if event.key == pygame.K_b and not self.holding_b:
                             self.showing_camera_setup_area = not self.showing_camera_setup_area
@@ -1180,8 +1181,6 @@ class Editor:
                         if event.key == pygame.K_t:
                             self.tilemap.autotile()
                             self.save_action()
-                        if event.key == pygame.K_LSHIFT:
-                            self.shift = True
                         if event.key == pygame.K_o:
                             self.level_manager.full_save()
                         if event.key == pygame.K_c:
@@ -1250,6 +1249,9 @@ class Editor:
                     if event.button == 3:
                         self.right_clicking = True
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_LSHIFT:
+                        self.shift = True
+
                     if event.key == pygame.K_ESCAPE:
                         if self.edited_type:
                             infos = self.infos_per_type_per_category[self.edited_tile_category][self.edited_type]
@@ -1299,7 +1301,10 @@ class Editor:
                         if 48 <= event.key <= 57 or event.key == 45 or event.key == 59:
 
                             if self.edited_value_type == list:
-                                self.edited_value = str(self.edited_value + chr(event.key))
+                                key = event.key
+                                if chr(event.key) == '6' and self.shift:
+                                    key = 45
+                                self.edited_value = str(self.edited_value + chr(key))
 
                             elif 48 <= event.key <= 57:
 
@@ -1325,6 +1330,9 @@ class Editor:
                     # Simply comparing the dicts detects if anything changed
                     if current_state != self.temp_snapshot:
                         self.save_action()
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_LSHIFT:
+                    self.shift = False
 
             if event.type == pygame.VIDEORESIZE:
                 # Update screen dimensions
