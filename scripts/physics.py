@@ -1,19 +1,7 @@
 #Heavily upgraded basic godot physics code that I then converted to Python --Aymeric
-import time
-from typing import reveal_type
-
-import pygame as pg
-
-import sys
-
-import pygame
-from time import sleep
-
-import random
 import math
 
-from scripts.particle import Particle
-from scripts.tilemap import Tilemap
+from scripts.display import screen_shake
 from scripts.sound import *
 from scripts.entities import deal_knockback, update_throwable_objects_action
 
@@ -598,11 +586,12 @@ class PhysicsPlayer:
         self.dash_startup_cur = max(self.dash_startup_cur - 1, 0)
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - 1, 0)
         if not self.anti_dash_buffer:
-            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0: #and self.dash_direction != [0, -1]:
-                self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
+            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0: #and self.dash_direction != [0, -1]
                 if self.game.player_grabbing:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
+                    screen_shake(self.game, 10)
+                    self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
                     if self.dash_direction == [0, 0]:
                         self.dash_direction[0] = self.last_direction
                     self.dashtime_cur = self.DASHTIME
@@ -986,7 +975,8 @@ class PhysicsPlayer:
         # Apply current slime scaling
         new_w = int(self.size[0] * self.visual_scale[0])
         new_h = int(self.size[1] * self.visual_scale[1])
-        scaled_img = pygame.transform.scale(img, (new_w, new_h))
+        pygame.transform.set_smoothscale_backend("MMX")
+        scaled_img = pygame.transform.smoothscale(img, (new_w, new_h))
 
         # Calculate base position (centered horizontally, bottom-aligned)
         render_x = self.pos[0] - offset[0] - (new_w - self.size[0]) // 2
@@ -1003,17 +993,33 @@ class PhysicsPlayer:
             scaled_img = pygame.transform.flip(scaled_img, False, True)
             render_y = self.pos[1] - offset[1]
 
-        if self.can_walljump['count'] >= 1:
-            # Create a red surface the same size as the image
-            red_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
+        # Create a surface the same size as the image
+        color_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
 
+        if self.can_walljump['count'] >= 1:
             # Update color depending on fatigue level (based on walljump count)
             removal_factor = 255 * ((self.can_walljump["count"]-1)/self.max_walljumps)
             color = (0, removal_factor, removal_factor, 0)
-            red_mask.fill(color)
+            color_mask.fill(color)
 
             # It keeps the alpha channel of the original sprite so only the player turns red.
-            scaled_img.blit(red_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+            scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+
+        if self.dash_amt == 0:
+            scaled_img = pygame.transform.grayscale(scaled_img)
+            color = (0, self.dashtime_cur * 6, self.dashtime_cur * 8, 0)
+            color_mask.fill(color)
+
+            scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+        if self.dashtime_cur != 0:
+            scaled_img = pygame.transform.grayscale(scaled_img)
+            color = (0, self.DASHTIME * 6, self.DASHTIME * 8, 0)
+            color_mask.fill(color)
+
+            scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+
 
         if self.rotation_angle != 0:
             # Rotate the image

@@ -748,14 +748,13 @@ class Game:
                 key_map = self.get_key_map()
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
 
-        self.clock.tick(60)
-
 
     def main_game_logic(self):
         """
         The core gameplay loop. Handles physics, collision, rendering order,
         entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
         """
+
         render_scroll = self.prerender_update()
 
         self.tilemap.render(self.display, offset=render_scroll)
@@ -764,6 +763,8 @@ class Game:
         self.prerender_over_update(render_scroll)
 
         self.post_render_update(render_scroll)
+
+        self.clock.tick(60)
 
     def run(self):
         """
