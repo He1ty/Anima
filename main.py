@@ -748,7 +748,6 @@ class Game:
                 key_map = self.get_key_map()
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
 
-
     def main_game_logic(self):
         """
         The core gameplay loop. Handles physics, collision, rendering order,

@@ -216,9 +216,12 @@ def display_bg(surf, img, pos):
 def display_level_bg(game, map_id):
     if map_id in (0, 1, 2):
         game.display.blit(game.assets['green_cave/0'], (0, 0))
-        display_bg(game.display, game.assets['green_cave/1'], (-game.scroll[0] / 10, -20))
-        display_bg(game.display, game.assets['green_cave/2'], (-game.scroll[0] / 10, -20))
-        display_bg(game.display, game.assets['green_cave/3'], (game.scroll[0] / 50, -20))
+        game.display.blit(game.assets['green_cave/1'], (0, 0))
+        game.display.blit(game.assets['green_cave/2'], (0, 0))
+        game.display.blit(game.assets['green_cave/3'], (0, 0))
+        s = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
+        s.fill((0,0,0, 170))
+        game.display.blit(s, (0, 0))
     if map_id in (3,4):
         game.display.blit(pygame.transform.scale(game.assets['blue_cave/0'], game.display.get_size()), (0, 0))
         display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/1'], game.display.get_size()), (-game.scroll[0] / 10, 0))
@@ -289,7 +292,7 @@ def draw_boss_health_bar(game, boss):
 
 def display_level_fg(game, map_id):
     if map_id in (0,1,2):
-        generate_fog(game.display, color=(24, 38, 31), opacity=90)
+        generate_fog(game.display, color=(83, 48, 99), opacity=10)
     if map_id == 3:
         generate_fog(game.display, color=(28, 50, 73), opacity=90)
         
