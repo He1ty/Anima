@@ -18,10 +18,10 @@ class PhysicsPlayer:
 
         # Constants for movement
         self.GRAVITY_DIRECTION = 1
-        self.SPEED = 2.5
+        self.SPEED = 2.3
         self.DASH_SPEED = 6
-        self.JUMP_VELOCITY = -6.5
-        self.DASHTIME = 12
+        self.JUMP_VELOCITY = -6
+        self.DASHTIME = 10
         self.JUMPTIME = 10
         self.DASH_COOLDOWN = 18
         self.FIRST_JUMP_WALLJUMP_COOLDOWN = 0
@@ -446,19 +446,26 @@ class PhysicsPlayer:
 
                 if self.dashtime_cur == 0:
                     self.dash_direction = [0, 0]
-                # First deceleration
-                if abs(self.acceleration[1]) in (0.42, 1):
+
+                # Initial deceleration when player try to slide on a block with an initial vertical speed (usually falling speed)
+                if abs(self.acceleration[1]) in (0.42, 1) and not self.buffering_jump:
                     if self.GRAVITY_DIRECTION == 1:
-                        self.velocity[1] = max(0, self.velocity[1] - 1.5)
+                        self.velocity[1] = max(0, self.velocity[1] - 2)
                     else:
-                        self.velocity[1] = min(0, self.velocity[1] + 1.5)
-                if self.can_walljump["count"] < self.max_walljumps - 1:
-                    if self.velocity[1] == 0:
-                        self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION
-                else:
-                    self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (on wall)
+                        self.velocity[1] = min(0, self.velocity[1] + 2)
+                # Sliding gravity accelerations
+                if self.velocity[1] == 0 or abs(self.acceleration[1]) not in (0.42, 1):
+                    if self.can_walljump["count"] < self.max_walljumps - 1:
+                        if self.velocity[1] == 0:
+                            self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION # gravity acceleration while sliding
+                    elif self.can_walljump["count"] == self.max_walljumps - 1:
+                        self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (last jump)
+                    else:
+                        self.acceleration[
+                            1] = 0.3 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding (no more jumps left, walljump fatigue)
             else:
-                if not self.holding_jump and (self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[1] > 0 and self.GRAVITY_DIRECTION == -1) and not (self.collision["left"] and self.collision["right"]):
+                not_realising_jump_after_jump = not self.holding_jump and (self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[1] > 0 and self.GRAVITY_DIRECTION == -1) and not (self.collision["left"] and self.collision["right"])
+                if not_realising_jump_after_jump:
                     self.acceleration[1] = self.GRAVITY_DIRECTION
                 else:
                     #print("pre", self.velocity[1])
@@ -466,10 +473,9 @@ class PhysicsPlayer:
 
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
-                self.velocity[1] = min(7.0, self.velocity[1] + self.acceleration[1])
+                self.velocity[1] = min(6.0, self.velocity[1] + self.acceleration[1])
             else:
-                self.velocity[1] = max(-7.0, self.velocity[1] + self.acceleration[1])
-            #print("post", self.velocity[1])
+                self.velocity[1] = max(-6.0, self.velocity[1] + self.acceleration[1])
         elif self.is_on_floor():
             self.pos[1] = int(self.pos[1]) # Take only the integer part in order to avoid some pixels overlap
             # (for example when we jump, if player stops at 80.399999, we make sure that player coordinate is at 80 before setting vertical velocity to 0)
@@ -531,7 +537,7 @@ class PhysicsPlayer:
                 self.dashtime_cur = 0
                 self.jumping = True
                 self.wall_jumping = True
-                if self.can_walljump["sliding"]:
+                if self.can_walljump["sliding"] and self.can_walljump["count"] < self.max_walljumps:
                     self.jump_logic_helper()
 
                     # Jouer le son de wall jump
@@ -560,8 +566,9 @@ class PhysicsPlayer:
 
 
         if self.superjump:
-            self.dash_ghost_trail()
-            self.update_ghost_trail()
+            if self.air_time < 10:
+                self.dash_ghost_trail()
+                self.update_ghost_trail()
 
     def jump_logic_helper(self):
         """Avoid code redundancy"""
@@ -632,7 +639,6 @@ class PhysicsPlayer:
                     self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
                     if not self.velocity[1] or not self.can_walljump["blocks_around"]:
                         self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
-
 
                 if self.dashtime_cur == 0:
                     self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
@@ -789,7 +795,7 @@ class PhysicsPlayer:
         """Avoids redundancy"""
         #The condition checks if there is no buffer, if player is falling, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
         if (not self.can_walljump["buffer"] and not self.holding_jump and
-                not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"]) and self.can_walljump["count"] < self.max_walljumps):
+                not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"])):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
             self.can_walljump["sliding"] = True
@@ -883,14 +889,13 @@ class PhysicsPlayer:
         }
 
         if self.superjump:
-            ghost["color"] = (224, 239, 162, 70)
-            ghost["lifetime"] = 50
+            ghost["color"] = (224, 239, 162, 40)
 
         # Add to list of ghost images
         self.ghost_images.append(ghost)
 
         # Max number of ghost images to prevent using too much memory
-        max_ghosts = 20
+        max_ghosts = 50
         if len(self.ghost_images) > max_ghosts:
             self.ghost_images.pop(0)
 

@@ -71,7 +71,7 @@ class LevelManager:
         except FileNotFoundError:
             # Create the file if it doesn't exist (e.g. new map)
             with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
-                json.dump({'tilemap': {}, 'tilesize': 16, 'offgrid': []}, f)
+                json.dump({'tilemap': {"0":{}}, 'tilesize': 16, 'offgrid': []}, f)
             self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
 
         self.editor.scroll = [0, 0]
@@ -86,10 +86,6 @@ class LevelManager:
 
         # ... (rest of function: update tile_list, ids, etc) ...
         self.editor.tile_list = list(self.editor.assets)
-        self.editor.levers_ids = set()
-        self.editor.doors_ids = set()
-        self.editor.buttons_ids = set()
-        self.editor.tps_ids = set()
         self.editor.tile_group = 0
         self.editor.tile_variant = 0
 
