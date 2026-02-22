@@ -219,9 +219,6 @@ def display_level_bg(game, map_id):
         display_bg(game.display, game.assets['green_cave/1'], (game.scroll[0]/20, 0))
         game.display.blit(game.assets['green_cave/2'], (0, 0))
         game.display.blit(game.assets['green_cave/3'], (0, 0))
-        s = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
-        s.fill((0,0,0, 60))
-        game.display.blit(s, (0, 0))
     if map_id in (3,4):
         game.display.blit(pygame.transform.scale(game.assets['blue_cave/0'], game.display.get_size()), (0, 0))
         display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/1'], game.display.get_size()), (-game.scroll[0] / 10, 0))
