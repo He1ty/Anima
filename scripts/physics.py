@@ -526,25 +526,35 @@ class PhysicsPlayer:
                 self.jumping = True
                 self.play_sound('jump', True)
 
-                # Superjump
-                if self.dashtime_cur != 0 and not self.buffering_jump and self.dash_direction[0] != 0:
+                # Jumps on dash
+                if self.dashtime_cur != 0 and not self.buffering_jump:
                     self.dashtime_cur = 0
                     self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
-                    # Angular input superjump
-                    if self.dash_started_in_air:
-                        self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
-                        self.velocity[1] = 1.2 * self.velocity[
-                                               1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-                    # On floor mono superjump
-                    elif self.dash_direction[1] == 0:
-                        self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
-                        self.velocity[1] = self.velocity[
-                            1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+
+                    # Bottom Jump
+                    if self.dash_direction[0] == 0:
+                        self.jump_logic_helper()
+
+                    # Superjumps
                     else:
-                        self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
-                        self.velocity[1] = 1.1 * self.velocity[
-                            1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-                    self.superjump = True
+
+                        # Angular input superjump
+                        if self.dash_started_in_air:
+                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                            self.velocity[1] = 1.4 * self.velocity[
+                                                   1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                        # On floor mono superjump
+                        elif self.dash_direction[1] == 0:
+                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                            self.velocity[1] = self.velocity[
+                                1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+
+                        # Double input superjump
+                        else:
+                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                            self.velocity[1] = 1.1 * self.velocity[
+                                1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                        self.superjump = True
 
             # Walljump
             elif not self.holding_jump and \
