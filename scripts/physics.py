@@ -1,6 +1,8 @@
 #Heavily upgraded basic godot physics code that I then converted to Python --Aymeric
 import math
 
+import pygame
+
 from scripts.display import screen_shake
 from scripts.sound import *
 from scripts.entities import deal_knockback, update_throwable_objects_action
@@ -49,6 +51,7 @@ class PhysicsPlayer:
         #self.dash_cooldown = 0
 
         self.dash_amt = self.dash_max_amt
+        self.dash_started_in_air = False
         self.tech_momentum_mult = 0
 
         self.superjump = False
@@ -272,7 +275,6 @@ class PhysicsPlayer:
 
             # Mise à jour des sons
             self.update_sounds()
-
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
@@ -490,6 +492,8 @@ class PhysicsPlayer:
 
             self.can_walljump["count"] = 0
             self.superjump = False
+            if self.dashtime_cur == 0:
+                self.dash_started_in_air = False
 
             # Stop unintended horizontal movement if no input is given
             if self.get_direction("x") == 0 and not self.is_stunned and self.dashtime_cur == 0:
@@ -523,11 +527,23 @@ class PhysicsPlayer:
                 self.play_sound('jump', True)
 
                 # Superjump
-                if self.dashtime_cur != 0 and not self.buffering_jump:
+                if self.dashtime_cur != 0 and not self.buffering_jump and self.dash_direction[0] != 0:
                     self.dashtime_cur = 0
-                    self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.4)
-                    self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
-                    self.velocity[1] = self.velocity[1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                    self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
+                    # Angular input superjump
+                    if self.dash_started_in_air:
+                        self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                        self.velocity[1] = 1.2 * self.velocity[
+                                               1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                    # On floor mono superjump
+                    elif self.dash_direction[1] == 0:
+                        self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                        self.velocity[1] = self.velocity[
+                            1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                    else:
+                        self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                        self.velocity[1] = 1.1 * self.velocity[
+                            1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
                     self.superjump = True
 
             # Walljump
@@ -609,7 +625,8 @@ class PhysicsPlayer:
 
                     # Jouer le son de dash
                     self.play_sound('dash', force=True)
-
+                if not self.is_on_floor():
+                    self.dash_started_in_air = True
                 self.dash_startup_cur = self.DASH_STARTUP_FRAMES
                 self.anti_dash_buffer = True
                 self.dash_cooldown_cur = self.DASH_COOLDOWN
@@ -843,6 +860,8 @@ class PhysicsPlayer:
                 self.collision_check_walljump_helper(1)
             if self.collision["left"]:
                 self.collision_check_walljump_helper(-1)
+            if self.superjump:
+                self.velocity[0] = 0
             self.wall_jumping = False
             self.superjump = False
 
@@ -1001,15 +1020,6 @@ class PhysicsPlayer:
         # Create a surface the same size as the image
         color_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
 
-        if self.can_walljump['count'] >= 1:
-            # Update color depending on fatigue level (based on walljump count)
-            removal_factor = 255 * ((self.can_walljump["count"]-1)/self.max_walljumps)
-            color = (0, removal_factor, removal_factor, 0)
-            color_mask.fill(color)
-
-            # It keeps the alpha channel of the original sprite so only the player turns red.
-            scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
-
         if self.dash_amt == 0:
             scaled_img = pygame.transform.grayscale(scaled_img)
             color = (0, self.dashtime_cur * 6, self.dashtime_cur * 8, 0)
@@ -1024,7 +1034,15 @@ class PhysicsPlayer:
 
             scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
 
+        if self.max_walljumps - self.can_walljump['count'] <= 1:
+            scaled_img = pygame.transform.grayscale(scaled_img)
+            # Update color depending on fatigue level (based on walljump count)
+            removal_factor = 255 * ((self.can_walljump["count"]-1)/self.max_walljumps)
+            color = (0, removal_factor, removal_factor, 0)
+            color_mask.fill(color)
 
+            # It keeps the alpha channel of the original sprite so only the player turns red.
+            scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
 
         if self.rotation_angle != 0:
             # Rotate the image
