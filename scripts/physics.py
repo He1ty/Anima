@@ -45,6 +45,8 @@ class PhysicsPlayer:
         self.damping = 0.8  # How much it wobbles (lower = more wobbly)
         self.last_velocity = [0, 0]  # To catch velocity right before collision
 
+        self.walljump_fatigue_frame_count = 0
+
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
 
@@ -276,7 +278,6 @@ class PhysicsPlayer:
             # Mise à jour des sons
             self.update_sounds()
 
-            print(self.can_walljump["wall"])
 
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
@@ -473,7 +474,6 @@ class PhysicsPlayer:
                 if not_realising_jump_after_jump:
                     self.acceleration[1] = self.GRAVITY_DIRECTION
                 else:
-                    #print("pre", self.velocity[1])
                     self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION # Normal gravity acceleration
 
             # Cap terminal velocity based on direction
@@ -1019,7 +1019,6 @@ class PhysicsPlayer:
         # Apply current slime scaling
         new_w = int(self.size[0] * self.visual_scale[0])
         new_h = int(self.size[1] * self.visual_scale[1])
-        pygame.transform.set_smoothscale_backend("MMX")
         scaled_img = pygame.transform.smoothscale(img, (new_w, new_h))
 
         # Calculate base position (centered horizontally, bottom-aligned)
@@ -1040,6 +1039,7 @@ class PhysicsPlayer:
         # Create a surface the same size as the image
         color_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
 
+
         if self.dash_amt == 0:
             scaled_img = pygame.transform.grayscale(scaled_img)
             color = (0, self.dashtime_cur * 6, self.dashtime_cur * 8, 0)
@@ -1055,14 +1055,20 @@ class PhysicsPlayer:
             scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
 
         if self.max_walljumps - self.can_walljump['count'] <= 1:
-            scaled_img = pygame.transform.grayscale(scaled_img)
+            self.walljump_fatigue_frame_count += 1
             # Update color depending on fatigue level (based on walljump count)
-            removal_factor = 255 * ((self.can_walljump["count"]-1)/self.max_walljumps)
-            color = (0, removal_factor, removal_factor, 0)
+            removal_factor = 255
+            color = (80, removal_factor, removal_factor, 0)
             color_mask.fill(color)
 
             # It keeps the alpha channel of the original sprite so only the player turns red.
-            scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+            if self.walljump_fatigue_frame_count > (25 if self.can_walljump['count'] == self.max_walljumps - 1 else 5):
+                scaled_img = pygame.transform.grayscale(scaled_img)
+                scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
+
+            if self.walljump_fatigue_frame_count > (30 if self.can_walljump['count'] == self.max_walljumps - 1 else 10) :
+                self.walljump_fatigue_frame_count = 0
+
 
         if self.rotation_angle != 0:
             # Rotate the image

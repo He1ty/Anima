@@ -100,7 +100,7 @@ class Game:
 
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
-        self.scroll_limits = {"x": (16, 656), "y": (-176, 144)}
+        self.scroll_limits = {"x": (16, 682), "y": (-176, 144)}
         self.camera_center = None
 
         # --- Asset Loading ---
@@ -304,7 +304,7 @@ class Game:
             self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
 
         self.spikes = []
-        spike_types = [("spikes", 0), ("spikes", 1)]
+        spike_types = [("spikes", 0), ("spikes", 1), ("gluy_spikes", 0), ("gluy_spikes", 1), ("gluy_spikes", 2)]
         spike_block_types = []
         for n in range(9):
             spike_block_types += [("spike_roots", n)]
