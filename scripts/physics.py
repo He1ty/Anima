@@ -275,6 +275,9 @@ class PhysicsPlayer:
 
             # Mise à jour des sons
             self.update_sounds()
+
+            print(self.can_walljump["wall"])
+
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
@@ -573,7 +576,7 @@ class PhysicsPlayer:
                     if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
                         self.velocity[1] *= 1
-                    else:  # Jumping away from the wall
+                    elif self.can_walljump["wall"] != 0:  # Jumping away from the wall
                         self.wall_jump_logic_helper()
 
                     self.can_walljump["count"] += 1
@@ -605,10 +608,7 @@ class PhysicsPlayer:
         h_jump_speed = 1.5
         v_boost = 0.5
         self.velocity[0] = 0
-        if self.can_walljump["wall"] == 1:
-            self.velocity[0] += -h_jump_speed
-        else:
-            self.velocity[0] += h_jump_speed
+        self.velocity[0] += -self.can_walljump["wall"] * h_jump_speed
         self.visual_scale = [0.6, 1.4]
         self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
         self.last_direction = -self.last_direction
@@ -810,7 +810,7 @@ class PhysicsPlayer:
                                                       entity_rect.y + self.size[1] > rect.y >= entity_rect.y)) or
                         (self.GRAVITY_DIRECTION == -1 and (entity_rect.y <= rect.y < entity_rect.y + self.size[1] or
                                                            entity_rect.y >= rect.y > entity_rect.y + self.size[1]))):
-                    if entity_rect.x - self.size[0] < rect.x <= entity_rect.x:
+                    if entity_rect.x - self.size[0] <= rect.x < entity_rect.x:
                         b_l.add(True)
                     if entity_rect.x + self.size[0] >= rect.x > entity_rect.x:
                         b_r.add(True)
@@ -866,14 +866,19 @@ class PhysicsPlayer:
         self.collision_check("y")
 
         if self.collision["right"] or self.collision["left"]:
-            if self.collision["right"]:
-                self.collision_check_walljump_helper(1)
-            if self.collision["left"]:
-                self.collision_check_walljump_helper(-1)
             if self.superjump:
                 self.velocity[0] = 0
             self.wall_jumping = False
             self.superjump = False
+
+        if self.get_block_on["left"] or self.get_block_on["right"]:
+            if self.get_block_on["right"]:
+                self.collision_check_walljump_helper(1)
+            if self.get_block_on["left"]:
+                self.collision_check_walljump_helper(-1)
+        else:
+            if self.can_walljump["wall"] != 0:
+                self.can_walljump["wall"] = 0
 
         if not(not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
@@ -891,8 +896,13 @@ class PhysicsPlayer:
             else:
                 # Air resistance/deceleration when not pressing anything in air
                 if self.get_direction("x") == 0:
-                    if abs(self.velocity[0]) < 2 and not self.jumping:
+                    # If player is colliding on a block
+                    if self.collision["right"] or self.collision["left"]:
+                        self.velocity[0] = 0
+                    # If player is slow-walking
+                    elif abs(self.velocity[0]) < 2 and not self.jumping:
                         self.velocity[0] *= 0.1
+                    # Normal air resistance
                     else:
                         self.velocity[0] *= 0.98
         else:
