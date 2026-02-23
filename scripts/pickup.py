@@ -13,23 +13,44 @@ class Pickup:
         self.animation = self.game.assets[self.type+"/"+self.state]
         self.size = self.animation.images[0].get_size()
         self.taking_time = 0
-        self.recharging_per_type = {
-                                        "doubledashball":3,
+        self.animations_duration = {
+            "doubledashball":
+                            {"idle": 8,
+                             "taking": 1,
+                             "taken": 4,
+                             "appearing": 3},
+            "soul":
+                    {"idle": 5,
+                 "taking": 3},
+
                                     }
-        self.recharging_time = self.recharging_per_type[self.type]  # in seconds
+        self.recharging_per_type = {
+                                        "doubledashball": 3,
+
+                                    }
+        if self.type in self.recharging_per_type:
+            self.recharging_time = self.recharging_per_type[self.type]  # in seconds
 
     def update(self):
 
         if self.state == "idle":
+            self.animation.img_duration = self.animations_duration[self.type][self.state]
             if self.player_is_touching():
 
                 if self.type == "doubledashball":
                     self.game.player.dash_amt = 2
+                    self.animation.frame = 0
+                    self.state = "taking"
 
-                self.state = "taking"
+                if self.game.player.dashtime_cur != 0:
+                    if self.type == "soul":
+                        self.game.collected_souls += 1
+
+                    self.animation.frame = 0
+                    self.state = "taking"
 
         elif self.state == "taking":
-            self.animation.img_duration = 1
+            self.animation.img_duration = self.animations_duration[self.type][self.state]
             if self.animation.done:
                 self.animation.done = False
                 self.animation.frame = 0
@@ -37,10 +58,15 @@ class Pickup:
                 self.taking_time = time.time()
 
         elif self.state == "taken":
-            if time.time() - self.taking_time >= self.recharging_time:
-                self.state = "appearing"
+            if "taken" in self.animations_duration[self.type]:
+                self.animation.img_duration = self.animations_duration[self.type][self.state]
+                if time.time() - self.taking_time >= self.recharging_time:
+                    self.state = "appearing"
+            else:
+                self.game.pickups.remove(self)
 
         elif self.state == "appearing":
+            self.animation.img_duration = self.animations_duration[self.type][self.state]
             if self.animation.done:
                 self.animation.done = False
                 self.animation.frame = 0

@@ -243,6 +243,7 @@ class Tilemap:
 
             if with_player:
                 if layer == PLAYER_LAYER:
+                    self.game.update_pickups(offset=offset)
                     self.game.player.render(surf, offset=offset)
                 if layer == self.game.FAKE_TILES_LAYER:
                     self.game.fake_tiles_render(offset=offset)
