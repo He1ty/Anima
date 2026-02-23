@@ -16,7 +16,7 @@ from scripts.activators import load_activators_actions
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200
 UNDERBAR_HEIGHT = 200
-
+#If layers are moved, check constants in activators.py (ACTIVATORS_LAYER), main.py(FAKE_TILES_LAYER) and tilemap.py(PLAYER_LAYER)
 
 class LevelManager:
 

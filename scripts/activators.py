@@ -5,7 +5,7 @@ import random
 from scripts.particle import Particle
 from scripts.display import move_visual, screen_shake
 
-ACTIVATORS_LAYER = "1"
+ACTIVATORS_LAYER = "2"
 
 class Activator:
     def __init__(self, game, pos, a_type, size=(16, 16), i=0):#Define basic attributes, that will be useful to track multiple elements from the lever(Position, activated, etc)

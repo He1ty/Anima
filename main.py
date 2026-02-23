@@ -52,7 +52,7 @@ class Game:
         # --- State Management ---
         # Controls which 'loop' the game is currently running
 
-        self.FAKE_TILES_LAYER = "4"
+        self.FAKE_TILES_LAYER = "5"
 
         self.state = "START_SCREEN"
         self.game_initialized = False
