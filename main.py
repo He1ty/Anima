@@ -12,11 +12,11 @@ from scripts.entities import *
 from scripts.utils import *
 from scripts.tilemap import Tilemap
 from scripts.physics import PhysicsPlayer
-from scripts.particle import Particle
+from scripts.particle import update_particles, particle_render
 from scripts.activators import *
 from scripts.user_interface import Menu, start_menu
 from scripts.saving import Save, save_game
-from scripts.doors import Door
+from scripts.doors import Door, doors_render_and_update
 from scripts.display import *
 from scripts.text import load_game_texts, display_bottom_text, update_bottom_text
 from scripts.spark import Spark
@@ -100,7 +100,7 @@ class Game:
 
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
-        self.scroll_limits = {"x": (16, 682), "y": (-176, 144)}
+        self.scroll_limits = {"x": (16, 656), "y": (-176, 144)}
         self.camera_center = None
 
         # --- Asset Loading ---
@@ -243,6 +243,9 @@ class Game:
 
         self.playtime = 0
         self.menu_time = 0
+
+        if hasattr(self, "fake_tile_groups"):
+            delattr(self, "fake_tile_groups")
 
     def toggle_hitboxes(self):
         self.player.show_hitbox = not self.player.show_hitbox
@@ -421,7 +424,7 @@ class Game:
                 self.load_level(self.level, transition_effect=False)
                 self.player.pos = [transition["dest_pos"][0] * self.tile_size, transition["dest_pos"][1] * self.tile_size]
 
-    def update_teleport(self, render_scroll):
+    def checkpoints_render_and_update(self, render_scroll):
         for checkpoint in self.checkpoints:
             if not self.tilemap.pos_visible(self.display, checkpoint["pos"], render_scroll, additional_offset=(16, 16)):
                 continue
@@ -469,64 +472,9 @@ class Game:
                             self.spawn_point["cameras"][str(camera.initial_state)]["center"] = camera.center
                 save_game(self, self.current_slot)
 
-    def update_pickups(self, offset):
-        for pickup in self.pickups:
-            if self.tilemap.pos_visible(self.display, pickup.pos, offset):
-                pickup.update()
-                pickup.render(self.display, offset)
-
-    def update_spawn(self):
-        # Define respawn point based on current section or checkpoint
-        if self.current_checkpoint is None:
-            for section in self.sections.keys():
-                if self.level in self.sections[section]:
-                    try:
-                        self.spawn_point = {"pos": self.spawner_pos[str(section)], "level": section}
-                    except KeyError:
-                        pass
-
-    def update_particles(self, render_scroll):
-        for rect in self.leaf_spawners:
-            if not self.tilemap.pos_visible(self.display, (rect.x, rect.y), offset=render_scroll, additional_offset=(100, 100)):
-                continue
-            if random.random() * 49999 < rect.width * rect.height:
-                pos = (rect.x + random.random() * rect.width, rect.y + random.random() * rect.height)
-                self.particles.append(Particle(self, 'leaf', pos, velocity=[-0.1, 0.3], frame=random.randint(0, 20)))
-
-    def update_projectile(self, render_scroll):
-        for projectile in self.projectiles[:]:
-            projectile['pos'][0] += projectile['direction'][0]
-            projectile['pos'][1] += projectile['direction'][1]
-            projectile['timer'] += 1
-            img = self.assets[projectile['type']].convert_alpha()
-            self.display.blit(img, (projectile['pos'][0] - img.get_width() / 2 - render_scroll[0],
-                                    projectile['pos'][1] - img.get_height() / 2 - render_scroll[1]))
-
-            # Remove projectiles on wall collision or timeout
-            if self.tilemap.solid_check(projectile['pos']) or projectile['timer'] > 360:
-                self.projectiles.remove(projectile)
-            elif self.player.rect().collidepoint(projectile['pos']):
-                self.player_hp -= projectile.get('damage', 10)
-                self.damage_flash_active = True
-                self.damage_flash_end_time = pygame.time.get_ticks() + self.damage_flash_duration
-                self.projectiles.remove(projectile)
-
-    def update_enemies(self, render_scroll):
-        for enemy in self.enemies.copy():
-            enemy.update(self.tilemap, (0, 0))
-            enemy.render(self.display, offset=render_scroll)
-            if enemy.hp <= 0 or enemy.pos[1] > self.max_falling_depth:
-                enemy.set_action("death")
-                if enemy.animation.done: self.enemies.remove(enemy)
-
     def update_camera_setup(self):
         for camera in self.camera_setup:
             camera.update()
-
-    def throwable_update(self, render_scroll):
-        for o in self.throwable:
-            o.update(self.tilemap, (0, 0))
-            o.render(self.display, offset=render_scroll)
 
     def spike_hitbox_update(self, render_scroll):
         for spike_hitbox in self.spikes:
@@ -544,54 +492,6 @@ class Game:
 
             if self.show_spikes_hitboxes:
                 spike_hitbox.render(self.display, spike_hitbox.circle_hitbox, offset=render_scroll)
-
-    def doors_update(self, render_scroll):
-        # Doors (Colliders updated for physics)
-        ds = []
-        for door in self.doors:
-            door.update()
-            door.render(self.display, offset=render_scroll)
-            if not door.opened:
-                ds.append(door.rect())
-                if self.player.show_hitbox:
-                    k = door.rect().copy()
-                    k.x -= render_scroll[0]
-                    k.y -= render_scroll[1]
-                    pygame.draw.rect(self.display, (255, 0, 0), k, 1)
-        self.doors_rects = ds
-
-    def spark_update(self, render_scroll):
-        for spark in self.sparks[:]:
-            if spark.update(): self.sparks.remove(spark)
-            spark.render(self.display, offset=render_scroll)
-
-    def particle_render(self, render_scroll):
-        for particle in self.particles[:]:
-            if not self.tilemap.pos_visible(self.display, particle.pos, offset=render_scroll, additional_offset=(100, 100)):
-                self.particles.remove(particle)
-                continue
-            if particle.update(): self.particles.remove(particle)
-            particle.render(self.display, offset=render_scroll)
-
-    def death_handling(self):
-        if self.player.pos[1] > self.max_falling_depth or self.player_hp <= 0:
-            kill_player(self, self.screen, self.spawn_point["pos"], self.spawn_point["level"])
-            for key in self.dict_kb.keys(): self.dict_kb[key] = 0
-            self.player_hp = 100
-
-    def damage_effect_update(self):
-        if self.damage_flash_active:
-            if pygame.time.get_ticks() < self.damage_flash_end_time:
-                screen_shake(self, 16)
-                screen_width, screen_height = self.screen.get_size()
-                border_surface = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-                elapsed = pygame.time.get_ticks() - (self.damage_flash_end_time - self.damage_flash_duration)
-                progress = min(1.0, elapsed / self.damage_flash_duration)
-                alpha = int(240 * (1 - progress))
-                pygame.draw.rect(border_surface, (0, 0, 0, alpha), (0, 0, screen_width, screen_height), 100)
-                self.screen.blit(border_surface, (0, 0))
-            else:
-                self.damage_flash_active = False
 
     def fake_tiles_render(self, offset=(0, 0)):
         group_to_remove = None
@@ -621,68 +521,62 @@ class Game:
             self.fake_tiles_opacity = 255
             self.fake_tiles_colliding_group = []
 
-    def prerender_update(self):
+    def main_game_logic(self):
+        """
+        The core gameplay loop. Handles physics, collision, rendering order,
+        entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
+        """
+
+        # -- Camera & Render Scroll setup
         self.update_camera_setup()
         update_camera(self)
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
-
         display_level_bg(self, self.level)
-        return render_scroll
 
-    def prerender_over_update(self, render_scroll):
+        # -- Tilemap Render and Update
+        self.tilemap.render(self.display, offset=render_scroll)
+        self.player.physics_process(self.tilemap, self.dict_kb)
 
+        # -- Pre Game-Initialization
         if not self.game_initialized:
             self.start_time = time.time()
 
+        # -- Transitions Update (from one map to another)
         self.update_transitions()
 
+        # -- Transition Animation Update
         if self.transition < 0: self.transition += 2
 
-        self.update_teleport(render_scroll)
+        # -- Checkpoints Render and Update
+        self.checkpoints_render_and_update(render_scroll)
+        doors_render_and_update(self, render_scroll)
 
-        if self.teleporting: update_teleporter(self, self.tp_id)
+        # -- Teleporters Render and Update
+        if self.teleporting:
+            update_teleporter(self, self.tp_id)
 
-        self.screenshake = max(0, self.screenshake - 1)
-
+        # -- Player Input Disable
         self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
 
-        self.update_particles(render_scroll)
+        # -- Activators Render
+        render_activators(self, render_scroll)
 
-
-        #Projectiles
-        #self.update_projectile(render_scroll)
-
-        # 4. Tilemap & Entities
-
-        for activator in self.activators: activator.render(self.display, offset=render_scroll)
-
-        # self.update_enemies(render_scroll)
-
-        # 5. Player & Physics
-        # attacking_update(self)
-
-    def post_render_update(self, render_scroll):
-
-        #self.throwable_update(render_scroll)
-
+        # -- Spikes Hitboxes render and update
         self.spike_hitbox_update(render_scroll)
 
-        self.particle_render(render_scroll)
+        # -- Particles Render and Update
+        update_particles(self, render_scroll)
+        particle_render(self, render_scroll)
 
-        # 6. Foreground & Lighting
+        # -- Foreground & Lighting
         display_level_fg(self, self.level)
         apply_lighting(self, render_scroll)
 
-        self.doors_update(render_scroll)
 
-        #self.spark_update(render_scroll)
-
-        # --- Final UI Blits ---
         update_bottom_text(self)
         if self.cutscene:
             draw_cutscene_border(self.display)
         else:
-            #draw_health_bar(self)
             pass
 
         # Handle Circle Transition Effect
@@ -697,25 +591,26 @@ class Game:
         else:
             self.player.disablePlayerInput = False
 
+        # -- Screenshake Update and Render
         # Scaling internal display to window size with screenshake
+        self.screenshake = max(0, self.screenshake - 1)
         screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2,
                               random.random() * self.screenshake - self.screenshake / 2)
         self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), screenshake_offset)
 
-        # Damage Vignette Effect
-        #self.damage_effect_update()
-
         pygame.display.update()
 
-        # --- Death Handling ---
-        self.death_handling()
+        # -- Death Handling
+        death_handling(self)
 
+        # -- Game initialization
         if not self.game_initialized:
             self.game_initialized = True
+            # - Save game on start
             if not os.path.exists(f"saves/save_{self.current_slot}.json"):
                 save_game(self, self.current_slot)
 
-        # --- Input Handling ---
+        # -- Input Handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -727,7 +622,9 @@ class Game:
                 if event.key == pygame.K_e:
                     # Interact with items or levers
                     update_throwable_objects_action(self)
-                    if not self.player_grabbing: update_activators_actions(self, self.level)
+                    if not self.player_grabbing:
+                        update_activators_actions(self, self.level)
+
                 if event.key == pygame.K_F11: toggle_fullscreen(self)
                 if event.key == pygame.K_f and not self.holding_attack:
                     self.dict_kb["key_attack"] = 1
@@ -746,21 +643,6 @@ class Game:
                 state = 1 if event.type == pygame.KEYDOWN else 0
                 key_map = self.get_key_map()
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
-
-    def main_game_logic(self):
-        """
-        The core gameplay loop. Handles physics, collision, rendering order,
-        entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
-        """
-
-        render_scroll = self.prerender_update()
-
-        self.tilemap.render(self.display, offset=render_scroll)
-        self.player.physics_process(self.tilemap, self.dict_kb)
-
-        self.prerender_over_update(render_scroll)
-
-        self.post_render_update(render_scroll)
 
         self.clock.tick(60)
 

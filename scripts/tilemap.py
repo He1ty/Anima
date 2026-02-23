@@ -5,6 +5,7 @@ import json
 from pygame import BLEND_ADD, BLEND_MAX, BLEND_RGBA_MULT, BLEND_RGBA_SUB, BLEND_RGBA_ADD
 
 from scripts.utils import round_up
+from scripts.pickup import pickups_render_and_update
 
 AUTOTILE_MAP = {
     tuple(sorted([(1, 0), (0, 1)])): 0,
@@ -243,7 +244,7 @@ class Tilemap:
 
             if with_player:
                 if layer == PLAYER_LAYER:
-                    self.game.update_pickups(offset=offset)
+                    pickups_render_and_update(self.game, offset=offset)
                     self.game.player.render(surf, offset=offset)
                 if layer == self.game.FAKE_TILES_LAYER:
                     self.game.fake_tiles_render(offset=offset)

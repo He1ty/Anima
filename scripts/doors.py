@@ -78,3 +78,18 @@ class Door:
     def render(self, surf, offset=(0, 0)):#display the animation
         surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False),
                   (self.pos[0] - offset[0], self.pos[1] - offset[1]))
+
+def doors_render_and_update(game, render_scroll):
+    # Doors (Colliders updated for physics)
+    ds = []
+    for door in game.doors:
+        door.update()
+        door.render(game.display, offset=render_scroll)
+        if not door.opened:
+            ds.append(door.rect())
+            if game.player.show_hitbox:
+                k = door.rect().copy()
+                k.x -= render_scroll[0]
+                k.y -= render_scroll[1]
+                pygame.draw.rect(game.display, (255, 0, 0), k, 1)
+    game.doors_rects = ds

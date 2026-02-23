@@ -586,3 +586,10 @@ def attacking_update(game):
     if game.attacking and game.player.animation.done:
         game.dict_kb["key_attack"] = 0
         game.player_last_attack_time = time.time()
+
+def death_handling(game):
+    if game.player.pos[1] > game.max_falling_depth or game.player_hp <= 0:
+        kill_player(game, game.screen, game.spawn_point["pos"], game.spawn_point["level"])
+        for key in game.dict_kb.keys():
+            game.dict_kb[key] = 0
+        game.player_hp = 100

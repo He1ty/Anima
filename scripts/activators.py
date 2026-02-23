@@ -92,6 +92,10 @@ def update_activators_actions(game, level):
                 game.teleporting = True
                 game.tp_id = str(activator.id)
 
+def render_activators(game, render_scroll):
+    for activator in game.activators:
+        activator.render(game.display, offset=render_scroll)
+
 class CameraSetup:
     def __init__(self, game, camera):
         self.game = game

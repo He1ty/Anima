@@ -84,3 +84,9 @@ class Pickup:
         self.animation = self.game.assets[self.type + "/" + self.state]
         surf.blit(self.animation.img(),
                   (self.pos[0] - offset[0], self.pos[1] - offset[1]))
+
+def pickups_render_and_update(game, offset):
+        for pickup in game.pickups:
+            if game.tilemap.pos_visible(game.display, pickup.pos, offset):
+                pickup.update()
+                pickup.render(game.display, offset)
