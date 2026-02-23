@@ -177,6 +177,7 @@ class Game:
         self.player_attack_time = 0.03
         self.player_attack_dist = 20
         self.player_last_attack_time = 0
+        self.collected_souls = 0
         self.holding_attack = False
         self.attacking = False
         self.player_attacked = False
@@ -468,11 +469,11 @@ class Game:
                             self.spawn_point["cameras"][str(camera.initial_state)]["center"] = camera.center
                 save_game(self, self.current_slot)
 
-    def update_pickups(self, render_scroll):
+    def update_pickups(self, offset):
         for pickup in self.pickups:
-            if self.tilemap.pos_visible(self.display, pickup.pos, render_scroll):
+            if self.tilemap.pos_visible(self.display, pickup.pos, offset):
                 pickup.update()
-                pickup.render(self.display, render_scroll)
+                pickup.render(self.display, offset)
 
     def update_spawn(self):
         # Define respawn point based on current section or checkpoint
@@ -642,8 +643,6 @@ class Game:
         if self.teleporting: update_teleporter(self, self.tp_id)
 
         self.screenshake = max(0, self.screenshake - 1)
-
-        self.update_pickups(render_scroll)
 
         self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
 
