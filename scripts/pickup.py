@@ -65,39 +65,42 @@ class Pickup:
                 y_dist = player_rect.centery - self.initial_rect().centery
                 x_sign = (x_dist / abs(x_dist)) if x_dist != 0 else self.prev_x_sign if hasattr(self,
                                                                                                 "prev_x_sign") else 0
-                self.prev_x_sign = x_sign
+                #self.prev_x_sign = x_sign
                 y_sign = (y_dist / abs(y_dist)) if y_dist != 0 else self.prev_y_sign if hasattr(self,
                                                                                                 "prev_y_sign") else 0
-                self.prev_y_sign = y_sign
+                #self.prev_y_sign = y_sign
 
-                inner_r = max(16 - math.pow((x_dist ** 2) + (y_dist ** 2), 0.5), 0)
+                inner_r = max(20 - math.pow((x_dist ** 2) + (y_dist ** 2), 0.5), 0)
 
 
                 if x_sign < 0:
                     self.pos[0] = max(self.initial_pos[0], self.pos[0] + x_dist / comeback_frequency)
-                else:
+                elif x_sign > 0:
                     self.pos[0] = min(self.initial_pos[0], self.pos[0] + x_dist / comeback_frequency)
 
                 if y_sign < 0:
                     self.pos[1] = max(self.initial_pos[1], self.pos[1] + y_dist / comeback_frequency)
-                else:
+                elif y_sign > 0:
                     self.pos[1] = min(self.initial_pos[1], self.pos[1] + y_dist / comeback_frequency)
 
                 if self.initial_rect().colliderect(self.game.player.rect().inflate(4, 4)):
 
-                    player_relative_angle = -x_sign*(math.atan(y_dist / x_dist) if x_dist else y_sign*math.pi/2)
+                    if x_dist:
+                        player_relative_angle = -x_sign*(math.atan(y_dist / x_dist))
+                    else:
+                        player_relative_angle = -y_sign*math.pi/2
 
                     if x_sign < 0:
                         self.pos[0] = min(self.pos[0] - inner_r*math.cos(player_relative_angle + math.pi)/moving_frequency,
                                           self.initial_pos[0] - inner_r*math.cos(player_relative_angle + math.pi))
-                    else:
+                    elif x_sign > 0:
                         self.pos[0] = max(self.pos[0] + inner_r * math.cos(player_relative_angle + math.pi) / moving_frequency,
                             self.initial_pos[0] + inner_r * math.cos(player_relative_angle + math.pi))
 
                     if y_sign < 0:
                         self.pos[1] = min(self.pos[1] - inner_r*math.sin(player_relative_angle + math.pi)/moving_frequency,
                                           self.initial_pos[1] - inner_r*math.sin(player_relative_angle + math.pi))
-                    else:
+                    elif y_sign > 0:
                         self.pos[1] = max(self.pos[1] - inner_r*math.sin(player_relative_angle + math.pi)/moving_frequency,
                                           self.initial_pos[1] - inner_r*math.sin(player_relative_angle + math.pi))
 

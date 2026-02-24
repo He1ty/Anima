@@ -1,10 +1,4 @@
 import sys
-import math
-import os
-import json
-import pygame
-import random
-import time
 
 # --- Game Script Imports ---
 # These modules handle specific game logic like physics, entities, and UI.
