@@ -1,6 +1,7 @@
 import pygame
 
 import json
+import math
 
 from pygame import BLEND_ADD, BLEND_MAX, BLEND_RGBA_MULT, BLEND_RGBA_SUB, BLEND_RGBA_ADD
 
@@ -17,12 +18,11 @@ AUTOTILE_MAP = {
     tuple(sorted([(1, 0), (0, -1)])): 6,
     tuple(sorted([(1, 0), (0, -1), (0, 1)])): 7,
     tuple(sorted([(1, 0), (-1, 0), (0, 1), (0, -1)])): 8,
-
 }
 
-PHYSICS_TILES = {'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass', 'mossy_stone_gluy'}
+PHYSICS_TILES = {'purpur_rock', 'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass', 'mossy_stone_gluy'}
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
-AUTOTILE_TYPES = {'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
+AUTOTILE_TYPES = {'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
 AUTOTILE_COMPATIBILITY = {'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
 PLAYER_LAYER = "2"
 
@@ -163,8 +163,20 @@ class Tilemap:
                         if self.tilemap[layer][check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and self.tilemap[layer][check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
                             neighbors.add(shift)
                 neighbors = tuple(sorted(neighbors))
-                if (tile['type'] in AUTOTILE_TYPES) and (neighbors in AUTOTILE_MAP):
-                    tile['variant'] = AUTOTILE_MAP[neighbors]
+
+                a_map = AUTOTILE_MAP
+                if "rotation" in tile:
+                    angle = -(tile["rotation"] - 1)*math.pi/2
+                    a_map = {
+                        tuple(sorted([(int(math.sin(angle)), int(-math.cos(angle)))])): 0,
+                        tuple(sorted([(int(math.sin(angle)), int(math.cos(angle))), (int(-math.sin(angle)), int(-math.cos(angle)))])): 1,
+                        tuple(sorted([(int((math.sin(angle))), int(math.cos(angle)))])): 2,
+                    }
+                if (tile['type'] in AUTOTILE_TYPES) and (neighbors in a_map):
+                    if "rotation" in tile:
+                        tile['variant'] = a_map[neighbors]
+                    else:
+                        tile['variant'] = a_map[neighbors]
 
     def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))

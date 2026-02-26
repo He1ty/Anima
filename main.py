@@ -614,6 +614,7 @@ class Game:
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    pygame.mouse.set_visible(True)
                     self.menu.menu_display()
                     for key in self.dict_kb.keys(): self.dict_kb[key] = 0
                 if event.key == pygame.K_e:
@@ -674,7 +675,7 @@ class Game:
 
             elif self.state == "PLAYING":
                 # Dynamic music based on level ID
-
+                pygame.mouse.set_visible(False)
                 change_music(self, "assets/sounds/" + f"map_{str(self.level)}" + ".wav")
                 self.main_game_logic()
 

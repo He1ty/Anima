@@ -40,13 +40,18 @@ class Pickup:
 
         if self.state == "idle":
             self.animation.img_duration = self.animations_duration[self.type][self.state]
+
+            # Actions if player touches pickup
             if self.player_is_touching():
                 if self.type == "doubledashball":
-                    self.game.player.dash_amt = 2
-                    self.animation.frame = 0
-                    self.state = "taking"
+                    if self.game.player.dash_amt != 2:
+                        self.game.player.dash_amt = 2
+                        self.animation.frame = 0
+                        self.state = "taking"
 
+                # If player touches while dashing
                 if self.game.player.dashtime_cur != 0:
+
                     if self.type == "soul":
                         pos = f"{self.initial_pos[0]};{self.initial_pos[1]}"
                         self.game.collected_souls.append(pos)
@@ -54,6 +59,7 @@ class Pickup:
                     self.animation.frame = 0
                     self.state = "taking"
                     self.animation = self.game.assets[self.type + "/" + self.state].copy()
+
 
             # Avoid player movement
             if self.type == "soul":
@@ -137,6 +143,6 @@ class Pickup:
 
 def pickups_render_and_update(game, offset):
         for pickup in game.pickups:
-            if game.tilemap.pos_visible(game.display, pickup.pos, offset, additional_offset=(16, 16)):
+            if game.tilemap.pos_visible(game.display, pickup.pos, offset, additional_offset=pickup.size):
                 pickup.update()
                 pickup.render(game.display, offset)
