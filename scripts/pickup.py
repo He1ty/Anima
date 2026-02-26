@@ -15,7 +15,7 @@ class Pickup:
         self.type = pickup_type
         self.game = game
         self.state = "idle"
-        self.animation = self.game.assets[self.type+"/"+self.state]
+        self.animation = self.game.assets[self.type+"/"+self.state].copy()
         self.size = self.animation.images[0].get_size()
         self.taking_time = 0
         self.animations_duration = {
@@ -41,69 +41,23 @@ class Pickup:
         if self.state == "idle":
             self.animation.img_duration = self.animations_duration[self.type][self.state]
             if self.player_is_touching():
-
                 if self.type == "doubledashball":
                     self.game.player.dash_amt = 2
                     self.animation.frame = 0
                     self.state = "taking"
 
-
                 if self.game.player.dashtime_cur != 0:
                     if self.type == "soul":
-                        self.game.collected_souls += 1
+                        pos = f"{self.initial_pos[0]};{self.initial_pos[1]}"
+                        self.game.collected_souls.append(pos)
 
                     self.animation.frame = 0
                     self.state = "taking"
+                    self.animation = self.game.assets[self.type + "/" + self.state].copy()
 
+            # Avoid player movement
             if self.type == "soul":
-
-                comeback_frequency = 5
-                moving_frequency = 5
-
-                player_rect = self.game.player.rect()
-                x_dist = player_rect.centerx - self.initial_rect().centerx
-                y_dist = player_rect.centery - self.initial_rect().centery
-                x_sign = (x_dist / abs(x_dist)) if x_dist != 0 else self.prev_x_sign if hasattr(self,
-                                                                                                "prev_x_sign") else 0
-                #self.prev_x_sign = x_sign
-                y_sign = (y_dist / abs(y_dist)) if y_dist != 0 else self.prev_y_sign if hasattr(self,
-                                                                                                "prev_y_sign") else 0
-                #self.prev_y_sign = y_sign
-
-                inner_r = max(20 - math.pow((x_dist ** 2) + (y_dist ** 2), 0.5), 0)
-
-
-                if x_sign < 0:
-                    self.pos[0] = max(self.initial_pos[0], self.pos[0] + x_dist / comeback_frequency)
-                elif x_sign > 0:
-                    self.pos[0] = min(self.initial_pos[0], self.pos[0] + x_dist / comeback_frequency)
-
-                if y_sign < 0:
-                    self.pos[1] = max(self.initial_pos[1], self.pos[1] + y_dist / comeback_frequency)
-                elif y_sign > 0:
-                    self.pos[1] = min(self.initial_pos[1], self.pos[1] + y_dist / comeback_frequency)
-
-                if self.initial_rect().colliderect(self.game.player.rect().inflate(4, 4)):
-
-                    if x_dist:
-                        player_relative_angle = -x_sign*(math.atan(y_dist / x_dist))
-                    else:
-                        player_relative_angle = -y_sign*math.pi/2
-
-                    if x_sign < 0:
-                        self.pos[0] = min(self.pos[0] - inner_r*math.cos(player_relative_angle + math.pi)/moving_frequency,
-                                          self.initial_pos[0] - inner_r*math.cos(player_relative_angle + math.pi))
-                    elif x_sign > 0:
-                        self.pos[0] = max(self.pos[0] + inner_r * math.cos(player_relative_angle + math.pi) / moving_frequency,
-                            self.initial_pos[0] + inner_r * math.cos(player_relative_angle + math.pi))
-
-                    if y_sign < 0:
-                        self.pos[1] = min(self.pos[1] - inner_r*math.sin(player_relative_angle + math.pi)/moving_frequency,
-                                          self.initial_pos[1] - inner_r*math.sin(player_relative_angle + math.pi))
-                    elif y_sign > 0:
-                        self.pos[1] = max(self.pos[1] - inner_r*math.sin(player_relative_angle + math.pi)/moving_frequency,
-                                          self.initial_pos[1] - inner_r*math.sin(player_relative_angle + math.pi))
-
+                self.avoid_player()
 
 
         elif self.state == "taking":
@@ -113,12 +67,14 @@ class Pickup:
                 self.animation.frame = 0
                 self.state = "taken"
                 self.taking_time = time.time()
+                self.animation = self.game.assets[self.type + "/" + self.state].copy()
 
         elif self.state == "taken":
             if "taken" in self.animations_duration[self.type]:
                 self.animation.img_duration = self.animations_duration[self.type][self.state]
                 if time.time() - self.taking_time >= self.recharging_time:
                     self.state = "appearing"
+                    self.animation = self.game.assets[self.type + "/" + self.state].copy()
             else:
                 self.game.pickups.remove(self)
 
@@ -128,6 +84,7 @@ class Pickup:
                 self.animation.done = False
                 self.animation.frame = 0
                 self.state = "idle"
+                self.animation = self.game.assets[self.type + "/" + self.state].copy()
 
         self.animation.update()
 
@@ -137,16 +94,49 @@ class Pickup:
     def initial_rect(self):
         return pygame.Rect(self.initial_pos[0], self.initial_pos[1], self.size[0], self.size[1])
 
+    def avoid_player(self):
+        comeback_speed = 0.1  # How fast it returns (0.0 to 1.0)
+        avoid_radius = 15  # How close the player gets before it moves
+        push_strength = 0.5  # How strongly it's pushed away
+
+        # 1. Get the vector from the player to the object's initial (home) spot
+        # (This is where the object "wants" to be)
+        home_pos = pygame.Vector2(self.initial_pos)
+        current_pos = pygame.Vector2(self.pos)
+        player_pos = pygame.Vector2(self.game.player.pos)
+
+        # 2. Return Force: Move back toward initial_pos
+        # Lerp (Linear Interpolation) makes the return move smooth and slow down as it arrives
+        target_pos = current_pos.lerp(home_pos, comeback_speed)
+
+        # 3. Avoidance Force: If player is too close, push target_pos away
+        dist_to_player = current_pos.distance_to(player_pos)
+
+        if dist_to_player < avoid_radius:
+            # Calculate direction AWAY from player
+            # If distance is 0, use a default vector to avoid error
+            push_dir = (current_pos - player_pos)
+            if push_dir.length() == 0:
+                push_dir = pygame.Vector2(1, 0)
+            else:
+                push_dir = push_dir.normalize()
+
+            # How much to push? (Stronger when closer)
+            push_magnitude = (avoid_radius - dist_to_player) * push_strength
+            target_pos += push_dir * push_magnitude
+
+        # 4. Apply the position
+        self.pos[0], self.pos[1] = target_pos.x, target_pos.y
+
     def player_is_touching(self):
         return self.rect().colliderect(self.game.player.rect().inflate(0, 0))
 
     def render(self, surf, offset=(0, 0)): #display the animation
-        self.animation = self.game.assets[self.type + "/" + self.state]
         surf.blit(self.animation.img(),
                   (self.pos[0] - offset[0], self.pos[1] - offset[1]))
 
 def pickups_render_and_update(game, offset):
         for pickup in game.pickups:
-            if game.tilemap.pos_visible(game.display, pickup.pos, offset):
+            if game.tilemap.pos_visible(game.display, pickup.pos, offset, additional_offset=(16, 16)):
                 pickup.update()
                 pickup.render(game.display, offset)

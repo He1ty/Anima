@@ -75,6 +75,6 @@
    }
   }
  },
- "offgrid": [],
+ "offgrid": {},
  "tilesize": 16
 }

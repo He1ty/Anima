@@ -525,7 +525,9 @@ def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition
     game.cutscene = False
     if animation:
         death_animation(screen)
+    pickups = game.pickups
     load_game(game, game.current_slot)
+    game.pickups = pickups
     game.transition = -30
     game.player.dash_amt = 1
     game.player.velocity = [0, 0]

@@ -71,7 +71,7 @@ class LevelManager:
         except FileNotFoundError:
             # Create the file if it doesn't exist (e.g. new map)
             with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
-                json.dump({'tilemap': {"0":{}}, 'tilesize': 16, 'offgrid': []}, f)
+                json.dump({'tilemap': {"0":{}}, 'tilesize': 16, 'offgrid': {}}, f)
             self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
 
         self.editor.scroll = [0, 0]
@@ -971,7 +971,7 @@ class Editor:
                     if self.tile_list[
                         self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
                             [("spawners", 0)], keep=True):
-                        print("Player aspawner alredy placed in this map")
+                        print("Player spawner alredy placed in this map")
 
                     else:
                         t = self.tile_list[self.tile_group]
@@ -994,52 +994,12 @@ class Editor:
                                     self.setup_edit_window(tile_category, tile)
                                     break
 
-                        '''
-                        if self.tile_list[self.tile_group] in (d[0] for d in self.doors):
-                            iD = int(input("Enter the door id: "))
-                            while iD in self.doors_ids:
-                                print("id already used")
-                                iD = int(input("Enter the door id: "))
-                            self.doors_ids.add(iD)
-                            self.tilemap.tilemap[str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                                'type': self.tile_list[self.tile_group],
-                                'variant': self.tile_variant,
-                                'pos': tile_pos,
-                                'id': iD}
-                        '''
-
                 else:
                     tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
                     if tile_loc in self.tilemap.tilemap[self.current_layer]:
                         tile = self.tilemap.tilemap[self.current_layer][tile_loc]
                         tile_category = self.get_infos_tile_category(tile)
                         self.setup_edit_window(tile_category, tile)
-                    '''
-                    
-                        if t in self.present_activators_types[self.current_activator_category]:
-                            self.set_window_mode()
-                            self.showing_properties_window = True
-                            self.selected_activator_type = "Levers" if "lever" in t else "Buttons" if "button" in t else "Teleporters"
-                            self.selected_activator = {"image": self.assets[t][0],
-                                                       "infos": self.activators[self.selected_activator_type][
-                                                           tile_loc]}
-                            self.clicking = False
-                        elif t == "transition":
-                            self.set_window_mode()
-                            self.showing_properties_window = True
-                            self.selected_activator_type = "Transitions"
-                            # Manual construction of info for transitions
-                            self.selected_activator = {
-                                "image": self.assets[t][0],
-                                "infos": {
-                                    "type": "transition",
-                                    "destination": self.tilemap.tilemap[tile_loc].get('destination', 0),
-                                    "dest_pos": self.tilemap.tilemap[tile_loc].get('dest_pos', [0, 0]),
-                                    "pos": self.tilemap.tilemap[tile_loc]['pos']
-                                }
-                            }
-                            self.clicking = False
-                        '''
 
         if self.right_clicking and mpos_in_mainarea:
             if not self.window_mode:
@@ -1048,14 +1008,15 @@ class Editor:
                     if tile_loc in self.tilemap.tilemap[self.current_layer]:
                         del self.tilemap.tilemap[self.current_layer][tile_loc]
 
-                    for tile in self.tilemap.offgrid_tiles.copy():
+                    for pos in self.tilemap.offgrid_tiles.copy():
+                        tile = self.tilemap.offgrid_tiles[pos]
                         tile_img = self.assets[tile['type']][tile['variant']]
                         tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
                                              tile['pos'][1] - self.scroll[1],
                                              tile_img.get_width(),
                                              tile_img.get_height())
                         if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
-                            self.tilemap.offgrid_tiles.remove(tile)
+                            del self.tilemap.offgrid_tiles[pos]
 
 
         if not self.edit_properties_mode_on:
@@ -1097,12 +1058,15 @@ class Editor:
 
                     if event.button == 1:
                         self.clicking = True
-                        if not self.ongrid:
-                            self.tilemap.offgrid_tiles.append({'type': self.tile_list[self.tile_group],
+                        if not self.ongrid and mpos_in_mainarea:
+                            self.tilemap.offgrid_tiles[str(mpos_scaled[0] + self.scroll[0]) +
+                                                       ";"
+                                                       + str(mpos_scaled[1] + self.scroll[1])] = \
+                                {'type': self.tile_list[self.tile_group],
                                                                'variant': self.tile_variant,
                                                                'pos': (
                                                                    mpos_scaled[0] + self.scroll[0],
-                                                                   mpos_scaled[1] + self.scroll[1])})
+                                                                   mpos_scaled[1] + self.scroll[1])}
                     if event.button == 3:
                         self.right_clicking = True
                 if event.type == pygame.KEYDOWN:

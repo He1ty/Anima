@@ -66,6 +66,7 @@ class Save:
                 "center":self.game.spawn_point["camera_center"],
                 "cameras": self.game.spawn_point["cameras"]
             },
+            "collected_souls": self.game.collected_souls,
             "doors": [],
             "activators":{},
             "level": self.game.level,
@@ -160,7 +161,11 @@ class Save:
                 if "center" in save_data["camera"]:
                     self.game.camera_center = save_data["camera"]["center"]
 
-            self.game.playtime = save_data["playtime"]
+            if "collected_souls" in save_data:
+               self.game.collected_souls = save_data["collected_souls"]
+
+            if "playtime" in save_data:
+               self.game.playtime = save_data["playtime"]
 
             #Load level
             self.game.load_level(level, transition_effect=False)

@@ -31,7 +31,7 @@ class Tilemap:
         self.game = game
         self.tile_size = tile_size
         self.tilemap = {}
-        self.offgrid_tiles = []
+        self.offgrid_tiles = {}
         self.show_collisions = False
         self.fake_tile_opacity = 255
         self.fake_tile_groups = []
@@ -42,11 +42,12 @@ class Tilemap:
         extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
         where 0 <= n < len(id_pairs)"""
         matches = []
-        for tile in self.offgrid_tiles.copy():
+        for loc in self.offgrid_tiles.copy():
+            tile = self.offgrid_tiles[loc]
             if (tile['type'], tile['variant']) in id_pairs:
                 matches.append(tile.copy())
                 if not keep:
-                    self.offgrid_tiles.remove(tile)
+                    del self.offgrid_tiles[loc]
 
         for layer in (layers if layers else self.tilemap):
             for loc in self.tilemap[layer].copy():
@@ -268,8 +269,8 @@ class Tilemap:
             if layer == "2" and with_player and self.show_collisions:
                 self.render_tiles_under(self.game.player.pos, self.game.player.size, 1)
 
-
-        for tile in self.offgrid_tiles:
+        for pos in self.offgrid_tiles.copy():
+            tile = self.offgrid_tiles[pos]
             img = self.game.assets[tile['type']][tile['variant']].copy()
             img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
             surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))

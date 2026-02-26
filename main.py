@@ -47,6 +47,7 @@ class Game:
         # Controls which 'loop' the game is currently running
 
         self.FAKE_TILES_LAYER = "5"
+        self.ACTIVATORS_LAYER = "2"
 
         self.state = "START_SCREEN"
         self.game_initialized = False
@@ -171,7 +172,9 @@ class Game:
         self.player_attack_time = 0.03
         self.player_attack_dist = 20
         self.player_last_attack_time = 0
-        self.collected_souls = 0
+
+        self.collected_souls = []
+
         self.holding_attack = False
         self.attacking = False
         self.player_attacked = False
@@ -299,7 +302,8 @@ class Game:
 
         self.pickups = []
         for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(BASE_IMG_PATH + 'pickups'))]):
-            self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
+            if f"{pickup["pos"][0]};{pickup["pos"][1]}" not in self.collected_souls:
+                self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
 
         self.spikes = []
         spike_types = [("spikes", 0), ("spikes", 1), ("gluy_spikes", 0), ("gluy_spikes", 1), ("gluy_spikes", 2)]
@@ -520,7 +524,6 @@ class Game:
         The core gameplay loop. Handles physics, collision, rendering order,
         entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
         """
-
         # -- Camera & Render Scroll setup
         self.update_camera_setup()
         update_camera(self)
