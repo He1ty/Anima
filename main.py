@@ -38,7 +38,7 @@ class Game:
             # --- Window Setup ---
             pygame.display.set_caption("Anima")
             # The actual window size
-            self.screen = pygame.display.set_mode((960, 576))
+            self.screen = pygame.display.set_mode((1000, 600))
             # The internal rendering surface (half size for a pixel-art aesthetic)
             self.display = pygame.Surface((480, 288))
             self.clock = pygame.time.Clock()
@@ -46,9 +46,20 @@ class Game:
         # --- State Management ---
         # Controls which 'loop' the game is currently running
 
+        self.title_state = "START_SCREEN"
+        self.pause_state = "PAUSE"
+        self.option_state = "SETTINGS"
+        self.audio_setting_state = "AUDIO_SETTINGS"
+        self.video_setting_state = "VIDEO_SETTINGS"
+        self.game_settings_state = "GAME_SETTINGS"
+        self.keyboard_state = "KEYBOARD_SETTINGS"
+        self.profile_selection_state = "PROFILE_SELECTION"
+        self.playing_state = "PLAYING"
+
         self.FAKE_TILES_LAYER = "5"
         self.ACTIVATORS_LAYER = "2"
 
+        self.previous_state = None;
         self.state = "START_SCREEN"
         self.game_initialized = False
 
@@ -614,8 +625,10 @@ class Game:
                 sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    pygame.mouse.set_visible(True)
-                    self.menu.menu_display()
+                    self.menu.capture_background()
+                    self.state = "PAUSE"
+
+                    #self.menu.menu_display()
                     for key in self.dict_kb.keys(): self.dict_kb[key] = 0
                 if event.key == pygame.K_e:
                     # Interact with items or levers
@@ -649,35 +662,59 @@ class Game:
         The main program entry point.
         This function implements a state machine to switch between the Intro, Profile Menu, and Gameplay.
         """
+
         while True:
-            if self.state == "START_SCREEN":
+            if self.state == self.title_state:
+                pygame.mouse.set_visible(True)
                 change_music(self,
                              "assets/sounds/GV2space-ambient-music-interstellar-space-journey-8wlwxmjrzj8_MDWW6nat.wav")
                 # start_menu is a blocking call (usually handles its own internal loop)
                 action = start_menu(self)
                 if action == "play":
-                    self.state = "PROFILE_SELECT"
+                    self.previous_state = self.state
+                    self.state = self.profile_selection_state
                 elif action == "settings":
-                    self.menu.options_visible = True
-                    self.menu.menu_display()
+                    self.previous_state = self.state
+                    self.state = self.option_state
+                    self.menu.capture_background()
+                    pygame.mouse.set_visible(False)
+
                 elif action == "quit":
                     pygame.quit()
                     sys.exit()
 
-            elif self.state == "PROFILE_SELECT":
+            elif self.state == self.option_state:
+
+                #self.menu.menu_display()
+                self.menu.options_visible = True
+
+                self.menu.draw_option_menu()
+
+            elif self.state == self.profile_selection_state:
                 change_music(self,
                              "assets/sounds/GV2space-ambient-music-interstellar-space-journey-8wlwxmjrzj8_MDWW6nat.wav")
                 # If a profile is chosen, start the game; otherwise return to intro
                 if self.menu.profile_selection_menu():
                     self.state = "PLAYING"
+                    pygame.mouse.set_visible(False)
                 else:
                     self.state = "START_SCREEN"
 
-            elif self.state == "PLAYING":
+            elif self.state == self.game_settings_state:
+                self.menu.draw_game_settings_menu()
+            elif self.state == self.audio_setting_state:
+                self.menu.draw_audio_settings_menu()
+            elif self.state == self.video_setting_state:
+                self.menu.draw_video_settings_menu()
+            elif self.state == self.keyboard_state:
+                print("KEYBOARD SETTINGS")
+            elif self.state == self.playing_state:
                 # Dynamic music based on level ID
-                pygame.mouse.set_visible(False)
                 change_music(self, "assets/sounds/" + f"map_{str(self.level)}" + ".wav")
                 self.main_game_logic()
+            elif self.state == self.pause_state:
+                self.menu.draw_pause_menu()
+            pygame.display.flip()
 
 
 if __name__ == "__main__":

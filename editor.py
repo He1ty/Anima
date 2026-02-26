@@ -10,7 +10,7 @@ from unicodedata import category
 # Assuming these exist in your project structure
 from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators, load_pickups
 from scripts.tilemap import Tilemap
-from scripts.button import Button
+from scripts.button import EditButton
 from scripts.activators import load_activators_actions
 
 RENDER_SCALE = 2.0
@@ -405,7 +405,7 @@ class Editor:
             y_pos = start_y + (btn_height + gap) * i
 
             # Draw Button
-            btn = Button(20, y_pos, window_size[0] - 40, btn_height, self.clicking)
+            btn = EditButton(20, y_pos, window_size[0] - 40, btn_height, self.clicking)
             btn.draw(self.env_window, (70, 70, 100), mpos_rel)
 
             text = self.font.render(env_name, True, (255, 255, 255))
@@ -430,7 +430,7 @@ class Editor:
 
         # Draw Cancel Button at bottom
         cancel_y = window_size[1] - 40
-        cancel_btn = Button(20, cancel_y, window_size[0] - 40, 30, self.clicking)
+        cancel_btn = EditButton(20, cancel_y, window_size[0] - 40, 30, self.clicking)
         cancel_btn.draw(self.env_window, (150, 50, 50), mpos_rel)
         cancel_txt = self.font.render("Cancel", True, (255, 255, 255))
         self.env_window.blit(cancel_txt, ((window_size[0] - cancel_txt.get_width()) // 2, cancel_y + 5))
@@ -479,7 +479,7 @@ class Editor:
                 # Highlight current level
                 color = (0, 200, 100) if i == self.level else (60, 60, 60)
 
-                map_btn = Button(SIDEBAR_WIDTH - map_col_width + 5, y_pos, btn_size, btn_size, self.clicking)
+                map_btn = EditButton(SIDEBAR_WIDTH - map_col_width + 5, y_pos, btn_size, btn_size, self.clicking)
                 map_btn.draw(self.sidebar, color, mpos)
 
                 # Draw Number
@@ -494,7 +494,7 @@ class Editor:
         tool_y = start_y + (btn_size + gap) * total_maps
         if -btn_size < tool_y < self.screen_height:
             # 2. Render "+" Button (Create new map)
-            add_btn = Button(SIDEBAR_WIDTH - map_col_width + 5, tool_y, btn_size, btn_size, self.clicking)
+            add_btn = EditButton(SIDEBAR_WIDTH - map_col_width + 5, tool_y, btn_size, btn_size, self.clicking)
             add_btn.draw(self.sidebar, (80, 80, 150), mpos)
             plus_surf = self.small_font.render("+", True, (255, 255, 255))
             self.sidebar.blit(plus_surf, (SIDEBAR_WIDTH - map_col_width + 5 + (btn_size - plus_surf.get_width()) // 2,
@@ -507,7 +507,7 @@ class Editor:
             # 3. Render "-" Button (Delete current map)
             # Draw it below the + button
             del_y = tool_y + btn_size + gap
-            del_btn = Button(SIDEBAR_WIDTH - map_col_width + 5, del_y, btn_size, btn_size, self.clicking)
+            del_btn = EditButton(SIDEBAR_WIDTH - map_col_width + 5, del_y, btn_size, btn_size, self.clicking)
             del_btn.draw(self.sidebar, (150, 50, 50), mpos)
             minus_surf = self.small_font.render("-", True, (255, 255, 255))
             self.sidebar.blit(minus_surf, (SIDEBAR_WIDTH - map_col_width + 5 + (btn_size - minus_surf.get_width()) // 2,
@@ -523,8 +523,8 @@ class Editor:
         # --- CATEGORY HEADER (Shifted left to not overlap map nav) ---
         avail_width = SIDEBAR_WIDTH - map_col_width
 
-        next_category = Button(avail_width - 30, 5, 24, 24, self.clicking)
-        previous_category = Button(10, 5, 24, 24, self.clicking)
+        next_category = EditButton(avail_width - 30, 5, 24, 24, self.clicking)
+        previous_category = EditButton(10, 5, 24, 24, self.clicking)
 
         if not self.category_changed:
             if next_category.pressed(mpos):
@@ -554,7 +554,7 @@ class Editor:
                 self.categories["Entities"].index(element)), True, (255, 255, 255))
 
             # Adjusted width for button
-            button = Button(pos[0], pos[1] - 5, avail_width - 20, 34, self.clicking)
+            button = EditButton(pos[0], pos[1] - 5, avail_width - 20, 34, self.clicking)
             button.draw(self.sidebar, (30, 30, 30), mpos)
 
             self.sidebar.blit(category_text, (pos[0] + 34, pos[1] + 5))
@@ -585,7 +585,7 @@ class Editor:
         self.underbar.fill((35, 35, 35))
 
         category_text = self.font.render(self.current_infos_tile_category, True, (255, 255, 255))
-        category_button = Button(20, 10, 100, 20, self.clicking)
+        category_button = EditButton(20, 10, 100, 20, self.clicking)
 
 
         infos_tiles = []
@@ -602,8 +602,8 @@ class Editor:
         cell_v_offset = 50
         for info_tile in infos_tiles:
             if self.get_infos_tile_category(info_tile) == self.current_infos_tile_category or self.current_infos_tile_category == "All":
-                act_button = Button(cell_h_offset + (cell_width + cell_h_offset) * c,
-                                    cell_v_offset + (cell_height + 10) * r, cell_width, cell_height, self.clicking)
+                act_button = EditButton(cell_h_offset + (cell_width + cell_h_offset) * c,
+                                        cell_v_offset + (cell_height + 10) * r, cell_width, cell_height, self.clicking)
 
                 if self.waiting_for_click_release or self.selecting_infos_tile_category:
                     act_button.activated = False
@@ -641,7 +641,7 @@ class Editor:
         if self.selecting_infos_tile_category:
             for tile_category in categories:
                     c_text = self.font.render(tile_category, True, (255, 255, 255))
-                    c_button = Button(20, 10 + 20 * (categories.index(tile_category) + 1), 100, 20, self.clicking)
+                    c_button = EditButton(20, 10 + 20 * (categories.index(tile_category) + 1), 100, 20, self.clicking)
                     c_button.draw(self.underbar, (50, 50, 50), mpos)
                     self.underbar.blit(c_text,
                                        ((140 - c_text.get_width()) / 2, 13 + 20 * (categories.index(tile_category) + 1)))
@@ -729,9 +729,9 @@ class Editor:
                 val_str = str(val_str)
             info_value = self.font.render(val_str, True, txt_color)
 
-            value_rect = Button(cell_h_offset + info_name.get_width() + 2,
-                                cell_v_offset + 5 + row_offset * info_r,
-                                max(info_value.get_width(), 9), info_value.get_height(), self.clicking)
+            value_rect = EditButton(cell_h_offset + info_name.get_width() + 2,
+                                    cell_v_offset + 5 + row_offset * info_r,
+                                    max(info_value.get_width(), 9), info_value.get_height(), self.clicking)
 
             # --- LOGIC FOR CLICKING A FIELD ---
             if value_rect.pressed(mpos) and not self.edited_info:
@@ -789,11 +789,11 @@ class Editor:
                 for t in available_types:
                     type_name = self.font.render(t, True, (255, 255, 255))
 
-                    type_rect = Button(62,
-                                       cell_v_offset + 5 + type_name.get_height() * (type_r+1),
-                                       type_name.get_width(),
-                                       type_name.get_height(),
-                                       self.clicking)
+                    type_rect = EditButton(62,
+                                           cell_v_offset + 5 + type_name.get_height() * (type_r+1),
+                                           type_name.get_width(),
+                                           type_name.get_height(),
+                                           self.clicking)
                     type_rect.draw(self.properties_window, (0, 50, 200), mpos)
                     self.properties_window.blit(type_name, (
                         type_rect.x, type_rect.y))

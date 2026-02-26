@@ -1,5 +1,6 @@
 import time
 
+import pygame
 import pygame as py
 import sys
 import numpy as np
@@ -7,6 +8,7 @@ import cv2
 import os
 import datetime
 
+from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector
 from scripts.display import toggle_fullscreen
 from scripts.sound import set_game_volume
 from scripts.utils import load_images, load_image
@@ -16,6 +18,7 @@ from scripts.saving import save_game, load_game, load_settings, save_settings
 class Menu:
 
     def __init__(self, game): #Basic definitions: Keyboard layout,languages, volume, screen resolutions,buttons configurations
+        self.debug_mode = False
         self.game = game
         self.screen = game.screen
         self.original_background = None
@@ -48,50 +51,60 @@ class Menu:
         self.button_font.set_bold(True)
 
         self.settings_categories = {
-                                    "Game" :
-                                        {"Language":
+                                    "GAME" :
+                                        {"LANGUAGE":
                                              {
                                                  "type": "multiple_choices",
                                                  "choices": self.languages,
                                                  "current": self.selected_language
-                                             }
+                                             },
+                                        "DEBUG MODE":
+                                            {
+                                            "type":"switch",
+                                            "current": self.debug_mode
+                                            }
                                         },
 
-                                    "Audio":
-                                        {"Main Sound":
+                                    "AUDIO":
+                                        {"MAIN SOUND":
                                             {
                                                 "type": "drag",
                                                 "current": self.volume
                                             },
-                                        "Music":
+                                        "MUSIC":
                                             {
                                                 "type": "drag",
                                                 "current": self.volume
                                             },
-                                        "Effects":
+                                        "SOUND EFFECTS":
+                                            {
+                                                "type": "drag",
+                                                "current": self.volume
+                                            },
+                                        "UI SOUNDS":
                                             {
                                                 "type": "drag",
                                                 "current": self.volume
                                             }
                                         },
 
-                                    "Video":
-                                        {"Full_Screen":
+                                    "VIDEO":
+                                        {"FULL SCREEN":
                                              {"type" : "switch",
-                                              "current": "On"},
-                                        "Resolution" :
+                                              "current": "Off"},
+                                        "V-SYNC" :
                                              {
-                                                 "type" : "multiple_choices",
-                                                 "choices" : 1
+                                                 "type" : "switch",
+                                                 "current" : "Off"
                                              },
-                                        "Brightness" :
+                                        "BRIGHTNESS" :
                                              {
                                                  "type": "drag",
                                                  "current": 0.5
                                              }
                                         },
 
-                                    "Keyboard":
+                                    "KEYBOARD":
                                         {"Layout":
                                              {
                                                  "type":"multiple_choices",
@@ -123,16 +136,161 @@ class Menu:
             "dimmed": (255, 255, 255, 80)
         }
 
+        self.option_buttons = []
+        self.option_buttons_labels = ["GAME","VIDEO","AUDIO","KEYBOARD"]
+        self.option_command_nb = 0
+
+        self.pause_buttons = []
+        self.pause_buttons_labels = ["RESUME","SETTINGS","SAVE AND QUIT"]
+        self.pause_command_nb = 0
+
+        self.audio_buttons = []
+        self.audio_buttons_labels = self.settings_categories["AUDIO"].keys()
+        self.audio_command_nb = 0
+
+        self.video_buttons = []
+        self.video_buttons_labels = self.settings_categories["VIDEO"].keys()
+        self.video_command_nb = 0
+
+        self.game_buttons = []
+        self.game_buttons_labels = self.settings_categories["GAME"].keys()
+        self.game_command_nb = 0
+
+        self.init_buttons()
+
+    def init_buttons(self):
+        """
+        Initialize all the buttons for all the different menu ( Pause , Settings, etc. )
+        """
+        # We clear the current button list
+        self.option_buttons = []
+        self.pause_buttons = []
+        self.audio_buttons = []
+        self.video_buttons = []
+        self.game_buttons = []
+
+        current_screen_size = self.screen.get_size()
+
+        button_x = (current_screen_size[0]) / 2
+
+        #  OPTION BUTTONS
+        start_option_btn_y = (current_screen_size[1] - (len(self.option_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        button_y = start_option_btn_y
+
+        for label in self.option_buttons_labels:
+            button = MenuButton(label, self.button_font, (button_x, button_y), self.COLORS['white'])
+            button_y += self.BUTTON_HEIGHT
+            self.option_buttons.append(button)
+
+        button_y = current_screen_size[1] - 90
+        print(self.video_buttons)
+
+        back_btn = MenuButton("BACK", self.button_font, (button_x, button_y), self.COLORS['white'])
+        print(self.video_buttons)
+        self.option_buttons.append(back_btn)
+
+        #  PAUSE BUTTONS
+        start_pause_btn_y =(current_screen_size[1] - (len(self.pause_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        button_y = start_pause_btn_y
+        for label in self.pause_buttons_labels:
+            button = MenuButton(label, self.button_font, (button_x, button_y), self.COLORS['white'])
+            button_y += self.BUTTON_HEIGHT
+            self.pause_buttons.append(button)
+
+        #  AUDIO SETTINGS BUTTON
+
+        button_x = (current_screen_size[0]) / 8
+        start_audio_btn_y = (current_screen_size[1] - (len(self.audio_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        button_y = start_audio_btn_y
+        for label in self.audio_buttons_labels:
+            button = DiscreteSlider(current_screen_size[0]-button_x-current_screen_size[0]*0.3-60,button_y,current_screen_size[0]*0.3,10,10,font=self.button_font,text=label+":",textx= button_x)
+            button_y += self.BUTTON_HEIGHT
+            self.audio_buttons.append(button)
+        self.audio_buttons.append(back_btn)
+
+        # VIDEO SETTINGS BUTTON
+
+        button_x = (current_screen_size[0]) / 8
+
+        start_video_btn = (current_screen_size[1] - (len(self.video_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        button_y = start_video_btn
+
+        for label in self.video_buttons_labels:
+            print(label)
+            button = None
+            match self.settings_categories["VIDEO"][label]["type"]:
+                case "drag":
+                    button = DiscreteSlider(current_screen_size[0]-button_x-current_screen_size[0]*0.3-60,button_y,current_screen_size[0]*0.3,10,10,font=self.button_font,text=label+":",textx= button_x)
+                case "switch":
+                    button = ToggleSwitch(current_screen_size[0]-button_x-60 ,button_y,font=self.button_font,text=label+":",textx= button_x)
+            button_y += self.BUTTON_HEIGHT
+            self.video_buttons.append(button)
+        self.video_buttons.append(back_btn)
+
+        # GAME SETTINGS BUTTON
+        button_x = (current_screen_size[0]) / 8
+        start_video_btn = (current_screen_size[1] - (len(self.game_buttons_labels) * self.BUTTON_HEIGHT)) / 2
+        button_y = start_video_btn
+
+        for label in self.game_buttons_labels:
+
+            button = None
+            match self.settings_categories["GAME"][label]["type"]:
+                case "drag":
+                    button = DiscreteSlider(current_screen_size[0] - button_x - current_screen_size[0] * 0.3 - 60,
+                                            button_y, current_screen_size[0] * 0.3, 10, 10, font=self.button_font,
+                                            text=label + ":", textx=button_x)
+                case "switch":
+                    button = ToggleSwitch(current_screen_size[0] - button_x - 60, button_y, font=self.button_font,
+                                          text=label + ":", textx=button_x)
+                case "multiple_choices":
+                    button = ArrowSelector(current_screen_size[0] - current_screen_size[0] / 8 - current_screen_size[0] * 0.2 - 35,
+                                           button_y, current_screen_size[0] * 0.2,40,self.button_font,
+                                           self.settings_categories["GAME"][label]["choices"],text=label + ":", textx=button_x,text_color2=(255,255,255))
+            button_y += self.BUTTON_HEIGHT
+            self.game_buttons.append(button)
+        self.game_buttons.append(back_btn)
+
+    def handle_key_input(self,event,command_nb : int,max_index : int):
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                if command_nb == 0:
+                    command_nb = 0
+                else:
+                    command_nb -= 1
+            if event.key == pygame.K_DOWN:
+                if command_nb == max_index:
+                    command_nb = max_index
+                else:
+                    command_nb += 1
+
+        return command_nb
+
+
+
+
+
     def update_settings_from_game(self): #Takes the saved settings to apply them to our keyboard and language (which is not graphycally working for the moment)
         self.volume = self.game.volume
         self.keyboard_layout = self.game.keyboard_layout.upper()
         if self.game.selected_language in self.languages:
             self.selected_language = self.game.selected_language
 
-    def capture_background(self):#uses the screen.copy of utils to do a screenshot of the game
+    def capture_background(self):
+        """
+        Uses the screen.copy of utils to do a screenshot of the game
+        :return:
+        """
         self.original_background = self.screen.copy()
 
-    def _get_centered_buttons(self, current_screen_size):#compute and return buttons like RESUME centered on the screen.Very boring to read but useful to resize the screen easily
+    def _get_centered_buttons(self, current_screen_size):
+        """
+        Compute and return buttons like RESUME centered on the screen.
+        Very boring to read but useful to resize the screen easily
+        :param current_screen_size:
+        :return:
+        """
         buttons = {}
 
         if self.options_visible:
@@ -169,7 +327,14 @@ class Menu:
 
         return buttons
 
-    def _draw_buttons(self, buttons):#Also very long. The function does 3 things: Hover effect, display the "arrows" images at the sides of the buttons, and "blacken" the other buttons when the language menu is expanded
+    def _draw_buttons(self, buttons):
+        """
+        Also very long. The function does 3 things: Hover effect,
+        display the "arrows" images at the sides of the buttons,
+        and "blacken" the other buttons when the language menu is expanded
+        :param buttons:
+        :return:
+        """
         if self.dropdown_expanded and self.options_visible:
             for text, rect in buttons.items():
                 label = self.button_font.render(text, True, self.COLORS["dimmed"])
@@ -206,7 +371,11 @@ class Menu:
                 image_y2 = rect.y + (rect.height - self.hover2_image.get_height()) // 2
                 self.screen.blit(self.hover2_image, (image_x2, image_y2))
 
-    def _draw_volume_control(self):#Draw the volume control option and the Hover effect
+    def _draw_volume_control(self):
+        """
+        Draw the volume control option and the Hover effect
+        :return:
+        """
         if not self.options_visible:
             return 0
 
@@ -225,7 +394,7 @@ class Menu:
 
         self.slider_rect = py.Rect(slider_start_x, slider_y - 2, slider_width, 4)
 
-        py.draw.rect(self.screen, self.COLORS["dark_gray"], self.slider_rect, border_radius=2)
+        py.draw.rect(self.screen, self.COLORS["dark_gray"], self.slider_rect, border_radius = 2)
 
         if is_hovered:
             highlight_rect = py.Rect(self.slider_rect.x - 5, self.slider_rect.y - 5,
@@ -246,7 +415,12 @@ class Menu:
 
         return knob_x
 
-    def _draw_language_dropdown(self):#Display the current language. If expanded display three buttons. And hover effect over every one of these buttons
+    def _draw_language_dropdown(self):
+        """
+        Display the current language.
+        If expanded display three buttons. And hover effect over every one of these buttons
+        :return:
+        """
         if not self.options_visible:
             return []
 
@@ -320,7 +494,11 @@ class Menu:
 
         return option_rects
 
-    def _draw_keyboard_button(self):#Display the current keyboard layout. Only AZERTY and QWERTY posible. Most of the function is, like the other draw options, a ton of lines to make it slightly better looking
+    def _draw_keyboard_button(self):
+        """
+        Display the current keyboard layout. Only AZERTY and QWERTY possible.
+        Most of the function is, like the other draw options, a ton of lines to make it slightly better looking
+        """
         if not self.options_visible:
             return False
 
@@ -361,7 +539,14 @@ class Menu:
 
         return is_hovered
 
-    def _handle_button_click(self, buttons, mouse_pos):#Here, to detect if a button is clicked we do not use the coordinates but the text displayed on it. It is easier
+    def _handle_button_click(self, buttons, mouse_pos):
+        """
+        Detect if a button is clicked we do not use the coordinates but the text displayed on it.
+        It is easier
+        :param buttons:
+        :param mouse_pos:
+        :return:
+        """
         if self.dropdown_expanded and self.options_visible:
             return True
 
@@ -386,7 +571,13 @@ class Menu:
                     return True
         return True
 
-    def _handle_volume_click(self, knob_x, mouse_pos):#the listle animation of changing the side of the cursor to make it more lively
+    def _handle_volume_click(self, knob_x, mouse_pos):
+        """
+         The little animation of changing the side of the cursor to make it more lively
+        :param knob_x:
+        :param mouse_pos:
+        :return:
+        """
         if not self.options_visible or self.dropdown_expanded:
             return False
 
@@ -443,7 +634,12 @@ class Menu:
         self.volume = max(0, min(1, self.volume))
         set_game_volume(self.game, self.volume)
 
-    def _update_options_positions(self, current_screen_size):#keep in mind that we always have to modify the buttons size and positions when the screen is resized
+    def _update_options_positions(self, current_screen_size):
+        """
+        Keep in mind that we always have to modify the buttons size and positions when the screen is resized
+        :param current_screen_size:
+        :return:
+        """
         control_x = (current_screen_size[0] - 300) // 2
         panel_y = 50
 
@@ -453,7 +649,12 @@ class Menu:
         self.dropdown_rect = py.Rect(control_x, panel_y + 100 + control_spacing, 200, 30)
         self.keyboard_button_rect = py.Rect(control_x, panel_y + 100 + control_spacing * 2, 200, 40)
 
-    def _draw_options_panel(self, current_screen_size):#drax the buttons and option in the option Panel mostly using the previous function
+    def _draw_options_panel(self, current_screen_size):
+        """
+        Draw the buttons and option in the option Panel mostly using the previous function
+        :param current_screen_size:
+        :return:
+        """
         if not self.options_visible:
             return
 
@@ -461,10 +662,7 @@ class Menu:
 
         options_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
         options_title = self.button_font.render("OPTIONS", True, options_title_color)
-        self.screen.blit(options_title, (
-            (current_screen_size[0] - options_title.get_width()) // 2,
-            50
-        ))
+        self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
 
     def delete_save_data(self, slot_id):
         """Deletes the JSON file and the associated thumbnail."""
@@ -485,7 +683,13 @@ class Menu:
         except Exception as e:
             print(f"Error deleting save: {e}")
 
-    def menu_display(self): #when called: Display the main menu with it's buttons, monitor keyboard and mouse input (keyboard means escape key but it looks cooler), and thirdly displaythe background and optio npanel if needed
+    def menu_display(self):
+        """
+        When called: Display the main menu with it's buttons, monitor keyboard and
+        mouse input (keyboard means escape key but it looks cooler),
+        and thirdly display the background and option panel if needed
+        :return:
+        """
         self.capture_background()
         self.menu_time_start = time.time()
         running = True
@@ -767,14 +971,249 @@ class Menu:
 
         return False  # Back was pressed
 
+    def draw_option_menu(self):
+
+        current_screen_size = self.screen.get_size()
+        if self.original_background is not None:
+            scaled_bg = py.transform.scale(self.original_background, current_screen_size)
+            self.screen.blit(scaled_bg, (0, 0))
+        else:
+            self.screen.fill(self.COLORS["black"])
+
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
+
+
+        options_title_color = self.COLORS["white"]
+        options_title = self.button_font.render("OPTIONS", True, options_title_color)
+        self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+        top_image = load_image("Opera_senza_titolo 2.png")
+        bottom_image = load_image("Opera_senza_titolo 1.png")
+        image_x = (current_screen_size[0] - top_image.get_width()) // 2
+        top_image_y = self.option_buttons[0].rect.y - top_image.get_height() - 20
+        bottom_image_y = self.option_buttons[-2].rect.y + self.BUTTON_HEIGHT + 10
+
+        self.top_image = top_image
+        self.bottom_image = bottom_image
+        self.top_image_pos = (image_x, top_image_y)
+        self.bottom_image_pos = (image_x, bottom_image_y)
+
+        self.screen.blit(self.top_image, self.top_image_pos)
+        self.screen.blit(self.bottom_image,self.bottom_image_pos)
+
+        for i,button in enumerate(self.option_buttons):
+            if i == self.option_command_nb:
+                button.start_hover_effect()
+            else:
+                button.end_hover_effect()
+            button.draw(self.screen)
+        py.display.flip()
+
+        for event in py.event.get():
+            if event.type == py.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.options_visible = False
+                    save_settings(self.game)
+                    self.game.state = self.game.previous_state
+                    self.game.previous_state = "SETTINGS"
+
+            self.option_command_nb = self.handle_key_input(event,self.option_command_nb,len(self.option_buttons)-1)
+            for button in self.option_buttons:
+
+                if button.handle_event(event):
+                    match button.text:
+                        case "BACK":
+                                self.options_visible = False
+                                save_settings(self.game)
+                                self.game.state = self.game.previous_state
+                                self.game.previous_state = "SETTINGS"
+                        case "AUDIO":
+                                self.game.state = self.game.audio_setting_state
+                        case "VIDEO":
+                            self.game.state = self.game.video_setting_state
+                        case "GAME":
+                            self.game.state = self.game.game_settings_state
+        return
+
+    def draw_game_settings_menu(self):
+        current_screen_size = self.screen.get_size()
+        if self.original_background is not None:
+            scaled_bg = py.transform.scale(self.original_background, current_screen_size)
+            self.screen.blit(scaled_bg, (0, 0))
+        else:
+            self.screen.fill(self.COLORS["black"])
+
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
+
+        game_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
+        game_title = self.button_font.render("GAME", True, game_title_color)
+        self.screen.blit(game_title, game_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+
+        for i,button in enumerate(self.game_buttons):
+            if i == self.game_command_nb:
+                button.start_hover_effect()
+            else:
+                button.end_hover_effect()
+            button.draw(self.screen)
+
+        for event in py.event.get():
+            if event.type == py.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game.state = self.game.option_state
+            self.game_command_nb = self.handle_key_input(event,self.game_command_nb,len(self.game_buttons)-1)
+            for button in self.game_buttons:
+                if button.handle_event(event) and isinstance(button,MenuButton):
+                    self.game.state = self.game.option_state
+
+
+        py.display.flip()
+
+    def draw_audio_settings_menu(self):
+        current_screen_size = self.screen.get_size()
+        if self.original_background is not None:
+            scaled_bg = py.transform.scale(self.original_background, current_screen_size)
+            self.screen.blit(scaled_bg, (0, 0))
+        else:
+            self.screen.fill(self.COLORS["black"])
+
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
+        audio_title_color =  self.COLORS["white"]
+        audio_title = self.button_font.render("AUDIO", True, audio_title_color)
+        self.screen.blit(audio_title, audio_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+
+        for i, button in enumerate(self.audio_buttons):
+            if i == self.audio_command_nb:
+                button.start_hover_effect()
+            else:
+                button.end_hover_effect()
+            button.draw(self.screen)
+
+        for event in py.event.get():
+            for i,button in enumerate(self.audio_buttons):
+                if button.handle_event(event):
+                    self.game.state = self.game.option_state
+            self.audio_command_nb = self.handle_key_input(event, self.audio_command_nb, len(self.audio_buttons) -1)
+            if event.type == py.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game.state = self.game.option_state
+
+
+
+
+
+        py.display.flip()
+
+    def draw_video_settings_menu(self):
+        current_screen_size = self.screen.get_size()
+        if self.original_background is not None:
+            scaled_bg = py.transform.scale(self.original_background, current_screen_size)
+            self.screen.blit(scaled_bg, (0, 0))
+        else:
+            self.screen.fill(self.COLORS["black"])
+
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
+
+        video_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
+        video_title = self.button_font.render("VIDEO", True, video_title_color)
+        self.screen.blit(video_title, video_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+
+        for i, button in enumerate(self.video_buttons):
+            if i == self.video_command_nb:
+                button.start_hover_effect()
+            else:
+                button.end_hover_effect()
+            button.draw(self.screen)
+
+        for event in py.event.get():
+            for  i,button in enumerate(self.video_buttons):
+                if button.handle_event(event):
+                    if isinstance(button, MenuButton):
+                        self.game.state = self.game.option_state
+            self.video_command_nb = self.handle_key_input(event, self.video_command_nb, len(self.video_buttons) - 1)
+            if event.type == py.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game.state = self.game.option_state
+
+
+
+        py.display.flip()
+
+    def draw_keyboard_settings_menu(self):
+        return
+
+    def draw_pause_menu(self):
+        current_screen_size = self.screen.get_size()
+        if self.original_background is not None:
+            scaled_bg = py.transform.scale(self.original_background, current_screen_size)
+            self.screen.blit(scaled_bg, (0, 0))
+        else:
+            self.screen.fill(self.COLORS["black"])
+
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
+        self._update_options_positions(current_screen_size)
+
+        top_image = load_image("Opera_senza_titolo 2.png")
+        bottom_image = load_image("Opera_senza_titolo 1.png")
+        image_x = (current_screen_size[0] - top_image.get_width()) // 2
+        top_image_y = self.pause_buttons[0].rect.y - top_image.get_height() - 20
+        bottom_image_y = self.pause_buttons[-1].rect.y + self.BUTTON_HEIGHT + 10
+
+        self.top_image = top_image
+        self.bottom_image = bottom_image
+        self.top_image_pos = (image_x, top_image_y)
+        self.bottom_image_pos = (image_x, bottom_image_y)
+
+        self.screen.blit(self.top_image, self.top_image_pos)
+        self.screen.blit(self.bottom_image, self.bottom_image_pos)
+
+        for i,button in enumerate(self.pause_buttons):
+            if i == self.pause_command_nb:
+                button.start_hover_effect()
+            else:
+                button.end_hover_effect()
+            button.draw(self.screen)
+        py.display.flip()
+
+        for event in py.event.get():
+            if event.type == py.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game.state = "PLAYING"
+                    self.game.previous_state = "PAUSE"
+
+            self.pause_command_nb = self.handle_key_input(event, self.pause_command_nb, len(self.pause_buttons) - 1)
+            for button in self.pause_buttons:
+                if button.handle_event(event):
+                    match button.text:
+                        case "RESUME":
+                                self.game.state = "PLAYING"
+                                self.game.previous_state = "PAUSE"
+                        case "SETTINGS":
+                            self.game.state = "SETTINGS"
+                            self.game.previous_state = "PAUSE"
+                        case "SAVE AND QUIT":
+                            self.game.save_system.update_playtime(self.game.current_slot)
+                            save_game(self.game, self.game.current_slot)
+                            self.game.__init__(full_setup=False)
+                            self.game.state = "START_SCREEN"
+                            self.game.previous_state = "PAUSE"
+
+    def draw_title_menu(self):
+        return
+
 
 def start_menu(game):
     py.init()
     load_settings(game)
-    if py.display.get_window_size() == (960, 576):
-        size = (1000, 600)
-    else:
-        size = py.display.get_window_size()
+    size = py.display.get_window_size()
 
     if py.display.is_fullscreen():
         screen = py.display.set_mode(size, py.FULLSCREEN)
