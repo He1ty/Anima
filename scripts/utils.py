@@ -1,6 +1,6 @@
 import pygame
 import os
-import json
+from PIL import Image
 
 
 
@@ -21,6 +21,65 @@ def load_images(path, tile_size=None):#Sort in alpha order every images of a giv
         images.append(load_image(path + '/' + img_name, (tile_size[0], tile_size[1]) if tile_size else None))
     return images
 
+def pil_to_pygame(pil_image):
+    # Get the image dimensions and raw pixel data
+    mode = pil_image.mode
+    size = pil_image.size
+    data = pil_image.tobytes()
+
+    # Create the Pygame surface from the raw string data
+    surface = pygame.image.fromstring(data, size, mode)
+
+    # .convert_alpha() optimizes the surface for Pygame rendering
+    return surface.convert_alpha()
+
+def slice_tileset_to_memory(image_path, tile_width, tile_height):
+    tiles = []  # This list will hold all our image objects
+
+    try:
+        # Open the source image
+        img = Image.open(image_path)
+        img_width, img_height = img.size
+
+        # Calculate the number of columns and rows
+        columns = img_width // tile_width
+        rows = img_height // tile_height
+
+        # Loop through the grid
+        for row in range(rows):
+            for col in range(columns):
+                # Calculate the bounding box for the current tile
+                left = col * tile_width
+                upper = row * tile_height
+                right = left + tile_width
+                lower = upper + tile_height
+
+                # Crop the image using the bounding box
+                bounding_box = (left, upper, right, lower)
+                tile = img.crop(bounding_box)
+
+                # Add the tile object to our list instead of saving it
+                tiles.append(pil_to_pygame(tile))
+
+        if len(tiles) > 3:
+            tmp = tiles.copy()
+            transformation = {7:3, 8:4, 3:5, 4:8, 5:7}
+            for i in transformation:
+                try:
+                    tiles[i] = tmp[transformation[i]]
+                except IndexError:
+                    pass
+
+        #print(f"Successfully sliced {len(tiles)} tiles into memory.")
+        return tiles
+
+    except FileNotFoundError:
+        print(f"Error: The file {image_path} was not found.")
+        return []
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return []
+
 def round_up(x):#pretty basic
     return int(x) + 1 if x % 1 != 0 and x > 0 else int(x)
 
@@ -28,7 +87,11 @@ def load_tiles(env=None):#load every tiles (graphic components) coresponding to 
     tiles = {}
     for environment in sorted(os.listdir(BASE_IMG_PATH + 'tiles')) if env is None else [env]:
         for tile in sorted(os.listdir(BASE_IMG_PATH + 'tiles/' + environment)):
-            tiles[tile] = load_images('tiles/' + environment + '/' + tile)
+            images = load_images('tiles/' + environment + '/' + tile)
+            if "tileset.png" in os.listdir(f'{BASE_IMG_PATH}/tiles/{environment}/{tile}'):
+                tiles[tile] = slice_tileset_to_memory(image_path=f'{BASE_IMG_PATH}/tiles/{environment}/{tile}/tileset.png', tile_width=16, tile_height=16)
+            else:
+                tiles[tile] = images
     return tiles
 
 def load_entities(e_info):#load every info on every entities

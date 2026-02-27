@@ -106,7 +106,7 @@ class Game:
 
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
-        self.scroll_limits = {"x": (16, 656), "y": (-176, 144)}
+        self.scroll_limits = {"x": (64, 624), "y": (-176, 144)}
         self.camera_center = None
 
         # --- Asset Loading ---

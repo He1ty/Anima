@@ -181,28 +181,7 @@ def update_camera(game):
 
             game.scroll[0] += (target_x - game.scroll[0]) / 20
             game.scroll[1] += (target_y - game.scroll[1]) / 20
-            
-def draw_health_bar(game, max_hearts=5):
-    display_hp = max(10, game.player_hp) if game.player_hp > 0 else 0
 
-    full_hearts = display_hp // 20
-    half_heart = 1 if display_hp % 20 >= 10 else 0
-
-    start_x = 20
-    start_y = 20
-    heart_spacing = 22
-
-    for i in range(full_hearts):
-        game.display.blit(game.assets['full_heart'], (start_x + (i * heart_spacing), start_y))
-
-    if half_heart:
-        game.display.blit(game.assets['half_heart'], (start_x + (full_hearts * heart_spacing), start_y))
-
-    empty_hearts = max_hearts - full_hearts - half_heart
-    for i in range(empty_hearts):
-        pos = start_x + ((full_hearts + half_heart + i) * heart_spacing)
-        game.display.blit(game.assets['empty_heart'], (pos, start_y))
-        
 def display_bg(surf, img, pos):
     n = pos[0]//img.get_width()
     if pos[0] - n*img.get_width() > 0:
@@ -218,6 +197,11 @@ def display_level_bg(game, map_id):
         game.display.blit(game.assets['green_cave/0'], (0, 0))
         display_bg(game.display, game.assets['green_cave/1'], (game.scroll[0]/20, 0))
         game.display.blit(game.assets['green_cave/2'], (0, 0))
+        fog_surface = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
+        fog_surface.fill((0,0,0,100))
+        game.display.blit(fog_surface, (0, 0))
+
+
     if map_id in (3,4):
         game.display.blit(pygame.transform.scale(game.assets['blue_cave/0'], game.display.get_size()), (0, 0))
         display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/1'], game.display.get_size()), (-game.scroll[0] / 10, 0))
@@ -288,7 +272,7 @@ def draw_boss_health_bar(game, boss):
 
 def display_level_fg(game, map_id):
     if map_id in (0,1,2):
-        generate_fog(game.display, color=(83, 48, 99), opacity=10)
+        generate_fog(game.display, color=(83, 48, 99), opacity=0)
     if map_id == 3:
         generate_fog(game.display, color=(28, 50, 73), opacity=90)
         
