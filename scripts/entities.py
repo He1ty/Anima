@@ -4,7 +4,6 @@ import random
 import math
 
 from scripts.saving import load_game
-from scripts.display import update_light
 
 
 class PhysicsEntity:
@@ -520,7 +519,7 @@ def death_animation(screen):
         clock.tick(30)
 
 
-def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition=True):
+def kill_player(game, screen, animation=True):
     # Handle player death, respawn them at the proper position
     game.cutscene = False
     if animation:
@@ -532,7 +531,6 @@ def kill_player(game, screen, spawn_pos, spawn_level, animation=True, transition
     game.player.dash_amt = 1
     game.player.velocity = [0, 0]
     game.player.dashtime_cur = 0
-
 
 
 def deal_dmg(game, source, target, att_dmg=5, att_time=1):
@@ -590,8 +588,7 @@ def attacking_update(game):
         game.player_last_attack_time = time.time()
 
 def death_handling(game):
-    if game.player.pos[1] > game.max_falling_depth or game.player_hp <= 0:
-        kill_player(game, game.screen, game.spawn_point["pos"], game.spawn_point["level"])
+    if game.player.pos[1] > game.max_falling_depth:
+        kill_player(game, game.screen)
         for key in game.dict_kb.keys():
             game.dict_kb[key] = 0
-        game.player_hp = 100

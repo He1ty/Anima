@@ -3,7 +3,6 @@ import math
 
 import pygame
 
-from scripts.display import screen_shake
 from scripts.sound import *
 from scripts.entities import deal_knockback, update_throwable_objects_action
 
@@ -623,7 +622,7 @@ class PhysicsPlayer:
                 if self.game.player_grabbing:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
-                    screen_shake(self.game, 10)
+                    self.game.camera.screen_shake(10)
                     self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
                     if self.dash_direction == [0, 0]:
                         self.dash_direction[0] = self.last_direction

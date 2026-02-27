@@ -4323,7 +4323,7 @@
    },
    "31;12": {
     "type": "hollow_stone",
-    "variant": 8,
+    "variant": 1,
     "pos": [
      31,
      12
@@ -4331,7 +4331,7 @@
    },
    "32;12": {
     "type": "hollow_stone",
-    "variant": 8,
+    "variant": 2,
     "pos": [
      32,
      12
@@ -4339,7 +4339,7 @@
    },
    "32;13": {
     "type": "hollow_stone",
-    "variant": 8,
+    "variant": 3,
     "pos": [
      32,
      13
@@ -4377,97 +4377,9 @@
      14
     ]
    },
-   "31;10": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     31,
-     10
-    ]
-   },
-   "31;11": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     31,
-     11
-    ]
-   },
-   "32;10": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     32,
-     10
-    ]
-   },
-   "33;10": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     33,
-     10
-    ]
-   },
-   "34;10": {
-    "type": "hollow_stone",
-    "variant": 3,
-    "pos": [
-     34,
-     10
-    ]
-   },
-   "34;11": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     34,
-     11
-    ]
-   },
-   "34;12": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     34,
-     12
-    ]
-   },
-   "33;12": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     33,
-     12
-    ]
-   },
-   "33;11": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     33,
-     11
-    ]
-   },
-   "32;11": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     32,
-     11
-    ]
-   },
-   "33;13": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     33,
-     13
-    ]
-   },
    "33;14": {
     "type": "hollow_stone",
-    "variant": 8,
+    "variant": 2,
     "pos": [
      33,
      14
@@ -4479,118 +4391,6 @@
     "pos": [
      33,
      15
-    ]
-   },
-   "34;13": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     34,
-     13
-    ]
-   },
-   "34;14": {
-    "type": "hollow_stone",
-    "variant": 4,
-    "pos": [
-     34,
-     14
-    ]
-   },
-   "35;11": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     35,
-     11
-    ]
-   },
-   "35;12": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     35,
-     12
-    ]
-   },
-   "36;11": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     36,
-     11
-    ]
-   },
-   "36;12": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     36,
-     12
-    ]
-   },
-   "35;13": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     35,
-     13
-    ]
-   },
-   "36;13": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     36,
-     13
-    ]
-   },
-   "37;13": {
-    "type": "hollow_stone",
-    "variant": 4,
-    "pos": [
-     37,
-     13
-    ]
-   },
-   "37;12": {
-    "type": "hollow_stone",
-    "variant": 3,
-    "pos": [
-     37,
-     12
-    ]
-   },
-   "37;11": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     37,
-     11
-    ]
-   },
-   "37;9": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     37,
-     9
-    ]
-   },
-   "30;10": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     30,
-     10
-    ]
-   },
-   "30;11": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     30,
-     11
     ]
    },
    "29;13": {
@@ -4635,7 +4435,7 @@
    },
    "30;12": {
     "type": "hollow_stone",
-    "variant": 8,
+    "variant": 1,
     "pos": [
      30,
      12
@@ -6794,726 +6594,6 @@
     ],
     "state": 0
    },
-   "31;9": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     31,
-     9
-    ]
-   },
-   "30;9": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     30,
-     9
-    ]
-   },
-   "32;9": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     32,
-     9
-    ]
-   },
-   "32;8": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     32,
-     8
-    ]
-   },
-   "31;8": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     31,
-     8
-    ]
-   },
-   "30;8": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     30,
-     8
-    ]
-   },
-   "33;9": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     33,
-     9
-    ]
-   },
-   "33;8": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     33,
-     8
-    ]
-   },
-   "34;8": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     34,
-     8
-    ]
-   },
-   "34;9": {
-    "type": "hollow_stone",
-    "variant": 3,
-    "pos": [
-     34,
-     9
-    ]
-   },
-   "6;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     6,
-     6
-    ]
-   },
-   "5;6": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     5,
-     6
-    ]
-   },
-   "5;7": {
-    "type": "hollow_stone",
-    "variant": 6,
-    "pos": [
-     5,
-     7
-    ]
-   },
-   "6;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     6,
-     7
-    ]
-   },
-   "7;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     7,
-     7
-    ]
-   },
-   "8;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     8,
-     7
-    ]
-   },
-   "9;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     9,
-     7
-    ]
-   },
-   "10;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     10,
-     7
-    ]
-   },
-   "11;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     11,
-     7
-    ]
-   },
-   "12;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     12,
-     7
-    ]
-   },
-   "12;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     12,
-     6
-    ]
-   },
-   "11;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     11,
-     6
-    ]
-   },
-   "10;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     10,
-     6
-    ]
-   },
-   "9;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     9,
-     6
-    ]
-   },
-   "8;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     8,
-     6
-    ]
-   },
-   "7;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     7,
-     6
-    ]
-   },
-   "13;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     13,
-     6
-    ]
-   },
-   "14;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     14,
-     6
-    ]
-   },
-   "15;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     15,
-     6
-    ]
-   },
-   "16;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     16,
-     6
-    ]
-   },
-   "16;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     16,
-     7
-    ]
-   },
-   "15;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     15,
-     7
-    ]
-   },
-   "14;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     14,
-     7
-    ]
-   },
-   "13;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     13,
-     7
-    ]
-   },
-   "17;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     17,
-     7
-    ]
-   },
-   "18;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     18,
-     6
-    ]
-   },
-   "17;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     17,
-     6
-    ]
-   },
-   "18;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     18,
-     7
-    ]
-   },
-   "18;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     18,
-     5
-    ]
-   },
-   "19;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     19,
-     5
-    ]
-   },
-   "20;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     20,
-     5
-    ]
-   },
-   "21;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     21,
-     6
-    ]
-   },
-   "20;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     20,
-     6
-    ]
-   },
-   "19;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     19,
-     6
-    ]
-   },
-   "19;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     19,
-     7
-    ]
-   },
-   "20;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     20,
-     7
-    ]
-   },
-   "21;7": {
-    "type": "hollow_stone",
-    "variant": 4,
-    "pos": [
-     21,
-     7
-    ]
-   },
-   "21;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     21,
-     5
-    ]
-   },
-   "8;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     8,
-     5
-    ]
-   },
-   "20;4": {
-    "type": "hollow_stone",
-    "variant": 3,
-    "pos": [
-     20,
-     4
-    ]
-   },
-   "22;4": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     22,
-     4
-    ]
-   },
-   "22;6": {
-    "type": "hollow_stone",
-    "variant": 4,
-    "pos": [
-     22,
-     6
-    ]
-   },
-   "22;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     22,
-     5
-    ]
-   },
-   "22;3": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     22,
-     3
-    ]
-   },
-   "22;2": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     22,
-     2
-    ]
-   },
-   "6;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     6,
-     4
-    ]
-   },
-   "6;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     6,
-     5
-    ]
-   },
-   "5;5": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     5,
-     5
-    ]
-   },
-   "5;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     5,
-     4
-    ]
-   },
-   "5;3": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     5,
-     3
-    ]
-   },
-   "4;3": {
-    "type": "hollow_stone",
-    "variant": 0,
-    "pos": [
-     4,
-     3
-    ]
-   },
-   "4;4": {
-    "type": "hollow_stone",
-    "variant": 6,
-    "pos": [
-     4,
-     4
-    ]
-   },
-   "6;3": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     6,
-     3
-    ]
-   },
-   "25;0": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     25,
-     0
-    ]
-   },
-   "25;1": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     25,
-     1
-    ]
-   },
-   "26;2": {
-    "type": "hollow_stone",
-    "variant": 3,
-    "pos": [
-     26,
-     2
-    ]
-   },
-   "25;2": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     25,
-     2
-    ]
-   },
-   "25;3": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     25,
-     3
-    ]
-   },
-   "26;3": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     26,
-     3
-    ]
-   },
-   "25;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     25,
-     4
-    ]
-   },
-   "26;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     26,
-     4
-    ]
-   },
-   "26;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     26,
-     5
-    ]
-   },
-   "26;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     26,
-     6
-    ]
-   },
-   "27;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     27,
-     6
-    ]
-   },
-   "27;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     27,
-     5
-    ]
-   },
-   "27;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     27,
-     4
-    ]
-   },
-   "27;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     27,
-     7
-    ]
-   },
-   "26;7": {
-    "type": "hollow_stone",
-    "variant": 6,
-    "pos": [
-     26,
-     7
-    ]
-   },
-   "25;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     25,
-     5
-    ]
-   },
-   "25;6": {
-    "type": "hollow_stone",
-    "variant": 6,
-    "pos": [
-     25,
-     6
-    ]
-   },
-   "28;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     28,
-     6
-    ]
-   },
-   "28;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     28,
-     7
-    ]
-   },
-   "29;7": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     29,
-     7
-    ]
-   },
-   "29;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     29,
-     6
-    ]
-   },
-   "31;7": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     31,
-     7
-    ]
-   },
-   "31;6": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     31,
-     6
-    ]
-   },
-   "30;6": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     30,
-     6
-    ]
-   },
-   "30;7": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     30,
-     7
-    ]
-   },
-   "32;7": {
-    "type": "hollow_stone",
-    "variant": 3,
-    "pos": [
-     32,
-     7
-    ]
-   },
-   "32;6": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     32,
-     6
-    ]
-   },
    "30;-3": {
     "type": "hollow_stone",
     "variant": 1,
@@ -8616,366 +7696,6 @@
     "pos": [
      53,
      -11
-    ]
-   },
-   "7;4": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     7,
-     4
-    ]
-   },
-   "8;4": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     8,
-     4
-    ]
-   },
-   "9;4": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     9,
-     4
-    ]
-   },
-   "10;4": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     10,
-     4
-    ]
-   },
-   "11;4": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     11,
-     4
-    ]
-   },
-   "11;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     11,
-     5
-    ]
-   },
-   "12;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     12,
-     5
-    ]
-   },
-   "13;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     13,
-     5
-    ]
-   },
-   "14;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     14,
-     5
-    ]
-   },
-   "15;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     15,
-     5
-    ]
-   },
-   "16;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     16,
-     5
-    ]
-   },
-   "17;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     17,
-     5
-    ]
-   },
-   "18;4": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     18,
-     4
-    ]
-   },
-   "17;4": {
-    "type": "hollow_stone",
-    "variant": 0,
-    "pos": [
-     17,
-     4
-    ]
-   },
-   "19;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     19,
-     4
-    ]
-   },
-   "19;3": {
-    "type": "hollow_stone",
-    "variant": 0,
-    "pos": [
-     19,
-     3
-    ]
-   },
-   "20;3": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     20,
-     3
-    ]
-   },
-   "21;3": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     21,
-     3
-    ]
-   },
-   "21;2": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     21,
-     2
-    ]
-   },
-   "21;1": {
-    "type": "hollow_stone",
-    "variant": 0,
-    "pos": [
-     21,
-     1
-    ]
-   },
-   "28;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     28,
-     5
-    ]
-   },
-   "28;4": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     28,
-     4
-    ]
-   },
-   "29;5": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     29,
-     5
-    ]
-   },
-   "30;5": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     30,
-     5
-    ]
-   },
-   "27;3": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     27,
-     3
-    ]
-   },
-   "26;1": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     26,
-     1
-    ]
-   },
-   "23;1": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     23,
-     1
-    ]
-   },
-   "23;3": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     23,
-     3
-    ]
-   },
-   "23;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     23,
-     4
-    ]
-   },
-   "23;5": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     23,
-     5
-    ]
-   },
-   "24;5": {
-    "type": "hollow_stone",
-    "variant": 5,
-    "pos": [
-     24,
-     5
-    ]
-   },
-   "24;4": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     4
-    ]
-   },
-   "24;3": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     3
-    ]
-   },
-   "24;2": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     2
-    ]
-   },
-   "23;2": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     23,
-     2
-    ]
-   },
-   "24;1": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     24,
-     1
-    ]
-   },
-   "23;0": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     23,
-     0
-    ]
-   },
-   "24;0": {
-    "type": "hollow_stone",
-    "variant": 1,
-    "pos": [
-     24,
-     0
-    ]
-   },
-   "22;0": {
-    "type": "hollow_stone",
-    "variant": 7,
-    "pos": [
-     22,
-     0
-    ]
-   },
-   "23;-1": {
-    "type": "hollow_stone",
-    "variant": 2,
-    "pos": [
-     23,
-     -1
-    ]
-   },
-   "22;-1": {
-    "type": "hollow_stone",
-    "variant": 0,
-    "pos": [
-     22,
-     -1
-    ]
-   },
-   "10;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     10,
-     5
-    ]
-   },
-   "9;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     9,
-     5
-    ]
-   },
-   "7;5": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     7,
-     5
-    ]
-   },
-   "22;1": {
-    "type": "hollow_stone",
-    "variant": 8,
-    "pos": [
-     22,
-     1
     ]
    }
   },
@@ -10446,7 +9166,7 @@
    },
    "6;16": {
     "type": "purpur_stone",
-    "variant": 3,
+    "variant": 8,
     "pos": [
      6,
      16
@@ -10478,7 +9198,7 @@
    },
    "6;17": {
     "type": "purpur_stone",
-    "variant": 3,
+    "variant": 8,
     "pos": [
      6,
      17
@@ -10502,7 +9222,7 @@
    },
    "6;18": {
     "type": "purpur_stone",
-    "variant": 3,
+    "variant": 8,
     "pos": [
      6,
      18
@@ -10734,7 +9454,7 @@
    },
    "7;15": {
     "type": "purpur_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      7,
      15
@@ -10742,7 +9462,7 @@
    },
    "7;19": {
     "type": "purpur_stone",
-    "variant": 2,
+    "variant": 3,
     "pos": [
      7,
      19
@@ -10750,7 +9470,7 @@
    },
    "8;16": {
     "type": "purpur_stone",
-    "variant": 6,
+    "variant": 8,
     "pos": [
      8,
      16
@@ -10778,6 +9498,46 @@
     "pos": [
      10,
      16
+    ]
+   },
+   "7;16": {
+    "type": "purpur_stone",
+    "variant": 8,
+    "pos": [
+     7,
+     16
+    ]
+   },
+   "7;17": {
+    "type": "purpur_stone",
+    "variant": 8,
+    "pos": [
+     7,
+     17
+    ]
+   },
+   "7;18": {
+    "type": "purpur_stone",
+    "variant": 8,
+    "pos": [
+     7,
+     18
+    ]
+   },
+   "8;17": {
+    "type": "purpur_stone",
+    "variant": 3,
+    "pos": [
+     8,
+     17
+    ]
+   },
+   "8;18": {
+    "type": "purpur_stone",
+    "variant": 4,
+    "pos": [
+     8,
+     18
     ]
    }
   },
@@ -19284,7 +18044,7 @@
    },
    "28;21": {
     "type": "purpur_spikes",
-    "variant": 2,
+    "variant": 1,
     "pos": [
      28,
      21
@@ -19293,7 +18053,7 @@
    },
    "29;21": {
     "type": "spikes",
-    "variant": 0,
+    "variant": 1,
     "pos": [
      29,
      21
@@ -23127,25 +21887,9 @@
      -11
     ]
    },
-   "44;-6": {
-    "type": "mossy_stone",
-    "variant": 2,
-    "pos": [
-     44,
-     -6
-    ]
-   },
-   "43;-6": {
-    "type": "mossy_stone",
-    "variant": 1,
-    "pos": [
-     43,
-     -6
-    ]
-   },
    "42;-6": {
     "type": "mossy_stone",
-    "variant": 1,
+    "variant": 2,
     "pos": [
      42,
      -6
@@ -23169,7 +21913,7 @@
    },
    "43;-5": {
     "type": "mossy_stone",
-    "variant": 8,
+    "variant": 1,
     "pos": [
      43,
      -5
@@ -23177,7 +21921,7 @@
    },
    "44;-5": {
     "type": "mossy_stone",
-    "variant": 3,
+    "variant": 2,
     "pos": [
      44,
      -5
@@ -24534,7 +23278,7 @@
    },
    "44;-4": {
     "type": "mossy_stone",
-    "variant": 8,
+    "variant": 3,
     "pos": [
      44,
      -4
@@ -24694,23 +23438,15 @@
    },
    "47;-8": {
     "type": "mossy_stone",
-    "variant": 7,
+    "variant": 6,
     "pos": [
      47,
      -8
     ]
    },
-   "47;-7": {
-    "type": "mossy_stone",
-    "variant": 6,
-    "pos": [
-     47,
-     -7
-    ]
-   },
    "48;-7": {
     "type": "mossy_stone",
-    "variant": 8,
+    "variant": 7,
     "pos": [
      48,
      -7
@@ -38463,18 +37199,10 @@
    },
    "45;-3": {
     "type": "mossy_stone",
-    "variant": 3,
-    "pos": [
-     45,
-     -3
-    ]
-   },
-   "45;-4": {
-    "type": "mossy_stone",
     "variant": 2,
     "pos": [
      45,
-     -4
+     -3
     ]
    },
    "44;-3": {

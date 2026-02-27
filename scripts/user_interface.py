@@ -561,7 +561,7 @@ class Menu:
                     self.game.menu_time += time.time() - self.menu_time_start
                     self.game.save_system.update_playtime(self.game.current_slot)
                     save_game(self.game, self.game.current_slot)
-                    self.game.__init__(full_setup=False)
+                    self.game.__init__(self.screen)
                     return False
                 elif text == "BACK":
                     self.options_visible = False
