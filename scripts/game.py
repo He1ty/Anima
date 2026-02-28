@@ -59,8 +59,8 @@ class Game:
         self.profile_selection_state = "PROFILE_SELECTION"
         self.playing_state = "PLAYING"
 
-        self.FAKE_TILES_LAYER = "5"
-        self.ACTIVATORS_LAYER = "2"
+        self.FAKE_TILES_LAYER = "6"
+        self.ACTIVATORS_LAYER = "3"
 
         self.previous_state = None;
         self.state = "START_SCREEN"
@@ -183,7 +183,7 @@ class Game:
 
         # --- Player Stats & Combat ---
         self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
-        self.player_hp = 100
+        self.player_dead = False
 
         self.collected_souls = []
 
@@ -495,13 +495,13 @@ class Game:
             if not self.player.noclip:
                 if not spike_hitbox.circle_hitbox:
                     if self.player.rect().colliderect(spike_hitbox.rect()):
-                        kill_player(self, self.screen)
+                        kill_player(self)
                 else:
                     dx = self.player.pos[0] - spike_hitbox.pos[0]
                     dy = self.player.pos[1] - spike_hitbox.pos[1]
                     distance = math.sqrt(dx ** 2 + dy ** 2)
                     if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.rect().colliderect(spike_hitbox.rect()):
-                        kill_player(self, self.screen)
+                        kill_player(self)
 
 
             if self.show_spikes_hitboxes:
@@ -615,7 +615,7 @@ class Game:
         pygame.display.update()
 
         # -- Death Handling
-        death_handling(self)
+        death_handling(self, self.screen)
 
         # -- Game initialization
         if not self.game_initialized:
@@ -649,7 +649,7 @@ class Game:
                 if event.key == pygame.K_h:
                     self.toggle_hitboxes()
                 if event.key == pygame.K_r:
-                    kill_player(self, self.screen, animation=False)
+                    kill_player(self)
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_f:
                     self.dict_kb["key_attack"] = 0

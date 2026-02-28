@@ -958,7 +958,6 @@ class Menu:
                                     # START NEW GAME
                                     self.game.level = 0
                                     self.game.load_level(self.game.default_level, transition_effect=False)
-                                    self.game.player_hp = 100
                                     # Crucial: Tell the game which slot is currently active for future saves
                                     self.game.current_slot = slot_id
                                     # Optional: Autosave immediately so the slot isn't empty next time

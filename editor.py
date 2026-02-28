@@ -16,7 +16,8 @@ from scripts.activators import load_activators_actions
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200
 UNDERBAR_HEIGHT = 200
-#If layers are moved, check constants in activators.py (ACTIVATORS_LAYER), main.py(FAKE_TILES_LAYER) and tilemap.py(PLAYER_LAYER)
+
+#If layers are moved, check constants in activators.py (ACTIVATORS_LAYER), main.py (FAKE_TILES_LAYER) and tilemap.py (PLAYER_LAYER)
 
 class LevelManager:
 
@@ -1008,15 +1009,17 @@ class Editor:
                     if tile_loc in self.tilemap.tilemap[self.current_layer]:
                         del self.tilemap.tilemap[self.current_layer][tile_loc]
 
-                    for pos in self.tilemap.offgrid_tiles.copy():
-                        tile = self.tilemap.offgrid_tiles[pos]
-                        tile_img = self.assets[tile['type']][tile['variant']]
-                        tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
-                                             tile['pos'][1] - self.scroll[1],
-                                             tile_img.get_width(),
-                                             tile_img.get_height())
-                        if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
-                            del self.tilemap.offgrid_tiles[pos]
+                    if self.current_layer in self.tilemap.offgrid_tiles:
+                        for pos in self.tilemap.offgrid_tiles[self.current_layer].copy():
+                            tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
+                            tile_img = self.assets[tile['type']][tile['variant']]
+                            tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                                 tile['pos'][1] - self.scroll[1],
+                                                 tile_img.get_width(),
+                                                 tile_img.get_height())
+                            if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
+                                del self.tilemap.offgrid_tiles[self.current_layer][pos]
+
 
 
         if not self.edit_properties_mode_on:
@@ -1058,7 +1061,9 @@ class Editor:
                     if event.button == 1:
                         self.clicking = True
                         if not self.ongrid and mpos_in_mainarea:
-                            self.tilemap.offgrid_tiles[str(mpos_scaled[0] + self.scroll[0]) +
+                            if self.current_layer not in self.tilemap.offgrid_tiles:
+                                self.tilemap.offgrid_tiles[self.current_layer] = {}
+                            self.tilemap.offgrid_tiles[self.current_layer][str(mpos_scaled[0] + self.scroll[0]) +
                                                        ";"
                                                        + str(mpos_scaled[1] + self.scroll[1])] = \
                                 {'type': self.tile_list[self.tile_group],

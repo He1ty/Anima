@@ -511,26 +511,9 @@ def death_animation(screen):
         pygame.display.flip()
         clock.tick(15)
 
-    while True:
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                print("dead")
-                return
-        clock.tick(30)
 
-
-def kill_player(game, screen, animation=True):
-    # Handle player death, respawn them at the proper position
-    game.cutscene = False
-    if animation:
-        death_animation(screen)
-    load_game(game, game.current_slot)
-    game.transition = -30
-    game.player.dash_amt = 1
-    game.player.velocity = [0, 0]
-    game.player.dashtime_cur = 0
-    for key in game.dict_kb.keys():
-        game.dict_kb[key] = 0
+def kill_player(game):
+    game.player_dead = True
 
 
 def deal_dmg(game, source, target, att_dmg=5, att_time=1):
@@ -570,7 +553,6 @@ def update_throwable_objects_action(game):
             o.launch([game.player.last_direction, -1], 3.2)
             return
 
-
 def attacking_update(game):
     # Update player attack state and handle attack direction
     game.attacking = ((game.dict_kb["key_attack"] == 1 and time.time() - game.player_last_attack_time >= 0.03)
@@ -587,8 +569,17 @@ def attacking_update(game):
         game.dict_kb["key_attack"] = 0
         game.player_last_attack_time = time.time()
 
-def death_handling(game):
-    if game.player.pos[1] > game.max_falling_depth:
-        kill_player(game, game.screen)
+def death_handling(game, screen):
+    if game.player_dead:
+        # Handle player death, respawn them at the proper position
+        game.cutscene = False
+        death_animation(screen)
+        load_game(game, game.current_slot)
+        game.transition = -30
+        game.player.dash_amt = 1
+        game.player.velocity = [0, 0]
+        game.player.dashtime_cur = 0
         for key in game.dict_kb.keys():
             game.dict_kb[key] = 0
+
+        game.player_dead = False

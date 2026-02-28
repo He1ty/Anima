@@ -30,7 +30,7 @@ PHYSICS_TILES = {'purpur_rock', 'stone', 'vine','mossy_stone', 'gray_mossy_stone
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
 AUTOTILE_TYPES = {'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
 AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
-PLAYER_LAYER = "2"
+PLAYER_LAYER = "3"
 
 class Tilemap:
     def __init__(self, game, tile_size = 16):
@@ -48,12 +48,6 @@ class Tilemap:
         extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
         where 0 <= n < len(id_pairs)"""
         matches = []
-        for loc in self.offgrid_tiles.copy():
-            tile = self.offgrid_tiles[loc]
-            if (tile['type'], tile['variant']) in id_pairs:
-                matches.append(tile.copy())
-                if not keep:
-                    del self.offgrid_tiles[loc]
 
         for layer in (layers if layers else self.tilemap):
             for loc in self.tilemap[layer].copy():
@@ -69,6 +63,14 @@ class Tilemap:
                     matches[-1]['pos'][1] *= self.tile_size
                     if not keep:
                         del self.tilemap[layer][loc]
+
+            if layer in self.offgrid_tiles:
+                for loc in self.offgrid_tiles[layer].copy():
+                    tile = self.offgrid_tiles[layer][loc]
+                    if (tile['type'], tile['variant']) in id_pairs:
+                        matches.append(tile.copy())
+                        if not keep:
+                            del self.offgrid_tiles[layer][loc]
 
         return matches
 
@@ -296,11 +298,16 @@ class Tilemap:
                             surf.blit(img, (
                                 tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
 
+            if layer in self.offgrid_tiles:
+                for pos in self.offgrid_tiles.copy()[layer]:
+                    tile = self.offgrid_tiles[layer][pos]
+                    img = self.game.assets[tile['type']][tile['variant']].copy()
+                    img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity),
+                             special_flags=BLEND_RGBA_MULT)
+                    surf.blit(img,
+                              (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
+
+
             if layer == "2" and with_player and self.show_collisions:
                 self.render_tiles_under(self.game.player.pos, self.game.player.size, 1)
 
-        for pos in self.offgrid_tiles.copy():
-            tile = self.offgrid_tiles[pos]
-            img = self.game.assets[tile['type']][tile['variant']].copy()
-            img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
-            surf.blit(self.game.assets[tile['type']][tile['variant']], (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))

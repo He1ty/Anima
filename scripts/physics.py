@@ -1,8 +1,6 @@
 #Heavily upgraded basic godot physics code that I then converted to Python --Aymeric
 import math
 
-import pygame
-
 from scripts.sound import *
 from scripts.entities import deal_knockback, update_throwable_objects_action
 
