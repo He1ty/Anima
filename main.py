@@ -4,6 +4,5 @@ import pygame
 
 if __name__ == "__main__":
     # Instantiate the game and start the loop
-    pygame.init()
     game = Game()
     game.run()

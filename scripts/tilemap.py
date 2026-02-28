@@ -17,13 +17,19 @@ AUTOTILE_MAP = {
     tuple(sorted([(-1, 0), (0, -1), (1, 0)])): 5,
     tuple(sorted([(1, 0), (0, -1)])): 6,
     tuple(sorted([(1, 0), (0, -1), (0, 1)])): 7,
-    tuple(sorted([(1, 0), (-1, 0), (0, 1), (0, -1)])): 8,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, 1), (1, -1), (-1, -1), (-1, 1)])): 8,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, -1), (-1, -1), (-1, 1)])): 9,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, 1), (1, -1), (-1, -1)])): 10,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, 1), (-1, -1)])): 11,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, 1), (-1, -1), (-1, 1)])): 12,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, 1), (1, -1), (-1, 1)])): 13,
+    tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, -1), (-1, 1)])): 14,
 }
 
 PHYSICS_TILES = {'purpur_rock', 'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass', 'mossy_stone_gluy'}
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
 AUTOTILE_TYPES = {'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
-AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy", "purpur_rock"], 'mossy_stone_gluy': ["mossy_stone"], 'purpur_rock':['mossy_stone']}
+AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
 PLAYER_LAYER = "2"
 
 class Tilemap:
@@ -157,12 +163,14 @@ class Tilemap:
             for loc in self.tilemap[layer]:
                 tile = self.tilemap[layer][loc]
                 neighbors = set()
-                for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)]:
+                corner_additional_shifts = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
+                for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)] + corner_additional_shifts:
                     check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
                     if check_loc in self.tilemap[layer]:
-                        if self.tilemap[layer][check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and self.tilemap[layer][check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
+                        if self.tilemap[layer][check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and
+                                                                                      self.tilemap[layer][check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
                             neighbors.add(shift)
-                neighbors = tuple(sorted(neighbors))
+                neighbors = sorted(neighbors)
 
                 a_map = AUTOTILE_MAP
                 if "rotation" in tile:
@@ -173,11 +181,20 @@ class Tilemap:
                         tuple(sorted([(int((-math.sin(angle))), int(-math.cos(angle)))])): 2,
                     }
 
+                if tuple(neighbors) not in a_map:
+                    for s in corner_additional_shifts:
+                        if s in neighbors:
+                            neighbors.remove(s)
+
+                neighbors = tuple(sorted(neighbors))
+
                 if (tile['type'] in AUTOTILE_TYPES) and (neighbors in a_map):
                     if "rotation" in tile:
                         tile['variant'] = a_map[neighbors]
                     else:
-                        tile['variant'] = a_map[neighbors]
+                        new_variant = a_map[neighbors]
+                        if new_variant < len(self.game.assets[tile["type"]]):
+                            tile['variant'] = new_variant
 
     def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))

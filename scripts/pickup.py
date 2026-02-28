@@ -1,10 +1,7 @@
-from multiprocessing.process import active_children
-
 import pygame
 import time
-import math
 
-from scripts.utils import round_up
+from scripts.saving import save_game
 
 
 class Pickup:
@@ -55,6 +52,7 @@ class Pickup:
                     if self.type == "soul":
                         pos = f"{self.initial_pos[0]};{self.initial_pos[1]}"
                         self.game.collected_souls.append(pos)
+                        save_game(self.game, self.game.current_slot)
 
                     self.animation.frame = 0
                     self.state = "taking"
@@ -64,7 +62,6 @@ class Pickup:
             # Avoid player movement
             if self.type == "soul":
                 self.avoid_player()
-
 
         elif self.state == "taking":
             self.animation.img_duration = self.animations_duration[self.type][self.state]

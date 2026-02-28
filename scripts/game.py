@@ -36,7 +36,6 @@ class Game:
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
 
-
         if full_setup:
             # The actual window size
             self.screen_width = 1000
@@ -69,7 +68,7 @@ class Game:
 
         # --- Icon Setup ---
         try:
-            icon_img = pygame.image.load("/assets/images/logo.png").convert_alpha()
+            icon_img = pygame.image.load("assets/images/logo.png").convert_alpha()
             icon_img = pygame.transform.smoothscale(icon_img, (16, 16))
             pygame.display.set_icon(icon_img)
         except FileNotFoundError:
@@ -320,7 +319,11 @@ class Game:
                 self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
 
         self.spikes = []
-        spike_types = [("spikes", 0), ("spikes", 1), ("gluy_spikes", 0), ("gluy_spikes", 1), ("gluy_spikes", 2)]
+        spike_types = []
+        for s in ("spikes", "gluy_spikes", "purpur_spikes"):
+            for n in range(3):
+                spike_types.append((s, n))
+
         spike_block_types = []
         for n in range(9):
             spike_block_types += [("spike_roots", n)]
@@ -384,9 +387,8 @@ class Game:
         fake_tiles_id_pairs = []
         for tile in sorted(os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}")):
             if "fake" in tile:
-                for variant in sorted(
-                        os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}/{tile}")):
-                    fake_tiles_id_pairs.append((tile, int(variant[0])))
+                for variant in range(len(self.assets[tile])):
+                    fake_tiles_id_pairs.append((tile, variant))
 
         if not hasattr(self, "fake_tile_groups"):
             self.fake_tile_groups = []
@@ -539,6 +541,7 @@ class Game:
         entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
         """
         # -- Camera & Render Scroll setup
+
         self.update_camera_setup()
         self.camera.update_camera()
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))

@@ -1045,7 +1045,6 @@ class Editor:
                     if mods & pygame.KMOD_CTRL:
                         self.zoom -= 0.1*event.y
                         self.zoom = max(0.2, min(self.zoom, 8.0))
-                        self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
                     else:
                         self.tile_variant = (self.tile_variant + event.y) % len(
                             self.assets[self.tile_list[self.tile_group]])
@@ -1307,10 +1306,23 @@ class Editor:
         # Blit everything to screen
         if not self.window_mode:
 
+            changing_size = False
+
+            if self.display.get_size() != (int(480 * self.zoom), int(288 * self.zoom)):
+                screenshot = self.screen.copy()
+                self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
+                changing_size = True
+
             scaled_display = pygame.transform.scale(self.display, (main_area_width, main_area_height))
 
             self.screen.blit(scaled_display, (0, 0))
             self.screen.blit(self.sidebar, (main_area_width, 0))
+
+            if changing_size:
+                # noinspection PyUnboundLocalVariable
+                self.screen.blit(screenshot, (0, 0))
+
+
             if self.edit_properties_mode_on and not self.selecting_dest_pos:
                 self.render_underbar()
                 self.screen.blit(self.underbar, (0, main_area_height - UNDERBAR_HEIGHT))
