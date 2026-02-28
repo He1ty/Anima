@@ -531,6 +531,8 @@ def kill_player(game, screen, animation=True):
     game.player.dash_amt = 1
     game.player.velocity = [0, 0]
     game.player.dashtime_cur = 0
+    for key in game.dict_kb.keys():
+        game.dict_kb[key] = 0
 
 
 def deal_dmg(game, source, target, att_dmg=5, att_time=1):
