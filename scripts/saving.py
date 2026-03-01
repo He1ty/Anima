@@ -5,7 +5,7 @@ from typing import SupportsFloat
 
 import pygame as py
 
-from scripts.sound import set_game_volume
+from scripts.display import check_screen
 
 
 class Save:
@@ -248,9 +248,14 @@ class Save:
     def save_settings(self):
 
         save_data = {
-                "volume": self.game.volume,
+                "music_volume": self.game.music_sound_manager.volume,
+                "SE_volume": self.game.sound_effect_manager.volume,
                 "keyboard_layout": self.game.keyboard_layout,
-                "language": self.game.selected_language
+                "language": self.game.selected_language,
+                "fullscreen": self.game.fullscreen,
+                "v-sync": self.game.vsync_on,
+                "brightness": self.game.brightness,
+                "debug_mode": self.game.debug_mode,
             }
 
         save_path = os.path.join(self.save_folder, f"settings.json")
@@ -277,38 +282,23 @@ class Save:
                 save_data = json.load(save_file)
 
             # --- Restore Settings ---
-            volume = save_data.get("volume", 0.5)
-            set_game_volume(self.game, volume)
+            music_volume = save_data.get("music_volume", 0.5)
+            self.game.music_sound_manager.set_volume(music_volume)
+            se_volume = save_data.get("SE_volume", 0.5)
+            self.game.sound_effect_manager.set_volume(se_volume)
             self.game.keyboard_layout = save_data.get("keyboard_layout")
             self.game.selected_language = save_data.get("language", "English")
+            self.game.fullscreen = save_data.get("fullscreen", True)
+            self.game.vsync_on = save_data.get("vsync_on", True)
+            self.game.brightness = save_data.get("brightness", 0.5)
+            self.game.debug_mode = save_data.get("debug_mode", False)
+
+            check_screen(self.game)
             if hasattr(self.game, "menu"):
-                self.game.menu.update_settings_from_game()
+                self.game.menu.update_settings_categories()
+                self.game.menu.init_buttons()
         except Exception as e:
             print(f"Error while loading the save: {e}")
             import traceback
             traceback.print_exc()
             return False
-
-
-
-# --- Global Helpers ---
-def save_game(game, slot=1):
-    if hasattr(game, 'save_system'):
-        return game.save_system.save_game(slot)
-    return False
-
-def save_settings(game):
-    if hasattr(game, 'save_system'):
-        return game.save_system.save_settings()
-    return False
-
-def load_settings(game):
-    if hasattr(game, 'save_system'):
-        return game.save_system.load_settings()
-    return False
-
-
-def load_game(game, slot=1):
-    if hasattr(game, 'save_system'):
-        return game.save_system.load_game(slot)
-    return False

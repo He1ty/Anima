@@ -3,7 +3,6 @@ import pygame
 import random
 import math
 
-from scripts.saving import load_game
 
 
 class PhysicsEntity:
@@ -553,6 +552,7 @@ def update_throwable_objects_action(game):
             o.launch([game.player.last_direction, -1], 3.2)
             return
 
+
 def attacking_update(game):
     # Update player attack state and handle attack direction
     game.attacking = ((game.dict_kb["key_attack"] == 1 and time.time() - game.player_last_attack_time >= 0.03)
@@ -574,7 +574,7 @@ def death_handling(game, screen):
         # Handle player death, respawn them at the proper position
         game.cutscene = False
         death_animation(screen)
-        load_game(game, game.current_slot)
+        game.load_game(game.current_slot)
         game.transition = -30
         game.player.dash_amt = 1
         game.player.velocity = [0, 0]

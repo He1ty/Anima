@@ -8,13 +8,13 @@ from scripts.tilemap import Tilemap
 from scripts.physics import PhysicsPlayer
 from scripts.particle import update_particles, particle_render
 from scripts.activators import *
-from scripts.user_interface import Menu, start_menu
-from scripts.saving import Save, save_game
+from scripts.user_interface import Menu
+from scripts.saving import Save
 from scripts.doors import Door, doors_render_and_update
 from scripts.display import *
 from scripts.camera import CameraSetup, Camera
 from scripts.text import load_game_texts, display_bottom_text, update_bottom_text
-from scripts.sound import set_game_volume, change_music
+from scripts.sound import Sound
 from scripts.pickup import Pickup
 
 
@@ -33,14 +33,44 @@ class Game:
         """
         pygame.init()
 
+        # --- Debug Mode ---
+        self.debug_mode = False
+
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
+
+        # --- Sound manager System ---
+        base_path = "assets/sounds/"
+        music_path = {'title_screen':base_path + 'Title-screen-ambient-music.wav',
+                      'level_0': base_path + 'map_0.wav'}
+        self.music_sound_manager = Sound(self,music_path,is_music=True,volume=1)
+        sound_effect_path = {
+            "dash":base_path + 'player/dash.wav',
+            'jump':base_path + 'player/jump.wav',
+            'run':base_path + 'player/run.wav',
+            'wall_jump':base_path + 'player/wall_jump.wav',
+            'land':base_path + 'player/land.wav',
+            'walk':None,
+            'stun':None
+        }
+        self.sound_effect_manager = Sound(self,sound_effect_path,is_music=False,volume=0.5)
 
         if full_setup:
             # The actual window size
             self.screen_width = 1000
             self.screen_height = 600
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+
+            # --- Menu & System Configuration ---
+            self.languages = ["Français", "English", "Español"]
+            self.selected_language = self.languages[1]
+            self.fullscreen = False
+            self.vsync_on = False
+            self.brightness = 0.5
+            self.keyboard_layout = "AZERTY"
+            self.menu = Menu(self)
+
+
 
         # The internal rendering surface (half size for a pixel-art aesthetic)
         self.display = pygame.Surface((self.screen_width/2, self.screen_height/2))
@@ -62,7 +92,7 @@ class Game:
         self.FAKE_TILES_LAYER = "6"
         self.ACTIVATORS_LAYER = "3"
 
-        self.previous_state = None;
+        self.previous_state = None
         self.state = "START_SCREEN"
         self.game_initialized = False
 
@@ -74,7 +104,7 @@ class Game:
         except FileNotFoundError:
             pass
 
-        self.fullscreen = False
+
         self.tile_size = 16
 
         # --- Entity Configuration ---
@@ -150,10 +180,7 @@ class Game:
             self.buttons_id_pairs += [(button, 0) for button in load_activators(env) if "button" in button]
             self.tp_id_pairs += [(tp, 0) for tp in load_activators(env) if "teleporter" in tp]
 
-        # --- Audio System ---
-        self.sound_running = False
-        self.volume = 0.5
-        self.current_music_path = None
+
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=2048)
@@ -238,12 +265,11 @@ class Game:
         self.particles = []
         self.sparks = []
 
-        # --- Menu & System Configuration ---
-        self.selected_language = "English"
-        self.menu = Menu(self)
-        self.keyboard_layout = "AZERTY"
+        # --- System Configuration ---
         self.save_system = Save(self)
         self.current_slot = None  # Tracking the active save slot
+
+
 
         # --- Modes configuration ---
         self.current_mode = "default"
@@ -327,6 +353,29 @@ class Game:
         spike_block_types = []
         for n in range(9):
             spike_block_types += [("spike_roots", n)]
+
+        # --- Audio System ---
+        base_path = "assets/sounds/"
+        sounds_effect_dict = {
+            'jump': base_path + "player/jump.wav",
+            'dash': base_path + "player/dash.wav",
+            'wall_jump': base_path + "player/wall_jump.wav",
+            'land': base_path + "player/land.wav",
+            'run': base_path + "player/run.wav",
+            'walk': None,
+            'stun': None
+        }
+
+        self.sound_effect_manager = Sound(self, sounds_effect_dict, False)
+
+        music_sound_dict = {
+            'title_screen': base_path + "Title-screen-ambient-music.wav",
+            'level_0': base_path + "map_0.wav",
+        }
+        self.music_sound_manager = Sound(self, music_sound_dict, True)
+        self.sound_running = False
+        self.volume = 0.5
+        self.current_music_path = None
 
 
         for spike in self.tilemap.extract(spike_types, keep=True):
@@ -430,6 +479,26 @@ class Game:
         self.max_falling_depth = 50000000000
         self.shader.update_light()
 
+    def save_game(self, slot=1):
+        if hasattr(self, 'save_system'):
+            return self.save_system.save_game(slot)
+        return False
+
+    def save_settings(self):
+        if hasattr(self, 'save_system'):
+            return self.save_system.save_settings()
+        return False
+
+    def load_settings(self):
+        if hasattr(self, 'save_system'):
+            return self.save_system.load_settings()
+        return False
+
+    def load_game(self, slot=1):
+        if hasattr(self, 'save_system'):
+            return self.save_system.load_game(slot)
+        return False
+
     def update_transitions(self):
         for transition in self.transitions:
             if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
@@ -484,7 +553,7 @@ class Game:
                             "scroll_limits"] = camera.scroll_limits
                         if hasattr(camera, "center"):
                             self.spawn_point["cameras"][str(camera.initial_state)]["center"] = camera.center
-                save_game(self, self.current_slot)
+                self.save_game(self.current_slot)
 
     def update_camera_setup(self):
         for camera in self.camera_setup:
@@ -622,7 +691,7 @@ class Game:
             self.game_initialized = True
             # - Save game on start
             if not os.path.exists(f"saves/save_{self.current_slot}.json"):
-                save_game(self, self.current_slot)
+                self.save_game(self.current_slot)
 
         # -- Input Handling
         for event in pygame.event.get():
@@ -646,7 +715,7 @@ class Game:
                 if event.key == pygame.K_f and not self.holding_attack:
                     self.dict_kb["key_attack"] = 1
                     self.holding_attack = True
-                if event.key == pygame.K_h:
+                if event.key == pygame.K_h and self.debug_mode:
                     self.toggle_hitboxes()
                 if event.key == pygame.K_r:
                     kill_player(self)
@@ -667,26 +736,16 @@ class Game:
         The main program entry point.
         This function implements a state machine to switch between the Intro, Profile Menu, and Gameplay.
         """
+        self.play_music("title_screen")
+        self.load_settings()
 
         while True:
+
+
             if self.state == self.title_state:
                 pygame.mouse.set_visible(True)
-                change_music(self,
-                             "assets/sounds/GV2space-ambient-music-interstellar-space-journey-8wlwxmjrzj8_MDWW6nat.wav")
-                # start_menu is a blocking call (usually handles its own internal loop)
-                action = start_menu(self)
-                if action == "play":
-                    self.previous_state = self.state
-                    self.state = self.profile_selection_state
-                elif action == "settings":
-                    self.previous_state = self.state
-                    self.state = self.option_state
-                    self.menu.capture_background()
-                    pygame.mouse.set_visible(False)
 
-                elif action == "quit":
-                    pygame.quit()
-                    sys.exit()
+                self.menu.draw_title_menu()
 
             elif self.state == self.option_state:
 
@@ -696,11 +755,10 @@ class Game:
                 self.menu.draw_option_menu()
 
             elif self.state == self.profile_selection_state:
-                change_music(self,
-                             "assets/sounds/GV2space-ambient-music-interstellar-space-journey-8wlwxmjrzj8_MDWW6nat.wav")
-                # If a profile is chosen, start the game; otherwise return to intro
+
                 if self.menu.profile_selection_menu():
                     self.state = "PLAYING"
+                    self.play_music(f"level_{self.level}")
                     pygame.mouse.set_visible(False)
                 else:
                     self.state = "START_SCREEN"
@@ -714,9 +772,18 @@ class Game:
             elif self.state == self.keyboard_state:
                 print("KEYBOARD SETTINGS")
             elif self.state == self.playing_state:
-                # Dynamic music based on level ID
-                change_music(self, "assets/sounds/" + f"map_{str(self.level)}" + ".wav")
                 self.main_game_logic()
             elif self.state == self.pause_state:
                 self.menu.draw_pause_menu()
             pygame.display.flip()
+
+    def play_music(self,name):
+        self.music_sound_manager.play(name=name, loops=-1)
+    def play_se(self,name):
+        self.sound_effect_manager.play(name=name)
+    def update_music_volume(self,volume):
+        self.music_sound_manager.volume = volume
+        self.music_sound_manager.set_volume(self.music_sound_manager.volume)
+    def update_sound_effect_volume(self,volume):
+        self.sound_effect_manager.volume = volume
+        self.sound_effect_manager.set_volume(self.sound_effect_manager.volume)

@@ -108,9 +108,6 @@ class PhysicsPlayer:
         self.disablePlayerInput = False
         self.collide_with_passable_blocks = True
 
-        # Système de son
-        self.init_sound_system()
-
         # Variables pour gérer les états des sons
         self.was_on_floor = True  # Pour gérer le son d'atterrissage
         self.running_sound_playing = False
@@ -120,43 +117,12 @@ class PhysicsPlayer:
 
         self.rotation_angle = 0
 
-    def init_sound_system(self):
-        """Initialise le système de son avec tous les fichiers nécessaires"""
-        # Dictionnaire qui stockera tous les sons
-        base_path = "assets/sounds/player/"
-        self.sounds = {
-            'jump': base_path + "jump.wav",
-            'dash': base_path + "dash.wav",
-            'wall_jump': base_path + "wall_jump.wav",
-            'land': base_path + "land.wav",
-            'run': base_path + "run.wav",
-            'walk': None,
-            'stun': None
-        }
-        load_sounds(self, self.sounds)
-
-    def play_sound(self, sound_key, force=False):
-        """
-        Joue un son spécifique
-
-        Args:
-            sound_key: La clé du son à jouer
-            force: Si True, joue le son même s'il est déjà en cours
-        """
-        if sound_key in self.sounds and self.sounds[sound_key]:
-            if force:
-                self.sounds[sound_key].stop()
-
-            # Vérifier si le son est déjà en cours de lecture
-            if not pygame.mixer.Channel(0).get_busy() or force:
-                self.sounds[sound_key].play(loops=0, maxtime=0, fade_ms=0)
-
     def update_sounds(self):
-        """Met à jour et gère les sons en fonction de l'état du joueur"""
+        """Update the player sounds depending on the player state"""
 
-        # Son d'atterrissage
+        # Landing sounds
         if self.is_on_floor() and not self.was_on_floor:
-            self.play_sound('land', True)
+            self.game.play_se('land')
 
         # Mise à jour de l'état du sol pour le prochain frame
         self.was_on_floor = self.is_on_floor()
@@ -170,7 +136,7 @@ class PhysicsPlayer:
 
             # Joue le son à intervalles réguliers pour créer un effet de pas
             if self.run_sound_timer >= self.run_sound_interval:
-                self.play_sound('run', True)
+                self.game.play_se('run')
                 self.run_sound_timer = 0
         else:
             self.run_sound_timer = 0
@@ -178,7 +144,7 @@ class PhysicsPlayer:
         # Détecte les changements d'action pour les événements ponctuels
         if self.action != self.last_action:
             if self.action in ["stun"]:
-                self.play_sound('stun')
+                self.game.play_se('stun')
 
             self.last_action = self.action
 
@@ -206,7 +172,7 @@ class PhysicsPlayer:
 
                 # Jouer le son de stun
                 if stun_elapsed < 0.05:  # Pour ne jouer le son qu'une fois au début du stun
-                    self.play_sound('stun')
+                    self.game.play_se('stun')
 
                 # When stunned, only apply knockback and gravity
                 self.gravity()
@@ -244,7 +210,7 @@ class PhysicsPlayer:
             # You can also use a 'lerp' here if you want a smooth landing animation
             self.rotation_angle = 0
 
-        if self.dict_kb["key_noclip"] == 1 and self.allowNoClip and not self.holding_n:
+        if self.dict_kb["key_noclip"] == 1 and self.game.debug_mode and not self.holding_n:
             self.noclip = not self.noclip
             self.holding_n = True
 
@@ -524,7 +490,7 @@ class PhysicsPlayer:
 
                 # Jouer le son de saut
                 self.jumping = True
-                self.play_sound('jump', True)
+                self.game.play_se('jump')
 
                 # Jumps on dash
                 if self.dashtime_cur != 0 and not self.buffering_jump:
@@ -567,8 +533,7 @@ class PhysicsPlayer:
                     self.jump_logic_helper()
 
                     # Jouer le son de wall jump
-                    self.play_sound('wall_jump', True)
-
+                    self.game.play_se('wall_jump')
 
                     if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
@@ -583,7 +548,7 @@ class PhysicsPlayer:
                     self.jump_logic_helper()
 
                     # Jouer le son de wall jump
-                    self.play_sound('wall_jump', True)
+                    self.game.play_se("wall_jump")
                     self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
 
@@ -631,7 +596,8 @@ class PhysicsPlayer:
                     self.velocity = [0, 0]
 
                     # Jouer le son de dash
-                    self.play_sound('dash', force=True)
+                    self.game.play_se('dash')
+                    #self.play_sound('dash', force=True)
                 if not self.is_on_floor():
                     self.dash_started_in_air = True
                 self.dash_startup_cur = self.DASH_STARTUP_FRAMES

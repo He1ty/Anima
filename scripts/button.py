@@ -181,8 +181,8 @@ class DiscreteSlider:
 
 
     def handle_event(self, event):
+        self._update_value(event)
         if self.hover:
-            self._update_value(event)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
                     if self.value > 0:
@@ -190,12 +190,6 @@ class DiscreteSlider:
                 if event.key == pygame.K_RIGHT:
                     if self.value < self.steps:
                         self.value += 1
-
-
-
-
-
-
         return None
 
     def _update_value(self, mouse_x):
@@ -216,7 +210,7 @@ class DiscreteSlider:
     def get_value(self):
         return self.value
 
-    def get_normalized(self):
+    def get_normalized(self)->float:
         return self.value / self.steps
 
     def start_hover_effect(self):
@@ -224,6 +218,9 @@ class DiscreteSlider:
 
     def end_hover_effect(self):
         self.hover = False
+
+    def set_normalized_value(self, value):
+        self.value = int(value*self.steps)
 
 class ToggleSwitch:
     def __init__(self, x, y, width=60, height=30,
@@ -294,6 +291,7 @@ class ToggleSwitch:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
                     self.state = not self.state
+                    return True
 
     def get_state(self):
         return self.state

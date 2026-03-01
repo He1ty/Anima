@@ -1,7 +1,6 @@
 import pygame
 import time
 
-from scripts.saving import save_game
 
 
 class Pickup:
@@ -52,7 +51,7 @@ class Pickup:
                     if self.type == "soul":
                         pos = f"{self.initial_pos[0]};{self.initial_pos[1]}"
                         self.game.collected_souls.append(pos)
-                        save_game(self.game, self.game.current_slot)
+                        self.game.save_game(self.game.current_slot)
 
                     self.animation.frame = 0
                     self.state = "taking"
