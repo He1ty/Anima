@@ -152,7 +152,7 @@ class PhysicsPlayer:
 
             self.last_action = self.action
 
-    def physics_process(self, tilemap, dict_kb):
+    def physics_process(self, dict_kb, dt):
         """Input : tilemap (map), dict_kb (dict)
         output : sends new coords for the PC to move to in accordance with player input and stage data (tilemap)"""
         self.dict_kb = dict_kb
@@ -234,25 +234,25 @@ class PhysicsPlayer:
             self.holding_n = False
 
         if not self.noclip:
-            self.air_time += 1
+            self.air_time += 1 * dt
             direction = self.get_direction("x")
             if direction != 0:
                 self.last_direction = direction
 
             if (not self.dashtime_cur > 0 or self.can_walljump["blocks_around"]) and not self.prevent_walking:
-                self.walk(direction)
+                self.walk(direction, dt)
 
-            self.gravity()
+            self.gravity(dt)
             self.jump()
-            self.dash()
-            self.dash_momentum()
+            self.dash(dt)
+            self.dash_momentum(dt)
 
-            self.apply_momentum()
+            self.apply_momentum(dt)
 
             self.apply_animations()
             self.apply_particle()
             self.animation.update()
-            self.update_slime_deformation()
+            self.update_slime_deformation(dt)
 
             # Mise à jour des sons
             self.update_sounds()
@@ -261,6 +261,8 @@ class PhysicsPlayer:
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
+
+        print(self.velocity[1])
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -280,7 +282,7 @@ class PhysicsPlayer:
             self.dict_kb["key_right"] = self.force_movement == "r"
             self.dict_kb["key_left"] = self.force_movement == "l"
 
-    def walk(self, direction, mult=1):
+    def walk(self, direction, dt, mult=1):
         """Changes x velocity with gradual acceleration and deceleration."""
         target_speed = direction * self.SPEED * mult
 
@@ -297,7 +299,7 @@ class PhysicsPlayer:
 
         if direction != 0 or self.dash_direction[0] != 0:
             # Gradually move current velocity toward target speed
-            self.velocity[0] += (target_speed - self.velocity[0]) * accel
+            self.velocity[0] += (target_speed - self.velocity[0]) * min(accel * dt, 1.0)
         else:
             # This handles the 'active' release of keys (handled in apply_momentum usually,
             # but kept here for logic consistency)
@@ -426,7 +428,7 @@ class PhysicsPlayer:
                     return self.rect().top == rect.bottom and self.velocity[1] <= 0
         return False
 
-    def gravity(self):
+    def gravity(self, dt):
         """Handles gravity. Gives downwards momentum (capped at 5) if in the air, negates momentum if on the ground, gives back a dash if the
         player is missing some. Stops movement if no input is given."""
         if not self.is_on_floor() and not self.dashtime_cur > 0 and not self.dash_startup_cur:
@@ -462,9 +464,9 @@ class PhysicsPlayer:
 
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
-                self.velocity[1] = min(6.0, self.velocity[1] + self.acceleration[1])
+                self.velocity[1] = min(6.0, self.velocity[1] + (self.acceleration[1] * dt))
             else:
-                self.velocity[1] = max(-6.0, self.velocity[1] + self.acceleration[1])
+                self.velocity[1] = max(-6.0, self.velocity[1] + (self.acceleration[1] * dt))
         elif self.is_on_floor():
             self.pos[1] = int(self.pos[1]) # Take only the integer part in order to avoid some pixels overlap
             # (for example when we jump, if player stops at 80.399999, we make sure that player coordinate is at 80 before setting vertical velocity to 0)
@@ -590,12 +592,12 @@ class PhysicsPlayer:
         self.last_direction = -self.last_direction
         self.velocity[1] += -v_boost
 
-    def dash(self):
+    def dash(self, dt):
         """Handles player dash."""
-        self.dash_startup_cur = max(self.dash_startup_cur - 1, 0)
-        self.dash_cooldown_cur = max(self.dash_cooldown_cur - 1, 0)
+        self.dash_startup_cur = max(self.dash_startup_cur - dt, 0)
+        self.dash_cooldown_cur = max(self.dash_cooldown_cur - dt, 0)
         if not self.anti_dash_buffer:
-            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur == 0: #and self.dash_direction != [0, -1]
+            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur <= 0: #and self.dash_direction != [0, -1]
                 if self.game.player_grabbing:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
@@ -626,12 +628,12 @@ class PhysicsPlayer:
             if self.dict_kb["key_dash"] == 0:
                 self.anti_dash_buffer = False
 
-    def dash_momentum(self):
+    def dash_momentum(self, dt):
         """Applies momentum from dash. Manage momentum when dash ends."""
         if self.dash_startup_cur == 0:
             if self.dashtime_cur > 0:
                 self.dash_ghost_trail()
-                self.dashtime_cur -= 1
+                self.dashtime_cur = max(0, self.dashtime_cur - dt)
                 move_x = self.dash_direction[0]
                 move_y = -self.dash_direction[1]
 
@@ -644,14 +646,15 @@ class PhysicsPlayer:
                     if not self.velocity[1] or not self.can_walljump["blocks_around"]:
                         self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
 
-                if self.dashtime_cur == 0:
-                    self.velocity[1] = abs(self.velocity[1])/self.velocity[1] if self.velocity[1] != 0 else 0
+                if self.dashtime_cur <= 0:
+                    mult = 2
+                    self.velocity[1] = (abs(self.velocity[1])/self.velocity[1])*mult if self.velocity[1] != 0 else 0
                     if self.collision["left"] or self.collision["right"]:
                         self.velocity[0] = 0
 
             self.update_ghost_trail()
 
-    def collision_check(self, axe):
+    def collision_check(self, axe, dt):
         """Checks for collision using tilemap"""
         entity_rect = self.rect()
 
@@ -665,9 +668,9 @@ class PhysicsPlayer:
             backup_velo = self.velocity[1]
 
             self.can_walljump["buffer"] = False
-            self.can_walljump["timer"] = max(0, self.can_walljump["timer"] - 1)
+            self.can_walljump["timer"] = max(0, self.can_walljump["timer"] - dt)
 
-            if self.can_walljump["timer"] == 0:
+            if self.can_walljump["timer"] <= 0:
                 self.can_walljump["sliding"] = False
             for rect in tilemap.physics_rects_under(self.pos, self.size, self.GRAVITY_DIRECTION) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
@@ -747,7 +750,7 @@ class PhysicsPlayer:
 
         if axe == "x":
             if self.can_walljump["cooldown"]:
-                self.can_walljump["cooldown"] = max(self.can_walljump["cooldown"]-1,0)
+                self.can_walljump["cooldown"] = max(self.can_walljump["cooldown"] - dt, 0)
             for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     # --- HORIZONTAL CORNER CORRECTION ---
@@ -824,7 +827,7 @@ class PhysicsPlayer:
         else:
             self.can_walljump["blocks_around"] = check_right or check_left
 
-    def apply_momentum(self):
+    def apply_momentum(self, dt):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
 
         self.wall_jump_blocks_around_check()
@@ -837,11 +840,14 @@ class PhysicsPlayer:
         if self.velocity[1] < 0 or not self.get_block_on["top"]:
             self.collision["top"] = False
 
-        self.pos[0] += self.velocity[0]
-        self.collision_check("x")
+        self.pos[0] += self.velocity[0] * dt
+        self.collision_check("x", dt)
 
-        self.pos[1] += self.velocity[1]
-        self.collision_check("y")
+        move_y = self.velocity[1] * dt
+        move_y = max(-7, min(move_y, 7))
+
+        self.pos[1] += move_y
+        self.collision_check("y", dt)
 
         if self.collision["right"] or self.collision["left"]:
             if self.superjump:
@@ -870,7 +876,7 @@ class PhysicsPlayer:
                     self.dash_direction = [0, 0]
                 # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)'
                 if self.get_direction("x") == 0 and self.dashtime_cur == 0:
-                    self.velocity[0] *= 0.8
+                    self.velocity[0] *= math.pow(0.8, dt)
             else:
                 # Air resistance/deceleration when not pressing anything in air
                 if self.get_direction("x") == 0:
@@ -879,12 +885,12 @@ class PhysicsPlayer:
                         self.velocity[0] = 0
                     # If player is slow-walking
                     elif abs(self.velocity[0]) < 2 and not self.jumping:
-                        self.velocity[0] *= 0.1
+                        self.velocity[0] *= math.pow(0.1, dt)
                     # Normal air resistance
                     else:
-                        self.velocity[0] *= 0.98
+                        self.velocity[0] *= math.pow(0.98, dt)
         else:
-            self.velocity[0] *= 0.95
+            self.velocity[0] *= math.pow(0.95, dt)
 
     def get_direction(self, axis):
         """Gets the current direction the player is holding towards. Takes an axis as argument ('x' or 'y')
@@ -922,7 +928,7 @@ class PhysicsPlayer:
             if ghost["lifetime"] <= 0:
                 self.ghost_images.remove(ghost)
 
-    def update_slime_deformation(self):
+    def update_slime_deformation(self, dt):
         # 1. Friction/Spring Physics: Move scale back to 1.0 like a spring
 
         # Stabilizes the spring effect in order to low its duration (so it doesn't spring during 80000 years)
@@ -937,11 +943,11 @@ class PhysicsPlayer:
         force_y = -self.stiffness * (self.visual_scale[1] - 1.0)
 
         # Acceleration = Force (mass is 1)
-        self.spring_velocity[0] = (self.spring_velocity[0] + force_x) * self.damping
-        self.spring_velocity[1] = (self.spring_velocity[1] + force_y) * self.damping
+        self.spring_velocity[0] = (self.spring_velocity[0] + force_x*dt) * self.damping
+        self.spring_velocity[1] = (self.spring_velocity[1] + force_y*dt) * self.damping
 
-        self.visual_scale[0] += self.spring_velocity[0]
-        self.visual_scale[1] += self.spring_velocity[1]
+        self.visual_scale[0] += self.spring_velocity[0] * dt
+        self.visual_scale[1] += self.spring_velocity[1] * dt
 
         # 2. Impact Detection (The "Splash")
         # Landing on Floor

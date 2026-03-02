@@ -592,6 +592,15 @@ class Game:
         The core gameplay loop. Handles physics, collision, rendering order,
         entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
         """
+        # Calculate delta time at the very start of the logic loop
+        # clock.tick returns milliseconds. 1000ms / 60fps = 16.666ms per frame.
+        # This makes dt = 1.0 at 60 FPS, and dt = 2.0 at 30 FPS.
+        raw_dt = self.clock.tick(60)
+        dt = raw_dt / (1000.0 / 60.0)
+
+        # Cap dt to prevent the player from clipping through walls during massive lag spikes
+        dt = min(dt, 3.0)
+
         # -- Camera & Render Scroll setup
 
         self.update_camera_setup()
@@ -601,7 +610,7 @@ class Game:
 
         # -- Tilemap Render and Update
         self.tilemap.render(self.display, offset=render_scroll)
-        self.player.physics_process(self.tilemap, self.dict_kb)
+        self.player.physics_process(self.dict_kb, dt)
 
         # -- Pre Game-Initialization
         if not self.game_initialized:
@@ -711,9 +720,6 @@ class Game:
                 state = 1 if event.type == pygame.KEYDOWN else 0
                 key_map = self.get_key_map()
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
-
-        self.clock.tick(60)
-
 
     def run(self):
         """
