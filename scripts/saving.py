@@ -248,6 +248,7 @@ class Save:
     def save_settings(self):
 
         save_data = {
+                "master_volume":self.game.master_volume,
                 "music_volume": self.game.music_sound_manager.volume,
                 "SE_volume": self.game.sound_effect_manager.volume,
                 "keyboard_layout": self.game.keyboard_layout,
@@ -282,9 +283,13 @@ class Save:
                 save_data = json.load(save_file)
 
             # --- Restore Settings ---
+            master_volume = save_data.get("master_volume",1)
+            self.game.master_volume = master_volume
+            self.game.update_master_volume(master_volume)
             music_volume = save_data.get("music_volume", 0.5)
             self.game.music_sound_manager.set_volume(music_volume)
             se_volume = save_data.get("SE_volume", 0.5)
+
             self.game.sound_effect_manager.set_volume(se_volume)
             self.game.keyboard_layout = save_data.get("keyboard_layout")
             self.game.selected_language = save_data.get("language", "English")

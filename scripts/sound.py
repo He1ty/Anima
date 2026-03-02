@@ -2,12 +2,13 @@ import pygame
 
 
 class Sound:
-    def __init__(self,game,sounds_paths:dict,is_music:bool,volume:float = 1):
+    def __init__(self,game,sounds_paths:dict,is_music:bool,master_volume,volume:float = 1):
         self.game = game
         self.volume = volume
         self.is_music = is_music
         self.sounds_paths = sounds_paths
         self.sounds = {}
+        self.master_volume = master_volume
 
         for sound_key, path in self.sounds_paths.items():
             if path:
@@ -28,7 +29,7 @@ class Sound:
         """
         if self.is_music:
             pygame.mixer.music.load(self.music_paths[name])
-            pygame.mixer.music.set_volume(self.volume)
+            pygame.mixer.music.set_volume(self.volume*self.master_volume)
             pygame.mixer.music.play(loops)
         else:
             self.sounds[name].play()
@@ -43,7 +44,7 @@ class Sound:
     def set_volume(self, volume):
         self.volume = volume
         if self.is_music:
-            pygame.mixer.music.set_volume(volume)
+            pygame.mixer.music.set_volume(self.master_volume * volume)
         else:
             for sound in self.sounds.values():
-                sound.set_volume(volume)
+                sound.set_volume(self.master_volume * volume)

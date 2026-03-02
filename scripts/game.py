@@ -47,10 +47,11 @@ class Game:
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
 
             # --- Sound manager System ---
+            self.master_volume = 1
             base_path = "assets/sounds/"
             music_path = {'title_screen': base_path + 'Title-screen-ambient-music.wav',
                           'level_0': base_path + 'map_0.wav'}
-            self.music_sound_manager = Sound(self, music_path, is_music=True, volume=1)
+            self.music_sound_manager = Sound(self, music_path, is_music=True, master_volume=self.master_volume,volume=1)
             sound_effect_path = {
                 "dash": base_path + 'player/dash.wav',
                 'jump': base_path + 'player/jump.wav',
@@ -60,7 +61,7 @@ class Game:
                 'walk': None,
                 'stun': None
             }
-            self.sound_effect_manager = Sound(self, sound_effect_path, is_music=False, volume=0.5)
+            self.sound_effect_manager = Sound(self, sound_effect_path, is_music=False,master_volume=self.master_volume, volume=0.5)
 
             # --- Menu & System Configuration ---
             self.languages = ["Français", "English", "Español"]
@@ -767,3 +768,8 @@ class Game:
     def update_sound_effect_volume(self,volume):
         self.sound_effect_manager.volume = volume
         self.sound_effect_manager.set_volume(self.sound_effect_manager.volume)
+    def update_master_volume(self,volume):
+        self.master_volume = volume
+        self.sound_effect_manager.master_volume = self.master_volume
+        self.music_sound_manager.master_volume = self.master_volume
+

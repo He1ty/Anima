@@ -64,7 +64,7 @@ class Menu:
                                         {"MAIN SOUND":
                                             {
                                                 "type": "drag",
-                                                "current": self.volume
+                                                "current": self.game.master_volume
                                             },
                                         "MUSIC":
                                             {
@@ -79,7 +79,7 @@ class Menu:
                                         "UI SOUNDS":
                                             {
                                                 "type": "drag",
-                                                "current": self.volume
+                                                "current": self.game.master_volume
                                             }
                                         },
 
@@ -319,7 +319,7 @@ class Menu:
                                         {"MAIN SOUND":
                                             {
                                                 "type": "drag",
-                                                "current": self.volume
+                                                "current": self.game.master_volume
                                             },
                                         "MUSIC":
                                             {
@@ -795,6 +795,8 @@ class Menu:
                         self.game.update_music_volume(button.get_normalized())
                     case "SOUND EFFECTS:":
                         self.game.update_sound_effect_volume(button.get_normalized())
+                    case "MAIN SOUND:":
+                        self.game.update_master_volume(button.get_normalized())
 
             self.audio_command_nb = self.handle_key_input(event, self.audio_command_nb, len(self.audio_buttons) -1)
             if event.type == py.KEYDOWN:
