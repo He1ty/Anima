@@ -1,5 +1,7 @@
 import sys
 
+import pygame
+
 # --- Game Script Imports ---
 # These modules handle specific game logic like physics, entities, and UI.
 from scripts.entities import *
@@ -544,13 +546,13 @@ class Game:
         for spike_hitbox in self.spikes:
             if not self.player.noclip:
                 if not spike_hitbox.circle_hitbox:
-                    if self.player.rect().colliderect(spike_hitbox.rect()):
+                    if self.player.collide_with(spike_hitbox.rect()):
                         kill_player(self)
                 else:
                     dx = self.player.pos[0] - spike_hitbox.pos[0]
                     dy = self.player.pos[1] - spike_hitbox.pos[1]
                     distance = math.sqrt(dx ** 2 + dy ** 2)
-                    if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.rect().colliderect(spike_hitbox.rect()):
+                    if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.collide_with(spike_hitbox.rect()):
                         kill_player(self)
 
 
@@ -758,17 +760,17 @@ class Game:
                 self.menu.draw_pause_menu()
             pygame.display.flip()
 
-    def play_music(self,name):
+    def play_music(self, name):
         self.music_sound_manager.play(name=name, loops=-1)
-    def play_se(self,name):
+    def play_se(self, name):
         self.sound_effect_manager.play(name=name)
-    def update_music_volume(self,volume):
+    def update_music_volume(self, volume):
         self.music_sound_manager.volume = volume
         self.music_sound_manager.set_volume(self.music_sound_manager.volume)
-    def update_sound_effect_volume(self,volume):
+    def update_sound_effect_volume(self, volume):
         self.sound_effect_manager.volume = volume
         self.sound_effect_manager.set_volume(self.sound_effect_manager.volume)
-    def update_master_volume(self,volume):
+    def update_master_volume(self, volume):
         self.master_volume = volume
         self.sound_effect_manager.master_volume = self.master_volume
         self.music_sound_manager.master_volume = self.master_volume

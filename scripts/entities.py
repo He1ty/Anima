@@ -412,7 +412,7 @@ class DamageBlock:
         # Return collision rectangle
 
         if self.type == 'spike':
-            width = 8
+            width = 10
             height = 5
             angle = self.rotation*math.pi/2
             if self.rotation % 2 == 0:
@@ -513,7 +513,6 @@ def death_animation(screen):
 
 def kill_player(game):
     game.player_dead = True
-
 
 def deal_dmg(game, source, target, att_dmg=5, att_time=1):
     # Handle damage dealing between entities

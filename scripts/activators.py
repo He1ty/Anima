@@ -27,8 +27,8 @@ class Activator:
             return True
         return False
 
-    def can_interact(self, player_rect, interaction_distance=2):#Check if the player can "touch" the lever.
-        can_interact = self.rect.colliderect(player_rect.inflate(interaction_distance, interaction_distance))
+    def can_interact(self, player, interaction_distance=2):#Check if the player can "touch" the lever.
+        can_interact = player.collide_with(self.rect.inflate((interaction_distance, interaction_distance)))
         return can_interact and self.activated
 
     def render(self, surface, offset=(0, 0)):#Just display the marvellous lever design of our dear designer

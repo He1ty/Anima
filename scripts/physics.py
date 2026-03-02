@@ -1,5 +1,6 @@
 #Heavily upgraded basic godot physics code that I then converted to Python --Aymeric
 import math
+import time
 
 from scripts.sound import *
 from scripts.entities import deal_knockback, update_throwable_objects_action
@@ -67,7 +68,6 @@ class PhysicsPlayer:
                         "key_noclip": 0}  # Used for reference
         self.anti_dash_buffer = False
         self.stop_dash_momentum = {"y": False, "x": False}
-        self.holding_jump = False
         self.can_walljump = {"sliding": False, "wall": -1, "buffer": False, "timer": 0, "blocks_around": False,
                              "cooldown": 0, "allowed": True, "available": False, "count":0}
         self.max_walljumps = 3
@@ -97,7 +97,11 @@ class PhysicsPlayer:
         self.ghost_images = []
 
         self.jumping = False
+        self.holding_jump = False
         self.wall_jumping = False
+        self.holding_walljump = False
+
+        self.holding_jump_from_ground = False
 
         self.facing = ""
         self.action = "idle"
@@ -392,6 +396,10 @@ class PhysicsPlayer:
     def rect(self):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
+    def inner_rect(self):
+        r = pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
+        return r.inflate((-6, -6))
+
     def is_on_floor(self):
         """Uses tilemap to heck if the player is standing on a surface based on gravity direction. used for gravity, jump, etc."""
         # Offset depends on gravity: +1 if normal (down), -1 if inverted (up)
@@ -417,11 +425,12 @@ class PhysicsPlayer:
                     self.dash_direction = [0, 0]
 
                 # Initial deceleration when player try to slide on a block with an initial vertical speed (usually falling speed)
-                if abs(self.acceleration[1]) in (0.42, 1) and not self.buffering_jump:
+                if abs(self.acceleration[1]) in (0.42, 1) and self.can_walljump["count"] < self.max_walljumps:
                     if self.GRAVITY_DIRECTION == 1:
                         self.velocity[1] = max(0, self.velocity[1] - 2)
                     else:
                         self.velocity[1] = min(0, self.velocity[1] + 2)
+
                 # Sliding gravity accelerations
                 if self.velocity[1] == 0 or abs(self.acceleration[1]) not in (0.42, 1):
                     if self.can_walljump["count"] < self.max_walljumps - 1:
@@ -479,6 +488,7 @@ class PhysicsPlayer:
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
             self.buffering_jump = False
+            self.holding_walljump = False
 
 
         if self.dict_kb["key_jump"] == 1:
@@ -529,6 +539,7 @@ class PhysicsPlayer:
                 self.dashtime_cur = 0
                 self.jumping = True
                 self.wall_jumping = True
+                self.holding_walljump = True
                 if self.can_walljump["sliding"] and self.can_walljump["count"] < self.max_walljumps:
                     self.jump_logic_helper()
 
@@ -555,11 +566,12 @@ class PhysicsPlayer:
 
             self.buffering_jump = True
 
-
         if self.superjump:
             if self.air_time < 10:
                 self.dash_ghost_trail()
                 self.update_ghost_trail()
+
+        self.holding_jump_from_ground = self.holding_jump and not self.holding_walljump
 
     def jump_logic_helper(self):
         """Avoid code redundancy"""
@@ -783,8 +795,8 @@ class PhysicsPlayer:
 
     def collision_check_walljump_helper(self,axis):
         """Avoids redundancy"""
-        #The condition checks if there is no buffer, if player is falling, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
-        if (not self.can_walljump["buffer"] and not self.holding_jump and
+        #The condition checks if there is no buffer, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
+        if (not self.can_walljump["buffer"] and not self.holding_jump_from_ground and
                 not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"])):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
@@ -947,6 +959,42 @@ class PhysicsPlayer:
         # Capture velocity for the next frame's impact calculation
         self.last_velocity = list(self.velocity)
 
+    def collide_with(self, rect, inner_rect=False):
+        if inner_rect:
+            return self.inner_rect().colliderect(rect)
+
+        else:
+            base_rect = self.rect()
+
+            # If there's no rotation, stick to the lightning-fast AABB standard check
+            if self.rotation_angle % 360 == 0:
+                return base_rect.colliderect(rect)
+
+            # --- TRUE ROTATED HITBOX VIA PYGAME MASKS ---
+
+            # 1. Create a solid surface representing the player's exact base hitbox
+            hitbox_surf = pygame.Surface(self.size, pygame.SRCALPHA)
+            hitbox_surf.fill((255, 255, 255, 255))
+
+            # 2. Rotate that surface by the player's angle
+            rotated_surf = pygame.transform.rotate(hitbox_surf, self.rotation_angle)
+
+            # 3. Generate a precise mask from the rotated surface
+            player_mask = pygame.mask.from_surface(rotated_surf)
+
+            # 4. Get the new rect of the rotated surface so we can properly anchor it
+            rotated_rect = rotated_surf.get_rect(center=base_rect.center)
+
+            # 5. Create a simple, completely filled mask for the target 'rect'
+            target_mask = pygame.Mask(rect.size, fill=True)
+
+            # 6. Calculate the relative coordinate offset between the two masks
+            offset_x = rect.x - rotated_rect.x
+            offset_y = rect.y - rotated_rect.y
+
+            # 7. Return True if any "1" pixels overlap in the two masks
+            return player_mask.overlap(target_mask, (int(offset_x), int(offset_y))) is not None
+
     def render(self, surf, offset=(0, 0)):
         # 1. Draw Ghosts
         for ghost in self.ghost_images[:]:
@@ -1051,7 +1099,39 @@ class PhysicsPlayer:
             surf.blit(scaled_img, (render_x, render_y))
 
         if self.show_hitbox:
-            debug_rect = self.rect().copy()
+            # 2. Draw the true outer hitbox in green
+            base_rect = self.rect()
+
+            if self.rotation_angle % 360 != 0:
+                # Recreate the surface and mask logic from collide_with
+                hitbox_surf = pygame.Surface(self.size, pygame.SRCALPHA)
+                hitbox_surf.fill((255, 255, 255, 255))
+                rotated_surf = pygame.transform.rotate(hitbox_surf, self.rotation_angle)
+
+                player_mask = pygame.mask.from_surface(rotated_surf)
+                rotated_rect = rotated_surf.get_rect(center=base_rect.center)
+
+                # Extract the points that make up the outer edge of the mask
+                outline = player_mask.outline()
+
+                # Shift all points to match world position minus the camera offset
+                shifted_outline = [
+                    (p[0] + rotated_rect.x - offset[0], p[1] + rotated_rect.y - offset[1])
+                    for p in outline
+                ]
+
+                # Draw the connected lines using the shifted points
+                if len(shifted_outline) > 2:
+                    pygame.draw.lines(surf, (0, 255, 0), True, shifted_outline, 1)
+            else:
+                # If not rotated, draw the standard rect
+                standard_rect = base_rect.copy()
+                standard_rect.x -= offset[0]
+                standard_rect.y -= offset[1]
+                pygame.draw.rect(surf, (0, 255, 0), standard_rect, 1)
+
+            # 1. Draw your original inner_rect in red
+            debug_rect = self.inner_rect().copy()
             debug_rect.x -= offset[0]
             debug_rect.y -= offset[1]
             pygame.draw.rect(surf, (255, 0, 0), debug_rect, 1)

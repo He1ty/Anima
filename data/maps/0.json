@@ -6698,73 +6698,9 @@
      -4
     ]
    },
-   "32;-10": {
-    "type": "dark_hollow_stone",
-    "variant": 1,
-    "pos": [
-     32,
-     -10
-    ]
-   },
-   "31;-10": {
-    "type": "dark_hollow_stone",
-    "variant": 1,
-    "pos": [
-     31,
-     -10
-    ]
-   },
-   "30;-10": {
-    "type": "dark_hollow_stone",
-    "variant": 0,
-    "pos": [
-     30,
-     -10
-    ]
-   },
-   "30;-9": {
-    "type": "dark_hollow_stone",
-    "variant": 6,
-    "pos": [
-     30,
-     -9
-    ]
-   },
-   "31;-9": {
-    "type": "dark_hollow_stone",
-    "variant": 5,
-    "pos": [
-     31,
-     -9
-    ]
-   },
-   "32;-9": {
-    "type": "dark_hollow_stone",
-    "variant": 5,
-    "pos": [
-     32,
-     -9
-    ]
-   },
-   "33;-9": {
-    "type": "dark_hollow_stone",
-    "variant": 8,
-    "pos": [
-     33,
-     -9
-    ]
-   },
-   "33;-10": {
-    "type": "dark_hollow_stone",
-    "variant": 1,
-    "pos": [
-     33,
-     -10
-    ]
-   },
    "34;-10": {
     "type": "dark_hollow_stone",
-    "variant": 1,
+    "variant": 0,
     "pos": [
      34,
      -10
@@ -6772,7 +6708,7 @@
    },
    "34;-9": {
     "type": "dark_hollow_stone",
-    "variant": 8,
+    "variant": 7,
     "pos": [
      34,
      -9
@@ -6866,17 +6802,9 @@
      -7
     ]
    },
-   "33;-8": {
-    "type": "dark_hollow_stone",
-    "variant": 6,
-    "pos": [
-     33,
-     -8
-    ]
-   },
    "34;-8": {
     "type": "dark_hollow_stone",
-    "variant": 5,
+    "variant": 6,
     "pos": [
      34,
      -8
@@ -14016,14 +13944,6 @@
      2
     ]
    },
-   "26;4": {
-    "type": "purple_flowers_decor",
-    "variant": 2,
-    "pos": [
-     26,
-     4
-    ]
-   },
    "19;23": {
     "type": "mossy_stone",
     "variant": 1,
@@ -14046,22 +13966,6 @@
     "pos": [
      35,
      23
-    ]
-   },
-   "22;20": {
-    "type": "pink_flowers_decor",
-    "variant": 0,
-    "pos": [
-     22,
-     20
-    ]
-   },
-   "23;20": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     23,
-     20
     ]
    },
    "11;12": {
@@ -15037,14 +14941,6 @@
     "variant": 6,
     "pos": [
      8,
-     38
-    ]
-   },
-   "5;38": {
-    "type": "allium_decor",
-    "variant": 2,
-    "pos": [
-     5,
      38
     ]
    },
@@ -17330,46 +17226,6 @@
      25
     ]
    },
-   "11;36": {
-    "type": "orange_tulip_decor",
-    "variant": 1,
-    "pos": [
-     11,
-     36
-    ]
-   },
-   "12;36": {
-    "type": "grass_decor",
-    "variant": 2,
-    "pos": [
-     12,
-     36
-    ]
-   },
-   "6;38": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     6,
-     38
-    ]
-   },
-   "9;38": {
-    "type": "orange_tulip_decor",
-    "variant": 2,
-    "pos": [
-     9,
-     38
-    ]
-   },
-   "4;38": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     4,
-     38
-    ]
-   },
    "18;44": {
     "type": "mossy_stone",
     "variant": 13,
@@ -18961,30 +18817,6 @@
     "pos": [
      23,
      2
-    ]
-   },
-   "27;6": {
-    "type": "purple_flowers_decor",
-    "variant": 1,
-    "pos": [
-     27,
-     6
-    ]
-   },
-   "10;36": {
-    "type": "grass_decor",
-    "variant": 0,
-    "pos": [
-     10,
-     36
-    ]
-   },
-   "3;38": {
-    "type": "allium_decor",
-    "variant": 0,
-    "pos": [
-     3,
-     38
     ]
    },
    "25;2": {
@@ -20600,22 +20432,6 @@
     "pos": [
      19,
      25
-    ]
-   },
-   "32;11": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     32,
-     11
-    ]
-   },
-   "33;11": {
-    "type": "purple_flowers_decor",
-    "variant": 2,
-    "pos": [
-     33,
-     11
     ]
    },
    "38;-12": {
@@ -29503,7 +29319,7 @@
    },
    "-7;73": {
     "type": "mossy_stone",
-    "variant": 9,
+    "variant": 8,
     "pos": [
      -7,
      73
@@ -29519,7 +29335,7 @@
    },
    "-6;73": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 8,
     "pos": [
      -6,
      73
@@ -29527,7 +29343,7 @@
    },
    "-5;73": {
     "type": "mossy_stone",
-    "variant": 5,
+    "variant": 9,
     "pos": [
      -5,
      73
@@ -30195,7 +30011,7 @@
    },
    "-7;74": {
     "type": "mossy_stone",
-    "variant": 3,
+    "variant": 9,
     "pos": [
      -7,
      74
@@ -30251,7 +30067,7 @@
    },
    "-8;76": {
     "type": "mossy_stone",
-    "variant": 6,
+    "variant": 7,
     "pos": [
      -8,
      76
@@ -30259,7 +30075,7 @@
    },
    "-7;76": {
     "type": "mossy_stone",
-    "variant": 4,
+    "variant": 3,
     "pos": [
      -7,
      76
@@ -30291,24 +30107,6 @@
      79
     ],
     "rotation": 1
-   },
-   "-8;77": {
-    "type": "spikes",
-    "variant": 2,
-    "pos": [
-     -8,
-     77
-    ],
-    "rotation": 2
-   },
-   "-7;77": {
-    "type": "spikes",
-    "variant": 0,
-    "pos": [
-     -7,
-     77
-    ],
-    "rotation": 2
    },
    "-5;81": {
     "type": "mossy_stone",
@@ -36525,110 +36323,6 @@
      -3
     ]
    },
-   "6;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     6,
-     6
-    ]
-   },
-   "7;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     7,
-     6
-    ]
-   },
-   "8;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     8,
-     6
-    ]
-   },
-   "9;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     9,
-     6
-    ]
-   },
-   "10;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     10,
-     6
-    ]
-   },
-   "11;6": {
-    "type": "purple_flowers_decor",
-    "variant": 1,
-    "pos": [
-     11,
-     6
-    ]
-   },
-   "12;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     12,
-     6
-    ]
-   },
-   "13;6": {
-    "type": "pink_flowers_decor",
-    "variant": 1,
-    "pos": [
-     13,
-     6
-    ]
-   },
-   "14;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     14,
-     6
-    ]
-   },
-   "15;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     15,
-     6
-    ]
-   },
-   "16;6": {
-    "type": "purple_flowers_decor",
-    "variant": 1,
-    "pos": [
-     16,
-     6
-    ]
-   },
-   "17;6": {
-    "type": "pink_flowers_decor",
-    "variant": 1,
-    "pos": [
-     17,
-     6
-    ]
-   },
-   "18;6": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     18,
-     6
-    ]
-   },
    "19;6": {
     "type": "mossy_stone",
     "variant": 0,
@@ -36659,102 +36353,6 @@
     "pos": [
      22,
      6
-    ]
-   },
-   "24;-1": {
-    "type": "pink_flowers_decor",
-    "variant": 1,
-    "pos": [
-     24,
-     -1
-    ]
-   },
-   "23;-1": {
-    "type": "grass_decor",
-    "variant": 0,
-    "pos": [
-     23,
-     -1
-    ]
-   },
-   "25;-1": {
-    "type": "grass_decor",
-    "variant": 2,
-    "pos": [
-     25,
-     -1
-    ]
-   },
-   "34;-6": {
-    "type": "grass_decor",
-    "variant": 2,
-    "pos": [
-     34,
-     -6
-    ]
-   },
-   "33;-6": {
-    "type": "allium_decor",
-    "variant": 1,
-    "pos": [
-     33,
-     -6
-    ]
-   },
-   "32;-6": {
-    "type": "allium_decor",
-    "variant": 0,
-    "pos": [
-     32,
-     -6
-    ]
-   },
-   "30;-5": {
-    "type": "allium_decor",
-    "variant": 0,
-    "pos": [
-     30,
-     -5
-    ]
-   },
-   "31;-5": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     31,
-     -5
-    ]
-   },
-   "19;5": {
-    "type": "allium_decor",
-    "variant": 0,
-    "pos": [
-     19,
-     5
-    ]
-   },
-   "20;5": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     20,
-     5
-    ]
-   },
-   "21;5": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     21,
-     5
-    ]
-   },
-   "22;5": {
-    "type": "grass_decor",
-    "variant": 1,
-    "pos": [
-     22,
-     5
     ]
    },
    "4;-4": {
@@ -36931,14 +36529,6 @@
     "pos": [
      39,
      9
-    ]
-   },
-   "28;6": {
-    "type": "purple_flowers_decor",
-    "variant": 2,
-    "pos": [
-     28,
-     6
     ]
    },
    "29;7": {
@@ -37709,6 +37299,54 @@
      0
     ],
     "rotation": 2
+   },
+   "-8;77": {
+    "type": "mossy_stone",
+    "variant": 7,
+    "pos": [
+     -8,
+     77
+    ]
+   },
+   "-7;77": {
+    "type": "mossy_stone",
+    "variant": 3,
+    "pos": [
+     -7,
+     77
+    ]
+   },
+   "-8;78": {
+    "type": "mossy_stone",
+    "variant": 6,
+    "pos": [
+     -8,
+     78
+    ]
+   },
+   "-7;78": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     -7,
+     78
+    ]
+   },
+   "-6;74": {
+    "type": "mossy_stone",
+    "variant": 5,
+    "pos": [
+     -6,
+     74
+    ]
+   },
+   "-5;74": {
+    "type": "mossy_stone",
+    "variant": 4,
+    "pos": [
+     -5,
+     74
+    ]
    }
   },
   "5": {
@@ -40653,7 +40291,8 @@
      45
     ]
    }
-  }
+  },
+  "7": {}
  },
  "offgrid": {
   "2": {
@@ -40697,22 +40336,6 @@
      -133.5
     ]
    },
-   "187.11111111111111;90.1925925925926": {
-    "type": "middleground_decor",
-    "variant": 0,
-    "pos": [
-     187.11111111111111,
-     90.1925925925926
-    ]
-   },
-   "279.15555555555557;75.59506172839507": {
-    "type": "middleground_decor",
-    "variant": 1,
-    "pos": [
-     279.15555555555557,
-     75.59506172839507
-    ]
-   },
    "454.4;-143.01234567901236": {
     "type": "middleground_decor",
     "variant": 2,
@@ -40737,20 +40360,180 @@
      -47.32839506172839
     ]
    },
-   "489.73333333333335;90.42962962962964": {
-    "type": "middleground_decor",
-    "variant": 0,
-    "pos": [
-     489.73333333333335,
-     90.42962962962964
-    ]
-   },
-   "397.1111111111111;-28.464197530864197": {
+   "253.6888888888889;76.38518518518518": {
     "type": "middleground_decor",
     "variant": 1,
     "pos": [
-     397.1111111111111,
-     -28.464197530864197
+     253.6888888888889,
+     76.38518518518518
+    ]
+   },
+   "515.5555555555557;-101.92592592592592": {
+    "type": "middleground_decor",
+    "variant": 0,
+    "pos": [
+     515.5555555555557,
+     -101.92592592592592
+    ]
+   },
+   "476.1333333333333;-95.84197530864198": {
+    "type": "middleground_decor",
+    "variant": 1,
+    "pos": [
+     476.1333333333333,
+     -95.84197530864198
+    ]
+   },
+   "508.4444444444444;-15.604938271604937": {
+    "type": "middleground_decor",
+    "variant": 8,
+    "pos": [
+     508.4444444444444,
+     -15.604938271604937
+    ]
+   },
+   "408.4444444444444;45.234567901234556": {
+    "type": "middleground_decor",
+    "variant": 1,
+    "pos": [
+     408.4444444444444,
+     45.234567901234556
+    ]
+   },
+   "429.3333333333333;77.23456790123456": {
+    "type": "middleground_decor",
+    "variant": 5,
+    "pos": [
+     429.3333333333333,
+     77.23456790123456
+    ]
+   },
+   "483.1111111111111;90.78518518518518": {
+    "type": "middleground_decor",
+    "variant": 0,
+    "pos": [
+     483.1111111111111,
+     90.78518518518518
+    ]
+   },
+   "197.37777777777777;44.72098765432099": {
+    "type": "middleground_decor",
+    "variant": 7,
+    "pos": [
+     197.37777777777777,
+     44.72098765432099
+    ]
+   },
+   "165.42222222222222;55.22962962962961": {
+    "type": "middleground_decor",
+    "variant": 4,
+    "pos": [
+     165.42222222222222,
+     55.22962962962961
+    ]
+   },
+   "402.3555555555556;-127.20987654320987": {
+    "type": "middleground_decor",
+    "variant": 8,
+    "pos": [
+     402.3555555555556,
+     -127.20987654320987
+    ]
+   },
+   "362.22222222222223;-143.24938271604935": {
+    "type": "middleground_decor",
+    "variant": 3,
+    "pos": [
+     362.22222222222223,
+     -143.24938271604935
+    ]
+   },
+   "323.9555555555555;-143.80246913580248": {
+    "type": "middleground_decor",
+    "variant": 2,
+    "pos": [
+     323.9555555555555,
+     -143.80246913580248
+    ]
+   },
+   "148.22222222222223;-127.48641975308642": {
+    "type": "middleground_decor",
+    "variant": 2,
+    "pos": [
+     148.22222222222223,
+     -127.48641975308642
+    ]
+   },
+   "189.60000000000002;-127.48641975308642": {
+    "type": "middleground_decor",
+    "variant": 3,
+    "pos": [
+     189.60000000000002,
+     -127.48641975308642
+    ]
+   },
+   "214.8;-143.80246913580248": {
+    "type": "middleground_decor",
+    "variant": 3,
+    "pos": [
+     214.8,
+     -143.80246913580248
+    ]
+   },
+   "560.4000000000001;-127.76296296296294": {
+    "type": "middleground_decor",
+    "variant": 3,
+    "pos": [
+     560.4000000000001,
+     -127.76296296296294
+    ]
+   },
+   "531.7777777777778;-143.50617283950618": {
+    "type": "middleground_decor",
+    "variant": 8,
+    "pos": [
+     531.7777777777778,
+     -143.50617283950618
+    ]
+   },
+   "91.11111111111111;-95.99999999999999": {
+    "type": "middleground_decor",
+    "variant": 8,
+    "pos": [
+     91.11111111111111,
+     -95.99999999999999
+    ]
+   },
+   "340.3555555555556;39.6641975308642": {
+    "type": "middleground_decor",
+    "variant": 4,
+    "pos": [
+     340.3555555555556,
+     39.6641975308642
+    ]
+   },
+   "372.0444444444445;-37.86666666666666": {
+    "type": "middleground_decor",
+    "variant": 6,
+    "pos": [
+     372.0444444444445,
+     -37.86666666666666
+    ]
+   },
+   "91.33333333333334;77.33333333333334": {
+    "type": "middleground_decor",
+    "variant": 5,
+    "pos": [
+     91.33333333333334,
+     77.33333333333334
+    ]
+   },
+   "109.06666666666668;-111.20987654320987": {
+    "type": "middleground_decor",
+    "variant": 8,
+    "pos": [
+     109.06666666666668,
+     -111.20987654320987
     ]
    }
   },
