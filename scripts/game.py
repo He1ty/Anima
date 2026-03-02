@@ -39,27 +39,28 @@ class Game:
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
 
-        # --- Sound manager System ---
-        base_path = "assets/sounds/"
-        music_path = {'title_screen':base_path + 'Title-screen-ambient-music.wav',
-                      'level_0': base_path + 'map_0.wav'}
-        self.music_sound_manager = Sound(self,music_path,is_music=True,volume=1)
-        sound_effect_path = {
-            "dash":base_path + 'player/dash.wav',
-            'jump':base_path + 'player/jump.wav',
-            'run':base_path + 'player/run.wav',
-            'wall_jump':base_path + 'player/wall_jump.wav',
-            'land':base_path + 'player/land.wav',
-            'walk':None,
-            'stun':None
-        }
-        self.sound_effect_manager = Sound(self,sound_effect_path,is_music=False,volume=0.5)
 
         if full_setup:
             # The actual window size
             self.screen_width = 1000
             self.screen_height = 600
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+
+            # --- Sound manager System ---
+            base_path = "assets/sounds/"
+            music_path = {'title_screen': base_path + 'Title-screen-ambient-music.wav',
+                          'level_0': base_path + 'map_0.wav'}
+            self.music_sound_manager = Sound(self, music_path, is_music=True, volume=1)
+            sound_effect_path = {
+                "dash": base_path + 'player/dash.wav',
+                'jump': base_path + 'player/jump.wav',
+                'run': base_path + 'player/run.wav',
+                'wall_jump': base_path + 'player/wall_jump.wav',
+                'land': base_path + 'player/land.wav',
+                'walk': None,
+                'stun': None
+            }
+            self.sound_effect_manager = Sound(self, sound_effect_path, is_music=False, volume=0.5)
 
             # --- Menu & System Configuration ---
             self.languages = ["Français", "English", "Español"]
@@ -354,28 +355,7 @@ class Game:
         for n in range(9):
             spike_block_types += [("spike_roots", n)]
 
-        # --- Audio System ---
-        base_path = "assets/sounds/"
-        sounds_effect_dict = {
-            'jump': base_path + "player/jump.wav",
-            'dash': base_path + "player/dash.wav",
-            'wall_jump': base_path + "player/wall_jump.wav",
-            'land': base_path + "player/land.wav",
-            'run': base_path + "player/run.wav",
-            'walk': None,
-            'stun': None
-        }
 
-        self.sound_effect_manager = Sound(self, sounds_effect_dict, False)
-
-        music_sound_dict = {
-            'title_screen': base_path + "Title-screen-ambient-music.wav",
-            'level_0': base_path + "map_0.wav",
-        }
-        self.music_sound_manager = Sound(self, music_sound_dict, True)
-        self.sound_running = False
-        self.volume = 0.5
-        self.current_music_path = None
 
 
         for spike in self.tilemap.extract(spike_types, keep=True):
