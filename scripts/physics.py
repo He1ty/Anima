@@ -111,9 +111,9 @@ class PhysicsPlayer:
         self.air_time = 0
         self.disablePlayerInput = False
         self.collide_with_passable_blocks = True
+        self.was_on_floor = False
 
         # Variables pour gérer les états des sons
-        self.was_on_floor = True  # Pour gérer le son d'atterrissage
         self.running_sound_playing = False
         self.run_sound_timer = 0
         self.run_sound_interval = 15  # Intervalle entre les répétitions du son de course
@@ -192,6 +192,18 @@ class PhysicsPlayer:
         if self.is_on_floor():
             self.jumping = False
             self.wall_jumping = False
+            self.was_on_floor = True
+            self.superjump = False
+            # Resets dash amount and walljump count
+            if self.dashtime_cur < 5 and self.dash_amt == 0:
+                self.dash_amt = self.dash_max_amt
+
+            self.can_walljump["count"] = 0
+
+            if self.dashtime_cur == 0:
+                self.dash_started_in_air = False
+        else:
+            self.was_on_floor = False
 
         rotation_speed = 4.5
         if not self.is_on_floor() and not self.can_walljump["sliding"]:
@@ -396,9 +408,9 @@ class PhysicsPlayer:
     def rect(self):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
-    def inner_rect(self):
+    def static_rect(self):
         r = pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
-        return r.inflate((-6, -6))
+        return r
 
     def is_on_floor(self):
         """Uses tilemap to heck if the player is standing on a surface based on gravity direction. used for gravity, jump, etc."""
@@ -459,16 +471,6 @@ class PhysicsPlayer:
             if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or \
            (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
                 self.velocity[1] = 0
-
-
-            #Resets dash amount and walljump count
-            if self.dashtime_cur < 5 and self.dash_amt == 0:
-                self.dash_amt = self.dash_max_amt
-
-            self.can_walljump["count"] = 0
-            self.superjump = False
-            if self.dashtime_cur == 0:
-                self.dash_started_in_air = False
 
             # Stop unintended horizontal movement if no input is given
             if self.get_direction("x") == 0 and not self.is_stunned and self.dashtime_cur == 0:
@@ -673,7 +675,8 @@ class PhysicsPlayer:
                         # --- GROUND CORNER CORRECTION ---
                         # If falling and clipping a corner, try to nudge onto the ledge
                         nudged = False
-                        if rect not in self.game.doors_rects and not self.is_on_floor() and (self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
+                        if (rect not in self.game.doors_rects and not self.was_on_floor and self.dashtime_cur and
+                                (self.dash_direction[0] == 0 or self.dash_direction[1] == 0)):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 if not any(
                                         pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
@@ -959,41 +962,47 @@ class PhysicsPlayer:
         # Capture velocity for the next frame's impact calculation
         self.last_velocity = list(self.velocity)
 
-    def collide_with(self, rect, inner_rect=False):
-        if inner_rect:
-            return self.inner_rect().colliderect(rect)
+    def collide_with(self, rect, static_rect=False, rotating_rect=True):
+        if static_rect and not rotating_rect:
+            return self.static_rect().colliderect(rect)
 
-        else:
-            base_rect = self.rect()
+        base_rect = self.rect()
 
-            # If there's no rotation, stick to the lightning-fast AABB standard check
-            if self.rotation_angle % 360 == 0:
+        # If there's no rotation, stick to the lightning-fast AABB standard check
+        if self.rotation_angle % 360 == 0:
+            if not static_rect:
                 return base_rect.colliderect(rect)
+            else:
+                return base_rect.colliderect(rect) and self.static_rect().colliderect(rect)
 
-            # --- TRUE ROTATED HITBOX VIA PYGAME MASKS ---
+        # --- TRUE ROTATED HITBOX VIA PYGAME MASKS ---
 
-            # 1. Create a solid surface representing the player's exact base hitbox
-            hitbox_surf = pygame.Surface(self.size, pygame.SRCALPHA)
-            hitbox_surf.fill((255, 255, 255, 255))
+        # 1. Create a solid surface representing the player's exact base hitbox
+        hitbox_surf = pygame.Surface(self.size, pygame.SRCALPHA)
+        hitbox_surf.fill((255, 255, 255, 255))
 
-            # 2. Rotate that surface by the player's angle
-            rotated_surf = pygame.transform.rotate(hitbox_surf, self.rotation_angle)
+        # 2. Rotate that surface by the player's angle
+        rotated_surf = pygame.transform.rotate(hitbox_surf, self.rotation_angle)
 
-            # 3. Generate a precise mask from the rotated surface
-            player_mask = pygame.mask.from_surface(rotated_surf)
+        # 3. Generate a precise mask from the rotated surface
+        player_mask = pygame.mask.from_surface(rotated_surf)
 
-            # 4. Get the new rect of the rotated surface so we can properly anchor it
-            rotated_rect = rotated_surf.get_rect(center=base_rect.center)
+        # 4. Get the new rect of the rotated surface so we can properly anchor it
+        rotated_rect = rotated_surf.get_rect(center=base_rect.center)
 
-            # 5. Create a simple, completely filled mask for the target 'rect'
-            target_mask = pygame.Mask(rect.size, fill=True)
+        # 5. Create a simple, completely filled mask for the target 'rect'
+        target_mask = pygame.Mask(rect.size, fill=True)
 
-            # 6. Calculate the relative coordinate offset between the two masks
-            offset_x = rect.x - rotated_rect.x
-            offset_y = rect.y - rotated_rect.y
+        # 6. Calculate the relative coordinate offset between the two masks
+        offset_x = rect.x - rotated_rect.x
+        offset_y = rect.y - rotated_rect.y
 
-            # 7. Return True if any "1" pixels overlap in the two masks
+        # 7. Return True if any "1" pixels overlap in the two masks
+        if not static_rect:
             return player_mask.overlap(target_mask, (int(offset_x), int(offset_y))) is not None
+        else:
+            return ((player_mask.overlap(target_mask, (int(offset_x), int(offset_y))) is not None)
+                    and self.static_rect().colliderect(rect))
 
     def render(self, surf, offset=(0, 0)):
         # 1. Draw Ghosts
@@ -1131,7 +1140,7 @@ class PhysicsPlayer:
                 pygame.draw.rect(surf, (0, 255, 0), standard_rect, 1)
 
             # 1. Draw your original inner_rect in red
-            debug_rect = self.inner_rect().copy()
+            debug_rect = self.static_rect().copy()
             debug_rect.x -= offset[0]
             debug_rect.y -= offset[1]
             pygame.draw.rect(surf, (255, 0, 0), debug_rect, 1)

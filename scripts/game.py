@@ -546,13 +546,13 @@ class Game:
         for spike_hitbox in self.spikes:
             if not self.player.noclip:
                 if not spike_hitbox.circle_hitbox:
-                    if self.player.collide_with(spike_hitbox.rect()):
+                    if self.player.collide_with(spike_hitbox.rect(), static_rect=True):
                         kill_player(self)
                 else:
                     dx = self.player.pos[0] - spike_hitbox.pos[0]
                     dy = self.player.pos[1] - spike_hitbox.pos[1]
                     distance = math.sqrt(dx ** 2 + dy ** 2)
-                    if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.collide_with(spike_hitbox.rect()):
+                    if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.collide_with(spike_hitbox.rect(), static_rect=True):
                         kill_player(self)
 
 
@@ -713,6 +713,7 @@ class Game:
                 if event.key in key_map: self.dict_kb[key_map[event.key]] = state
 
         self.clock.tick(60)
+
 
     def run(self):
         """

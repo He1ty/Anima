@@ -61,7 +61,7 @@ def update_teleporter(game, t_id):
 
 def update_activators_actions(game, level):
     for activator in game.activators:
-        if activator.can_interact(game.player.rect()):
+        if activator.can_interact(game.player):
             activator_pos = f"{activator.pos[0]//game.tile_size};{activator.pos[1]//game.tile_size}"
             action = game.activators_actions[activator_pos]
             if action["infos_type"] == "visual_and_door":
