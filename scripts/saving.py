@@ -220,7 +220,8 @@ class Save:
                         "date": save_date,
                         "level": level,
                         "keyboard_layout": save_data.get("settings", {}).get("keyboard_layout", "unknown"),
-                        "playtime": save_data.get("playtime", 0)
+                        "playtime": save_data.get("playtime", 0),
+                        "souls":len(save_data.get("collected_souls",[]))
                     }
 
                     saves.append(save_info)

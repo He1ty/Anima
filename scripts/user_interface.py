@@ -8,7 +8,7 @@ import cv2
 import os
 import datetime
 
-from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector
+from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
 from scripts.display import toggle_fullscreen, check_screen
 from scripts.utils import load_images, load_image
 from scripts.text import load_game_font
@@ -39,6 +39,7 @@ class Menu:
         py.font.init()
         self.control_font = load_game_font(size=24)
         self.keyboard_font = load_game_font(size=20)
+        self.title_font = load_game_font(size=44)
         self.button_font = load_game_font(size=36)
         self.hover_image = load_image("Opera_senza_titolo.png")
         self.hover2_image = py.transform.flip(load_image("Opera_senza_titolo.png"), True, False)
@@ -116,7 +117,7 @@ class Menu:
         self.thumbs = {}
         for i in range(3):
             try:
-                self.thumbs[i+1] = py.image.load(f"saves/slot_{i+1}_thumb.png")
+                self.thumbs[i+1] = load_image("entities/player/idle/0.png")
             except FileNotFoundError:
                 self.thumbs[i+1] = None
 
@@ -134,6 +135,11 @@ class Menu:
         self.title_buttons = []
         self.title_buttons_labels = ["PLAY","SETTINGS","QUIT"]
         self.title_command_nb = 0
+
+        self.profile_selection_slots = []
+        self.profile_command_nb = 0
+        self.delete_command_nb = 0
+        self.delete_slot_id = None
 
         self.option_buttons = []
         self.option_buttons_labels = ["GAME","VIDEO","AUDIO","KEYBOARD"]
@@ -168,6 +174,7 @@ class Menu:
         self.audio_buttons = []
         self.video_buttons = []
         self.game_buttons = []
+        self.profile_selection_slots = []
 
         current_screen_size = self.screen.get_size()
 
@@ -271,6 +278,40 @@ class Menu:
             button_y += self.BUTTON_HEIGHT
             self.game_buttons.append(button)
         self.game_buttons.append(back_btn)
+
+        # PROFILE SELECTION SLOTS
+        saves = self.game.save_system.list_saves()
+        used_slots = {save["slot"]: save for save in saves}
+
+        slot_width = current_screen_size[0] * 0.7
+        slot_height = 110
+        start_y = 160
+        slot_x = (current_screen_size[0] - slot_width) / 2
+
+        fonts = {
+            "number": load_game_font(size=48),
+            "text": load_game_font(size=30),
+            "detail": load_game_font(size=22),
+        }
+        fonts["number"].set_bold(True)
+
+        for i in range(1, 4):
+            slot = SaveSlotUI(
+                slot_id=i,
+                x=slot_x,
+                y=start_y + (i - 1) * slot_height,
+                width=slot_width,
+                height=slot_height,
+                fonts=fonts,
+                colors=self.COLORS,
+            )
+            save_data = used_slots.get(i, None)
+            thumb = self.thumbs.get(i, None) if hasattr(self, "thumbs") else None
+            slot.update_data(save_data=save_data, thumbnail=thumb)
+            self.profile_selection_slots.append(slot)
+        self.profile_selection_slots.append(back_btn)
+
+
 
     def save_current_button_states(self):
         """Update the dictionary with the current button state."""
@@ -418,6 +459,119 @@ class Menu:
             print(f"Slot {slot_id} deleted successfully.")
         except Exception as e:
             print(f"Error deleting save: {e}")
+
+    def draw_delete_confirm_popup(self, confirm_delete_id, text_font):
+        """Draws the delete confirmation popup. Returns (yes_btn_rect, no_btn_rect)."""
+        current_screen_size = self.screen.get_size()
+        center_x = current_screen_size[0] // 2
+
+        popup_rect = py.Rect(center_x - 200, current_screen_size[1] // 2 - 100, 400, 200)
+        py.draw.rect(self.screen, (20, 20, 20), popup_rect)
+        py.draw.rect(self.screen, self.COLORS["white"], popup_rect, 2)
+
+        msg = text_font.render(f"DELETE PROFILE {confirm_delete_id}?", True, self.COLORS["white"])
+        self.screen.blit(msg, (center_x - msg.get_width() // 2, popup_rect.top + 40))
+
+        yes_btn = py.Rect(center_x - 120, popup_rect.bottom - 60, 100, 40)
+        no_btn = py.Rect(center_x + 20, popup_rect.bottom - 60, 100, 40)
+
+        yes_color = (150,0,0) if self.delete_command_nb == 1 else (100,0,0)
+        no_color = (100,100,100) if self.delete_command_nb == 0 else (50,50,50)
+
+        py.draw.rect(self.screen, yes_color, yes_btn)
+        py.draw.rect(self.screen, no_color, no_btn)
+
+        yes_txt = text_font.render("YES", True, (255, 255, 255))
+        no_txt = text_font.render("NO", True, (255, 255, 255))
+        self.screen.blit(yes_txt, (yes_btn.centerx - yes_txt.get_width() // 2, yes_btn.centery - 15))
+        self.screen.blit(no_txt, (no_btn.centerx - no_txt.get_width() // 2, no_btn.centery - 15))
+
+        return yes_btn, no_btn
+
+    def draw_profile_selection_menu(self):
+        current_screen_size = self.screen.get_size()
+        if self.game.previous_state == self.game.TITLE_STATE:
+            self.draw_title_screen_background_animation()
+        else:
+            if self.original_background is not None:
+                scaled_bg = py.transform.scale(self.original_background, current_screen_size)
+                self.screen.blit(scaled_bg, (0, 0))
+            else:
+                self.screen.fill(self.COLORS["black"])
+
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
+
+        options_title_color = self.COLORS["white"]
+        options_title = self.title_font.render("SELECT PROFILE", True, options_title_color)
+        self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+
+        for i, slot in enumerate(self.profile_selection_slots):
+            if i == self.profile_command_nb:
+                slot.start_hover_effect()
+            else:
+                slot.end_hover_effect()
+            slot.draw(self.screen)
+
+        if self.delete_slot_id is not None:
+            self.draw_delete_confirm_popup(self.delete_slot_id, self.profile_selection_slots[0].text_font)
+
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RIGHT and self.delete_command_nb == 1:
+                        self.delete_command_nb = 0
+                    if event.key == pygame.K_LEFT and self.delete_command_nb == 0:
+                        self.delete_command_nb = 1
+                    if event.key == pygame.K_RETURN:
+                        match self.delete_command_nb:
+                            case 0:
+                                self.delete_slot_id = None
+                                self.delete_command_nb = 0
+                            case 1:
+                                # CALL DELETE LOGIC
+                                self.delete_save_data(self.delete_slot_id)
+                                # Refresh data
+                                saves = self.game.save_system.list_saves()
+                                used_slots = {save["slot"]: save for save in saves}
+                                save_data = used_slots.get(self.delete_slot_id, None)
+                                self.profile_selection_slots[self.delete_slot_id-1].update_data(save_data=save_data)
+                                self.delete_slot_id = None
+                                self.delete_command_nb = 0
+
+            return
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.game.state = self.game.TITLE_STATE
+                    self.profile_command_nb = 0
+                self.profile_command_nb = self.handle_key_input(event, self.profile_command_nb, len(self.profile_selection_slots)-1)
+                for slots in self.profile_selection_slots:
+                    action = slots.handle_event(event)
+                    match action:
+                        case True:
+                            self.game.state = self.game.TITLE_STATE
+                            self.profile_command_nb = 0
+                        case "LOAD":
+                            if self.game.load_game(slots.slot_id):
+                                self.game.state = self.game.PLAYING_STATE
+                                self.profile_command_nb = 0
+                                self.game.play_music(f"level_{self.game.level}")
+                                pygame.mouse.set_visible(False)
+                        case "START":
+                            # START NEW GAME
+                            self.game.level = 0
+                            self.game.load_level(self.game.default_level, transition_effect=False)
+                            # Crucial: Tell the game which slot is currently active for future saves
+                            self.game.current_slot = slots.slot_id
+                            self.game.state = self.game.PLAYING_STATE
+                            self.game.play_music(f"level_{self.game.level}")
+                            pygame.mouse.set_visible(False)
+                        case "DELETE":
+                            self.delete_slot_id = slots.slot_id
 
     def profile_selection_menu(self):
         """
@@ -629,7 +783,7 @@ class Menu:
     def draw_option_menu(self):
 
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.title_state:
+        if self.game.previous_state == self.game.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -644,7 +798,7 @@ class Menu:
 
 
         options_title_color = self.COLORS["white"]
-        options_title = self.button_font.render("OPTIONS", True, options_title_color)
+        options_title = self.title_font.render("OPTIONS", True, options_title_color)
         self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
         top_image = load_image("Opera_senza_titolo 2.png")
         bottom_image = load_image("Opera_senza_titolo 1.png")
@@ -689,11 +843,11 @@ class Menu:
                                 self.game.state = self.game.previous_state
                                 self.game.previous_state = "SETTINGS"
                         case "AUDIO":
-                                self.game.state = self.game.audio_setting_state
+                                self.game.state = self.game.AUDIO_SETTING_STATE
                         case "VIDEO":
-                            self.game.state = self.game.video_setting_state
+                            self.game.state = self.game.VIDEO_SETTING_STATE
                         case "GAME":
-                            self.game.state = self.game.game_settings_state
+                            self.game.state = self.game.GAME_SETTING_STATE
         return
 
     def draw_title_screen_background_animation(self):
@@ -717,7 +871,7 @@ class Menu:
 
     def draw_game_settings_menu(self):
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.title_state:
+        if self.game.previous_state == self.game.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -731,7 +885,7 @@ class Menu:
         self.screen.blit(overlay, (0, 0))
 
         game_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
-        game_title = self.button_font.render("GAME", True, game_title_color)
+        game_title = self.title_font.render("GAME", True, game_title_color)
         self.screen.blit(game_title, game_title.get_rect(center=(current_screen_size[0] / 2, 50)))
 
         for i,button in enumerate(self.game_buttons):
@@ -745,7 +899,7 @@ class Menu:
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.game_command_nb = 0
-                    self.game.state = self.game.option_state
+                    self.game.state = self.game.OPTION_STATE
             self.game_command_nb = self.handle_key_input(event,self.game_command_nb,len(self.game_buttons)-1)
             for button in self.game_buttons:
                 match button.text:
@@ -755,14 +909,14 @@ class Menu:
                         self.game.debug_mode = button.get_state()
                 if button.handle_event(event) and isinstance(button,MenuButton):
                     self.game_command_nb = 0
-                    self.game.state = self.game.option_state
+                    self.game.state = self.game.OPTION_STATE
 
 
         py.display.flip()
 
     def draw_audio_settings_menu(self):
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.title_state:
+        if self.game.previous_state == self.game.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -775,7 +929,7 @@ class Menu:
         overlay.fill(self.COLORS["overlay"])
         self.screen.blit(overlay, (0, 0))
         audio_title_color =  self.COLORS["white"]
-        audio_title = self.button_font.render("AUDIO", True, audio_title_color)
+        audio_title = self.title_font.render("AUDIO", True, audio_title_color)
         self.screen.blit(audio_title, audio_title.get_rect(center=(current_screen_size[0] / 2, 50)))
 
         for i, button in enumerate(self.audio_buttons):
@@ -788,7 +942,7 @@ class Menu:
         for event in py.event.get():
             for i,button in enumerate(self.audio_buttons):
                 if button.handle_event(event):
-                    self.game.state = self.game.option_state
+                    self.game.state = self.game.OPTION_STATE
                     self.audio_command_nb = 0
                 match button.text:
                     case "MUSIC:":
@@ -802,7 +956,7 @@ class Menu:
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.audio_command_nb = 0
-                    self.game.state = self.game.option_state
+                    self.game.state = self.game.OPTION_STATE
 
 
 
@@ -812,7 +966,7 @@ class Menu:
 
     def draw_video_settings_menu(self):
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.title_state:
+        if self.game.previous_state == self.game.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -826,7 +980,7 @@ class Menu:
         self.screen.blit(overlay, (0, 0))
 
         video_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
-        video_title = self.button_font.render("VIDEO", True, video_title_color)
+        video_title = self.title_font.render("VIDEO", True, video_title_color)
         self.screen.blit(video_title, video_title.get_rect(center=(current_screen_size[0] / 2, 50)))
 
         for i, button in enumerate(self.video_buttons):
@@ -847,12 +1001,12 @@ class Menu:
                     check_screen(self.game)
                     if isinstance(button, MenuButton):
                         self.video_command_nb = 0
-                        self.game.state = self.game.option_state
+                        self.game.state = self.game.OPTION_STATE
             self.video_command_nb = self.handle_key_input(event, self.video_command_nb, len(self.video_buttons) - 1)
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.video_command_nb = 0
-                    self.game.state = self.game.option_state
+                    self.game.state = self.game.OPTION_STATE
 
 
 
@@ -920,8 +1074,8 @@ class Menu:
                             self.game.__init__(full_setup=False)
                             self.settings_categories = settings_categories
                             self.init_buttons()
-                            self.game.state = self.game.title_state
-                            self.game.previous_state = self.game.pause_state
+                            self.game.state = self.game.TITLE_STATE
+                            self.game.previous_state = self.game.PAUSE_STATE
                             self.game.music_sound_manager.play(name="title_screen",loops=-1)
 
     def draw_title_menu(self):
@@ -944,11 +1098,11 @@ class Menu:
                 if button.handle_event(event):
                     match button.text:
                         case "PLAY":
-                            self.game.previous_state = self.game.title_state
-                            self.game.state = self.game.profile_selection_state
+                            self.game.previous_state = self.game.TITLE_STATE
+                            self.game.state = self.game.PROFILE_SELECTION_STATE
                         case "SETTINGS":
-                            self.game.previous_state = self.game.title_state
-                            self.game.state = self.game.option_state
+                            self.game.previous_state = self.game.TITLE_STATE
+                            self.game.state = self.game.OPTION_STATE
                         case "QUIT":
                             self.cap.release()
                             pygame.quit()

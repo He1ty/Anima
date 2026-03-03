@@ -65,6 +65,10 @@ class Game:
             }
             self.sound_effect_manager = Sound(self, sound_effect_path, is_music=False,master_volume=self.master_volume, volume=0.5)
 
+            # --- System Configuration ---
+            self.save_system = Save(self)
+            self.current_slot = None  # Tracking the active save slot
+
             # --- Menu & System Configuration ---
             self.languages = ["Français", "English", "Español"]
             self.selected_language = self.languages[1]
@@ -83,15 +87,15 @@ class Game:
         # --- State Management ---
         # Controls which 'loop' the game is currently running
 
-        self.title_state = "START_SCREEN"
-        self.pause_state = "PAUSE"
-        self.option_state = "SETTINGS"
-        self.audio_setting_state = "AUDIO_SETTINGS"
-        self.video_setting_state = "VIDEO_SETTINGS"
-        self.game_settings_state = "GAME_SETTINGS"
-        self.keyboard_state = "KEYBOARD_SETTINGS"
-        self.profile_selection_state = "PROFILE_SELECTION"
-        self.playing_state = "PLAYING"
+        self.TITLE_STATE = "START_SCREEN"
+        self.PAUSE_STATE = "PAUSE"
+        self.OPTION_STATE = "SETTINGS"
+        self.AUDIO_SETTING_STATE = "AUDIO_SETTINGS"
+        self.VIDEO_SETTING_STATE = "VIDEO_SETTINGS"
+        self.GAME_SETTING_STATE = "GAME_SETTINGS"
+        self.KEYBOARD_STATE = "KEYBOARD_SETTINGS"
+        self.PROFILE_SELECTION_STATE = "PROFILE_SELECTION"
+        self.PLAYING_STATE = "PLAYING"
 
         self.FAKE_TILES_LAYER = "6"
         self.ACTIVATORS_LAYER = "3"
@@ -269,9 +273,6 @@ class Game:
         self.particles = []
         self.sparks = []
 
-        # --- System Configuration ---
-        self.save_system = Save(self)
-        self.current_slot = None  # Tracking the active save slot
 
 
 
@@ -728,42 +729,25 @@ class Game:
         """
         self.play_music("title_screen")
         self.load_settings()
-
+        pygame.mouse.set_visible(False)
         while True:
-
-
-            if self.state == self.title_state:
-                pygame.mouse.set_visible(True)
-
+            if self.state == self.TITLE_STATE:
                 self.menu.draw_title_menu()
-
-            elif self.state == self.option_state:
-
-                #self.menu.menu_display()
-                self.menu.options_visible = True
-
+            elif self.state == self.OPTION_STATE:
                 self.menu.draw_option_menu()
-
-            elif self.state == self.profile_selection_state:
-
-                if self.menu.profile_selection_menu():
-                    self.state = "PLAYING"
-                    self.play_music(f"level_{self.level}")
-                    pygame.mouse.set_visible(False)
-                else:
-                    self.state = "START_SCREEN"
-
-            elif self.state == self.game_settings_state:
+            elif self.state == self.PROFILE_SELECTION_STATE:
+                self.menu.draw_profile_selection_menu()
+            elif self.state == self.GAME_SETTING_STATE:
                 self.menu.draw_game_settings_menu()
-            elif self.state == self.audio_setting_state:
+            elif self.state == self.AUDIO_SETTING_STATE:
                 self.menu.draw_audio_settings_menu()
-            elif self.state == self.video_setting_state:
+            elif self.state == self.VIDEO_SETTING_STATE:
                 self.menu.draw_video_settings_menu()
-            elif self.state == self.keyboard_state:
+            elif self.state == self.KEYBOARD_STATE:
                 print("KEYBOARD SETTINGS")
-            elif self.state == self.playing_state:
+            elif self.state == self.PLAYING_STATE:
                 self.main_game_logic()
-            elif self.state == self.pause_state:
+            elif self.state == self.PAUSE_STATE:
                 self.menu.draw_pause_menu()
             pygame.display.flip()
 

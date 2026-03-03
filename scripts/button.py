@@ -1,4 +1,5 @@
 import pygame
+import datetime
 
 from scripts.utils import load_image
 
@@ -424,3 +425,171 @@ class ArrowSelector:
         self.hover = True
     def end_hover_effect(self):
         self.hover = False
+
+class SaveSlotUI:
+    def __init__(self, slot_id, x,y,width,height, fonts, colors):
+
+        self.slot_id = slot_id
+        self.rect = pygame.Rect(x,y,4 * width / 5,height)
+        self.width = self.rect.width
+        self.height = self.rect.height
+
+        self.number_font = fonts["number"]
+        self.text_font = fonts["text"]
+        self.detail_font = fonts["detail"]
+
+        self.colors = colors
+
+        self.souls_icon = load_image("pickups/soul/idle/01.png")
+
+        self.save_data = None
+        self.thumbnail = None
+
+        self.delete_rect = pygame.Rect(
+            self.rect.right + 20,
+            self.rect.top,
+            width/5,
+            height/2
+        )
+        self.delete_rect.centery = self.rect.centery
+
+
+        self.hover = False
+        self.is_selected = False
+        self.delete_hover = False
+
+    def update_data(self, save_data=None, thumbnail=None):
+        self.save_data = save_data
+        self.thumbnail = thumbnail
+
+    def draw(self, surface):
+
+        line_color = self.colors["white"] if self.hover else (100, 100, 100)
+        text_color = self.colors["white"] if self.hover else (200, 200, 200)
+
+        pygame.draw.line(surface, line_color,
+                     (self.rect.left, self.rect.top),
+                     (self.rect.right, self.rect.top), 2)
+
+        num_txt = self.number_font.render(f"{self.slot_id}.", True, text_color)
+        surface.blit(num_txt, (
+            self.rect.left + 20,
+            self.rect.centery - num_txt.get_height() // 2
+        ))
+
+
+
+        if self.save_data:
+            img_rect = pygame.Rect(self.rect.left + 80,
+                               self.rect.top + 15,
+                               80, 80)
+            if self.thumbnail:
+                img = pygame.transform.scale(self.thumbnail, img_rect.size)
+                img.set_alpha(128)
+                surface.blit(img, img_rect.topleft)
+
+            right_margin = 30
+            x_right = self.rect.right - right_margin
+
+            level_name = self.save_data.get("level_name", "Unknown").upper()
+            play_seconds = self.save_data.get("playtime", 0)
+            time_str = str(datetime.timedelta(seconds=int(play_seconds)))
+            date_str = self.save_data.get("date", "----")
+
+            y_start = self.rect.top + 10
+            spacing = 5
+
+            lvl_txt = self.text_font.render(level_name, True, (220, 220, 220))
+            lvl_rect  = lvl_txt.get_rect(x=x_right - lvl_txt.get_width(),y=y_start)
+            time_txt = self.detail_font.render(time_str, True, (170, 170, 170))
+            time_rect = time_txt.get_rect(x=x_right - time_txt.get_width(),y=lvl_rect.bottom + spacing)
+            date_txt = self.detail_font.render(date_str, True, (150, 150, 150))
+            date_rect = date_txt.get_rect(x=x_right - date_txt.get_width(),y=time_rect.bottom + spacing)
+
+
+
+            surface.blit(lvl_txt,lvl_rect)
+
+            surface.blit(time_txt,time_rect)
+
+            surface.blit(date_txt,date_rect)
+
+            del_color = (200, 0, 0) if self.delete_hover else (120, 0, 0)
+
+            pygame.draw.rect(surface, del_color, self.delete_rect, border_radius=6)
+
+            del_txt = self.detail_font.render("DELETE", True, (255, 255, 255))
+            surface.blit(del_txt,
+                         (self.delete_rect.centerx - del_txt.get_width() // 2,
+                          self.delete_rect.centery - del_txt.get_height() // 2))
+
+            deaths = self.save_data.get("deaths", 0)
+            souls = self.save_data.get("souls", 0)
+
+            stats_y = img_rect.bottom + 10
+            icon_size = 16
+
+            # Logo morts (carré rouge)
+            death_icon = pygame.Rect(img_rect.right + 20,
+                                 img_rect.top+10,
+                                 icon_size,
+                                 icon_size)
+            pygame.draw.rect(surface, (200, 50, 50), death_icon)
+
+            # Texte
+            death_txt = self.detail_font.render(f"{deaths}",True,(200, 200, 200))
+            death_rect = death_txt.get_rect(x=death_icon.right + 5 ,centery = death_icon.centery)
+            surface.blit(death_txt,death_rect)
+
+
+            # Logo souls (carré bleu)
+            soul_icon_rect = pygame.Rect(
+                img_rect.right + 20,
+                img_rect.bottom-icon_size-10,
+                icon_size,
+                icon_size
+            )
+            surface.blit(pygame.transform.scale(self.souls_icon,(icon_size,icon_size)), soul_icon_rect)
+
+            # Texte
+            souls_text = self.detail_font.render(f"{souls}",True,(200, 200, 200))
+            souls_rect = souls_text.get_rect(x=soul_icon_rect.right + 5,centery = soul_icon_rect.centery)
+            surface.blit(souls_text,souls_rect)
+
+        else:
+            ng_txt = self.text_font.render(
+                "NEW GAME",
+                True,
+                (255, 255, 255) if self.hover else (120, 120, 120)
+            )
+            ng_rect = ng_txt.get_rect(centerx=self.rect.centerx,centery=self.rect.centery)
+            surface.blit(ng_txt,ng_rect)
+
+    def handle_event(self, event):
+        if self.hover:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RIGHT:
+                    self.delete_hover = True
+                elif event.key == pygame.K_LEFT:
+                    self.delete_hover = False
+                if event.key == pygame.K_RETURN:
+                    if self.save_data and self.delete_hover:
+                        print(f"Delete slot {self.slot_id}")
+                        return "DELETE"
+
+                    if self.save_data:
+                        print(f"Load slot {self.slot_id}")
+                        return "LOAD"
+                    else:
+                        print(f"Start new game in slot {self.slot_id}")
+                        return "START"
+        else:
+            self.delete_hover = False
+
+    def start_hover_effect(self):
+        self.hover = True
+
+    def end_hover_effect(self):
+        self.hover = False
+
+
