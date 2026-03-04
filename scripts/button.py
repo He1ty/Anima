@@ -513,12 +513,12 @@ class SaveSlotUI:
             surface.blit(time_txt,time_rect)
 
             surface.blit(date_txt,date_rect)
-
             del_color = (200, 0, 0) if self.delete_hover else (120, 0, 0)
 
             pygame.draw.rect(surface, del_color, self.delete_rect, border_radius=6)
 
             del_txt = self.detail_font.render("DELETE", True, (255, 255, 255))
+
             surface.blit(del_txt,
                          (self.delete_rect.centerx - del_txt.get_width() // 2,
                           self.delete_rect.centery - del_txt.get_height() // 2))
@@ -527,11 +527,11 @@ class SaveSlotUI:
             souls = self.save_data.get("souls", 0)
 
             stats_y = img_rect.bottom + 10
-            icon_size = 16
+            icon_size = 32
 
             # Logo morts (carré rouge)
             death_icon = pygame.Rect(img_rect.right + 20,
-                                 img_rect.top+10,
+                                 img_rect.top+5,
                                  icon_size,
                                  icon_size)
             pygame.draw.rect(surface, (200, 50, 50), death_icon)
@@ -545,7 +545,7 @@ class SaveSlotUI:
             # Logo souls (carré bleu)
             soul_icon_rect = pygame.Rect(
                 img_rect.right + 20,
-                img_rect.bottom-icon_size-10,
+                img_rect.bottom-icon_size-5,
                 icon_size,
                 icon_size
             )
@@ -574,17 +574,16 @@ class SaveSlotUI:
                     self.delete_hover = False
                 if event.key == pygame.K_RETURN:
                     if self.save_data and self.delete_hover:
-                        print(f"Delete slot {self.slot_id}")
                         return "DELETE"
 
                     if self.save_data:
-                        print(f"Load slot {self.slot_id}")
                         return "LOAD"
                     else:
-                        print(f"Start new game in slot {self.slot_id}")
                         return "START"
+            return None
         else:
             self.delete_hover = False
+            return None
 
     def start_hover_effect(self):
         self.hover = True
