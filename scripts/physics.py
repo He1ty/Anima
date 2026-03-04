@@ -47,6 +47,7 @@ class PhysicsPlayer:
 
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
+        self.dash_end_movement = False
 
         #self.dash_cooldown = 0
 
@@ -68,7 +69,7 @@ class PhysicsPlayer:
                         "key_noclip": 0}  # Used for reference
         self.anti_dash_buffer = False
         self.stop_dash_momentum = {"y": False, "x": False}
-        self.can_walljump = {"sliding": False, "wall": -1, "buffer": False, "timer": 0, "blocks_around": False,
+        self.can_walljump = {"sliding": False, "wall": 0, "buffer": False, "timer": 0, "blocks_around": False,
                              "cooldown": 0, "allowed": True, "available": False, "count":0}
         self.max_walljumps = 3
         self.force_movement_direction = {"r":[False,0],"l":[False,0]}
@@ -262,7 +263,6 @@ class PhysicsPlayer:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
 
-        print(self.velocity[1])
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -410,10 +410,6 @@ class PhysicsPlayer:
     def rect(self):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
-    def static_rect(self):
-        r = pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
-        return r
-
     def is_on_floor(self):
         """Uses tilemap to heck if the player is standing on a surface based on gravity direction. used for gravity, jump, etc."""
         # Offset depends on gravity: +1 if normal (down), -1 if inverted (up)
@@ -429,12 +425,11 @@ class PhysicsPlayer:
         return False
 
     def gravity(self, dt):
-        """Handles gravity. Gives downwards momentum (capped at 5) if in the air, negates momentum if on the ground, gives back a dash if the
-        player is missing some. Stops movement if no input is given."""
+        """Handles gravity. Gives downwards momentum (capped at 6) if in the air, negates momentum if on the ground.
+        Stops movement if no input is given."""
         if not self.is_on_floor() and not self.dashtime_cur > 0 and not self.dash_startup_cur:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"]:
-
                 if self.dashtime_cur == 0:
                     self.dash_direction = [0, 0]
 
@@ -462,11 +457,13 @@ class PhysicsPlayer:
                 else:
                     self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION # Normal gravity acceleration
 
+
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
                 self.velocity[1] = min(6.0, self.velocity[1] + (self.acceleration[1] * dt))
             else:
                 self.velocity[1] = max(-6.0, self.velocity[1] + (self.acceleration[1] * dt))
+
         elif self.is_on_floor():
             self.pos[1] = int(self.pos[1]) # Take only the integer part in order to avoid some pixels overlap
             # (for example when we jump, if player stops at 80.399999, we make sure that player coordinate is at 80 before setting vertical velocity to 0)
@@ -540,6 +537,7 @@ class PhysicsPlayer:
             elif not self.holding_jump and \
                     self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
                 "allowed"]:
+
                 self.dashtime_cur = 0
                 self.jumping = True
                 self.wall_jumping = True
@@ -549,6 +547,7 @@ class PhysicsPlayer:
 
                     # Jouer le son de wall jump
                     self.game.play_se('wall_jump')
+
 
                     if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
@@ -647,6 +646,7 @@ class PhysicsPlayer:
                         self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
 
                 if self.dashtime_cur <= 0:
+                    self.dash_end_movement = True
                     mult = 2
                     self.velocity[1] = (abs(self.velocity[1])/self.velocity[1])*mult if self.velocity[1] != 0 else 0
                     if self.collision["left"] or self.collision["right"]:
@@ -774,6 +774,7 @@ class PhysicsPlayer:
                                 break
 
                     if not nudged:
+
                         if self.velocity[0] > 0:
                             entity_rect.right = rect.left
                             self.collision['right'] = True
@@ -787,14 +788,18 @@ class PhysicsPlayer:
                             #self.dash_cooldown = 5
                         self.pos[0] = entity_rect.x
                         self.stop_dash_momentum["x"] = True
+
+            for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
                 if ((self.GRAVITY_DIRECTION == 1 and (entity_rect.y - self.size[1] < rect.y <= entity_rect.y or
                                                       entity_rect.y + self.size[1] > rect.y >= entity_rect.y)) or
                         (self.GRAVITY_DIRECTION == -1 and (entity_rect.y <= rect.y < entity_rect.y + self.size[1] or
                                                            entity_rect.y >= rect.y > entity_rect.y + self.size[1]))):
                     if entity_rect.x - self.size[0] <= rect.x < entity_rect.x:
                         b_l.add(True)
+
                     if entity_rect.x + self.size[0] >= rect.x > entity_rect.x:
                         b_r.add(True)
+
 
             self.get_block_on["left"] = bool(b_l)
             self.get_block_on["right"] = bool(b_r)
@@ -802,7 +807,7 @@ class PhysicsPlayer:
     def collision_check_walljump_helper(self,axis):
         """Avoids redundancy"""
         #The condition checks if there is no buffer, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
-        if (not self.can_walljump["buffer"] and not self.holding_jump_from_ground and
+        if (not self.can_walljump["buffer"] and not self.dash_end_movement and not self.holding_jump_from_ground and
                 not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"])):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
@@ -813,27 +818,28 @@ class PhysicsPlayer:
             self.can_walljump["wall"] = axis
 
     def wall_jump_blocks_around_check(self):
-        check_right = (self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().y + 2), transparent_check=False) or
-                                              self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().bottom - 2), transparent_check=False))
+        vertical_offset = 2
+
+        check_right = (self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().y + vertical_offset), transparent_check=False) or
+                                              self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().bottom - vertical_offset), transparent_check=False))
         check_left = (self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().y + 2), transparent_check=False) or
-                                              self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().bottom - 2), transparent_check=False))
+                                              self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().bottom - vertical_offset), transparent_check=False))
         if check_right and check_left:
             self.can_walljump["blocks_around"] = (
-                        self.tilemap.solid_check((self.rect().centerx + 9 * self.last_direction, self.rect().y + 2),
+                        self.tilemap.solid_check((self.rect().centerx + 8.5 * self.last_direction, self.rect().y + vertical_offset),
                                                  transparent_check=False) or
                         self.tilemap.solid_check(
-                            (self.rect().centerx + 8.5 * self.last_direction, self.rect().bottom - 2),
+                            (self.rect().centerx + 8.5 * self.last_direction, self.rect().bottom - vertical_offset),
                             transparent_check=False))
         else:
             self.can_walljump["blocks_around"] = check_right or check_left
 
     def apply_momentum(self, dt):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
-
         self.wall_jump_blocks_around_check()
-        if int(self.velocity[0]) > 0 or not self.get_block_on["left"]:
+        if int(self.velocity[0]) > 0 or not self.get_block_on["left"] or self.velocity[0] == 0:
             self.collision["left"] = False
-        if int(self.velocity[0]) < 0 or not self.get_block_on["right"]:
+        if int(self.velocity[0]) < 0 or not self.get_block_on["right"] or self.velocity[0] == 0:
             self.collision["right"] = False
         if self.velocity[1] > 0:
             self.collision["bottom"] = False
@@ -843,11 +849,15 @@ class PhysicsPlayer:
         self.pos[0] += self.velocity[0] * dt
         self.collision_check("x", dt)
 
+
         move_y = self.velocity[1] * dt
         move_y = max(-7, min(move_y, 7))
 
         self.pos[1] += move_y
         self.collision_check("y", dt)
+
+        if abs(int(self.velocity[1])) ==  0:
+            self.dash_end_movement = False
 
         if self.collision["right"] or self.collision["left"]:
             if self.superjump:
@@ -856,9 +866,9 @@ class PhysicsPlayer:
             self.superjump = False
 
         if self.get_block_on["left"] or self.get_block_on["right"]:
-            if self.get_block_on["right"]:
+            if self.get_block_on["right"] and (not self.get_block_on["left"] or self.collision["right"]):
                 self.collision_check_walljump_helper(1)
-            if self.get_block_on["left"]:
+            if self.get_block_on["left"] and (not self.get_block_on["right"] or self.collision["left"]):
                 self.collision_check_walljump_helper(-1)
         else:
             if self.can_walljump["wall"] != 0:
@@ -891,6 +901,7 @@ class PhysicsPlayer:
                         self.velocity[0] *= math.pow(0.98, dt)
         else:
             self.velocity[0] *= math.pow(0.95, dt)
+
 
     def get_direction(self, axis):
         """Gets the current direction the player is holding towards. Takes an axis as argument ('x' or 'y')
@@ -970,7 +981,7 @@ class PhysicsPlayer:
 
     def collide_with(self, rect, static_rect=False, rotating_rect=True):
         if static_rect and not rotating_rect:
-            return self.static_rect().colliderect(rect)
+            return self.rect().colliderect(rect)
 
         base_rect = self.rect()
 
@@ -979,7 +990,7 @@ class PhysicsPlayer:
             if not static_rect:
                 return base_rect.colliderect(rect)
             else:
-                return base_rect.colliderect(rect) and self.static_rect().colliderect(rect)
+                return base_rect.colliderect(rect) and self.rect().colliderect(rect)
 
         # --- TRUE ROTATED HITBOX VIA PYGAME MASKS ---
 
@@ -1008,7 +1019,7 @@ class PhysicsPlayer:
             return player_mask.overlap(target_mask, (int(offset_x), int(offset_y))) is not None
         else:
             return ((player_mask.overlap(target_mask, (int(offset_x), int(offset_y))) is not None)
-                    and self.static_rect().colliderect(rect))
+                    and self.rect().colliderect(rect))
 
     def render(self, surf, offset=(0, 0)):
         # 1. Draw Ghosts
@@ -1146,7 +1157,7 @@ class PhysicsPlayer:
                 pygame.draw.rect(surf, (0, 255, 0), standard_rect, 1)
 
             # 1. Draw your original inner_rect in red
-            debug_rect = self.static_rect().copy()
+            debug_rect = self.rect().copy()
             debug_rect.x -= offset[0]
             debug_rect.y -= offset[1]
             pygame.draw.rect(surf, (255, 0, 0), debug_rect, 1)
