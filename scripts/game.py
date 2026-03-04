@@ -35,14 +35,15 @@ class Game:
         """
         pygame.init()
 
-        # --- Debug Mode ---
-        self.debug_mode = False
+
 
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
 
 
         if full_setup:
+            # --- Debug Mode ---
+            self.debug_mode = False
             # The actual window size
             self.screen_width = 1000
             self.screen_height = 600
@@ -674,7 +675,6 @@ class Game:
                               random.random() * self.screenshake - self.screenshake / 2)
         self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), screenshake_offset)
 
-        pygame.display.update()
 
         # -- Death Handling
         death_handling(self, self.screen)
@@ -749,8 +749,22 @@ class Game:
                 self.main_game_logic()
             elif self.state == self.PAUSE_STATE:
                 self.menu.draw_pause_menu()
-            pygame.display.flip()
+            self.apply_brightness()
+            pygame.display.update()
 
+    def apply_brightness(self):
+        width, height = self.screen.get_size()
+        overlay = pygame.Surface((width, height),pygame.SRCALPHA)
+
+        if self.brightness < 0.5:
+            alpha = int((0.5-self.brightness) *2* 200)
+            overlay.fill((0,0,0,alpha))
+        elif self.brightness > 0.5:
+            alpha = int((self.brightness-0.5) *2* 80)
+            overlay.fill((255,255,255,alpha))
+        else:
+            return
+        self.screen.blit(overlay, (0, 0))
     def play_music(self, name):
         self.music_sound_manager.play(name=name, loops=-1)
     def play_se(self, name):
