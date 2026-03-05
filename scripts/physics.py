@@ -108,7 +108,7 @@ class PhysicsPlayer:
         self.action = "idle"
         self.animation = self.game.assets['player/' + "idle"].copy()
         self.collision = {'left': False, 'right': False, 'bottom': False, 'top': False}
-        self.get_block_on = {'left': False, 'right': False, 'top':False}
+        self.get_block_on = {'left': False, 'right': False, 'top':False, 'bottom':False}
         self.air_time = 0
         self.disablePlayerInput = False
         self.collide_with_passable_blocks = True
@@ -662,6 +662,7 @@ class PhysicsPlayer:
         b_r = set()
         b_l = set()
         b_t = set()
+        b_b = set()
 
         # Handle Vertical Collision First
         if axe == "y":
@@ -706,6 +707,10 @@ class PhysicsPlayer:
                             self.can_walljump["buffer"] = True
                             self.can_walljump["sliding"] = False
 
+                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y + self.size[1] >= rect.y > entity_rect.y and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width) or
+                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y > rect.y >= entity_rect.y - self.size[1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
+                    b_b.add(True)
+
             for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] < 0) or (self.GRAVITY_DIRECTION == -1 and self.velocity[1] > 0):
@@ -746,6 +751,7 @@ class PhysicsPlayer:
                     b_t.add(True)
 
             self.get_block_on["top"] = bool(b_t)
+            self.get_block_on["bottom"] = bool(b_b)
             entity_rect.y -= backup_velo
 
         if axe == "x":
@@ -812,6 +818,9 @@ class PhysicsPlayer:
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
             self.can_walljump["sliding"] = True
+            if self.can_walljump["wall"] != axis:
+                if self.get_block_on["left"] and self.get_block_on["right"]:
+                    self.acceleration[1] = 0.42
             self.can_walljump["wall"] = axis
             self.can_walljump["timer"] = 2
         elif self.can_walljump["wall"] != axis:
@@ -841,7 +850,7 @@ class PhysicsPlayer:
             self.collision["left"] = False
         if int(self.velocity[0]) < 0 or not self.get_block_on["right"] or self.velocity[0] == 0:
             self.collision["right"] = False
-        if self.velocity[1] > 0:
+        if self.velocity[1] > 0 or not self.get_block_on["bottom"]:
             self.collision["bottom"] = False
         if self.velocity[1] < 0 or not self.get_block_on["top"]:
             self.collision["top"] = False
@@ -868,8 +877,10 @@ class PhysicsPlayer:
         if self.get_block_on["left"] or self.get_block_on["right"]:
             if self.get_block_on["right"] and (not self.get_block_on["left"] or self.collision["right"]):
                 self.collision_check_walljump_helper(1)
+
             if self.get_block_on["left"] and (not self.get_block_on["right"] or self.collision["left"]):
                 self.collision_check_walljump_helper(-1)
+
         else:
             if self.can_walljump["wall"] != 0:
                 self.can_walljump["wall"] = 0

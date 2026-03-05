@@ -720,7 +720,8 @@ class Game:
             if event.type in (pygame.KEYDOWN, pygame.KEYUP):
                 state = 1 if event.type == pygame.KEYDOWN else 0
                 key_map = self.get_key_map()
-                if event.key in key_map: self.dict_kb[key_map[event.key]] = state
+                if event.key in key_map:
+                    self.dict_kb[key_map[event.key]] = state
 
     def run(self):
         """
@@ -760,7 +761,7 @@ class Game:
             alpha = int((0.5-self.brightness) *2* 200)
             overlay.fill((0,0,0,alpha))
         elif self.brightness > 0.5:
-            alpha = int((self.brightness-0.5) *2* 80)
+            alpha = int((self.brightness-0.5) *2* 50)
             overlay.fill((255,255,255,alpha))
         else:
             return
