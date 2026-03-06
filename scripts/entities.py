@@ -492,7 +492,8 @@ def death_animation(screen):
         "No man is lost while he still hopes.": "Miguel Cervantes, Lépante Soldier, Writer, Poet, SceneWriter",
         "Death is nothing, but to live defeated and without glory is to die every day.": "Napoléon Bonaparte, Emperor of Europe",
         "It is not death i am afraid of, It is not to have lived enough ": "Napoléon Bonaparte, Emperor of Europe",
-        "Language is a subset of humanity": "Benoît Tailhades, Ingenio Magno, "
+        "Language is a subset of humanity": "Benoît Tailhades, Ingenio Magno, ",
+        "Mon Avis :" :"Giannini Loic, Ingenio Magno"
     }
 
     message, auteur = random.choice(list(citations.items()))
@@ -513,6 +514,7 @@ def death_animation(screen):
 
 def kill_player(game):
     game.player_dead = True
+    game.death_counter += 1
 
 def deal_dmg(game, source, target, att_dmg=5, att_time=1):
     # Handle damage dealing between entities
@@ -573,7 +575,9 @@ def death_handling(game, screen):
         # Handle player death, respawn them at the proper position
         game.cutscene = False
         death_animation(screen)
+        nb_deaths = game.death_counter
         game.load_game(game.current_slot)
+        game.death_counter = nb_deaths
         game.transition = -30
         game.player.dash_amt = 1
         game.player.velocity = [0, 0]

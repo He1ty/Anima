@@ -10,6 +10,7 @@ import datetime
 
 from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
 from scripts.display import toggle_fullscreen, check_screen
+from scripts.keybing_menu import ControlsMenu
 from scripts.utils import load_images, load_image
 from scripts.text import load_game_font
 
@@ -41,8 +42,8 @@ class Menu:
         self.keyboard_font = load_game_font(size=20)
         self.title_font = load_game_font(size=44)
         self.button_font = load_game_font(size=36)
-        self.hover_image = load_image("Opera_senza_titolo.png")
-        self.hover2_image = py.transform.flip(load_image("Opera_senza_titolo.png"), True, False)
+        self.hover_image = load_image("ui/Opera_senza_titolo.png")
+        self.hover2_image = py.transform.flip(load_image("ui/Opera_senza_titolo.png"), True, False)
 
         self.button_font.set_bold(True)
 
@@ -160,6 +161,9 @@ class Menu:
         self.game_buttons = []
         self.game_buttons_labels = self.settings_categories["GAME"].keys()
         self.game_command_nb = 0
+
+        self.controls_menu = None
+        self.controls_command_nb = 0
 
         self.init_buttons()
 
@@ -307,6 +311,13 @@ class Menu:
             slot.update_data(save_data=save_data, thumbnail=thumb)
             self.profile_selection_slots.append(slot)
         self.profile_selection_slots.append(back_btn)
+
+        self.controls_menu = ControlsMenu(
+            screen=self.screen,
+            game=self.game,
+            title_font=self.title_font,  # même police que les autres menus
+            button_font=self.button_font
+        )
 
 
 
@@ -597,8 +608,8 @@ class Menu:
         options_title_color = self.COLORS["white"]
         options_title = self.title_font.render("OPTIONS", True, options_title_color)
         self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
-        top_image = load_image("Opera_senza_titolo 2.png")
-        bottom_image = load_image("Opera_senza_titolo 1.png")
+        top_image = load_image("ui/Opera_senza_titolo 2.png")
+        bottom_image = load_image("ui/Opera_senza_titolo 1.png")
         image_x = (current_screen_size[0] - top_image.get_width()) // 2
         top_image_y = self.option_buttons[0].rect.y - top_image.get_height() - 20
         bottom_image_y = self.option_buttons[-2].rect.y + self.BUTTON_HEIGHT + 10
@@ -644,6 +655,8 @@ class Menu:
                             self.game.state = self.game.VIDEO_SETTING_STATE
                         case "GAME":
                             self.game.state = self.game.GAME_SETTING_STATE
+                        case "KEYBOARD":
+                            self.game.state = self.game.KEYBOARD_STATE
         return
 
     def draw_title_screen_background_animation(self):
@@ -707,8 +720,6 @@ class Menu:
                     self.game_command_nb = 0
                     self.game.state = self.game.OPTION_STATE
 
-
-
     def draw_audio_settings_menu(self):
         current_screen_size = self.screen.get_size()
         if self.game.previous_state == self.game.TITLE_STATE:
@@ -752,11 +763,6 @@ class Menu:
                 if event.key == pygame.K_ESCAPE:
                     self.audio_command_nb = 0
                     self.game.state = self.game.OPTION_STATE
-
-
-
-
-
 
     def draw_video_settings_menu(self):
         current_screen_size = self.screen.get_size()
@@ -802,11 +808,14 @@ class Menu:
                     self.video_command_nb = 0
                     self.game.state = self.game.OPTION_STATE
 
-
-
-
     def draw_keyboard_settings_menu(self):
-        return
+        self.draw_title_screen_background_animation()
+        for event in pygame.event.get():
+            result = self.controls_menu.handle_event(event)
+            if result == "back":
+                self.controls_command_nb = 0
+                self.game.state = self.game.OPTION_STATE
+        self.controls_menu.draw_controls_menu()
 
     def draw_pause_menu(self):
         current_screen_size = self.screen.get_size()
@@ -820,8 +829,8 @@ class Menu:
         overlay.fill(self.COLORS["overlay"])
         self.screen.blit(overlay, (0, 0))
 
-        top_image = load_image("Opera_senza_titolo 2.png")
-        bottom_image = load_image("Opera_senza_titolo 1.png")
+        top_image = load_image("ui/Opera_senza_titolo 2.png")
+        bottom_image = load_image("ui/Opera_senza_titolo 1.png")
         image_x = (current_screen_size[0] - top_image.get_width()) // 2
         top_image_y = self.pause_buttons[0].rect.y - top_image.get_height() - 20
         bottom_image_y = self.pause_buttons[-1].rect.y + self.BUTTON_HEIGHT + 10
@@ -899,6 +908,7 @@ class Menu:
                             self.cap.release()
                             pygame.quit()
                             sys.exit()
+
 
     def update_setting_by_button(self,button,setting):
         """

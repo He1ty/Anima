@@ -160,6 +160,19 @@ def load_backgrounds(b_info):
                                                        b_info[str(environment + "/" + bg[:-4])]["size"] if str(environment + "/" + bg[:-4]) in b_info else None)
     return tiles
 
+
+def draw_rect_alpha(surface, color, rect, alpha):
+    """
+    surface : surface where we draw the rectangle (ex: screen)
+    color   : (R, G, B)
+    rect    : (x, y, width, height)
+    alpha   : opacity between 0 et 255
+    """
+
+    shape_surf = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
+    shape_surf.fill((color[0], color[1], color[2], alpha))
+    surface.blit(shape_surf, (rect[0], rect[1]))
+
 class Animation:
     def __init__(self, images, img_dur = 5, loop = True):
         self.images = images
@@ -184,6 +197,8 @@ class Animation:
 
     def img(self):
         return self.images[int(self.frame / self.img_duration)]
+
+
 
 
 

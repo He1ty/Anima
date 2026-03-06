@@ -77,8 +77,18 @@ class Game:
             self.vsync_on = False
             self.brightness = 0.5
             self.keyboard_layout = "AZERTY"
-            self.menu = Menu(self)
+            self.key_map = {"key_up" : pygame.K_z,
+                            "key_down" : pygame.K_s,
+                            "key_left" : pygame.K_q,
+                            "key_right" : pygame.K_d,
+                            "key_jump" : pygame.K_SPACE,
+                            "key_dash" : pygame.K_g,
+                            "key_interact" : pygame.K_e,
+                            "key_noclip" : pygame.K_n,
+                            "key_hitbox" : pygame.K_h,
+                            "key_select" : pygame.K_RETURN}
 
+            self.menu = Menu(self)
 
 
         # The internal rendering surface (half size for a pixel-art aesthetic)
@@ -115,6 +125,8 @@ class Game:
 
 
         self.tile_size = 16
+
+        self.death_counter = 0
 
         # --- Entity Configuration ---
         # Defines animation durations, sizes, and looping behavior for every entity type
@@ -158,9 +170,6 @@ class Game:
             'particle/leaf': Animation(load_images('particles/leaf'), loop=5),
             'particle/crystal': Animation(load_images('particles/crystal'), loop=1000),
             'particle/crystal_fragment': Animation(load_images('particles/crystal_fragment'), loop=1),
-            'full_heart': load_image('full_heart.png', (16, 16)),
-            'half_heart': load_image('half_heart.png', (16, 16)),
-            'empty_heart': load_image('empty_heart.png', (16, 16)),
             'glorbo_projectile': load_image('projectiles/glorbo_projectile.png', (16, 16)),
             'missile': load_image('projectiles/missile.png', (16, 16)),
             'checkpoint/1': Animation(load_images('checkpoint/activated'), img_dur=10),
@@ -198,6 +207,7 @@ class Game:
             print(f"Error initializing sound: {e}")
 
         # --- Input & Level Tracking ---
+        self.keybindings = {}
         self.dict_kb = {"key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
                         "key_jump": 0, "key_dash": 0, "key_noclip": 0, "key_attack": 0}
 
@@ -324,6 +334,12 @@ class Game:
         return {pygame.K_w: "key_up", pygame.K_s: "key_down", pygame.K_a: "key_left",
                 pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
                 pygame.K_n: "key_noclip"}
+
+    def set_keymap(self,bindings: dict):
+        for cat in bindings:
+            for bind in bindings[cat]:
+                self.key_map[f"key_{bind.lower()}"] = bindings[cat][bind]
+
 
     def load_level(self, map_id, transition_effect=True):
         """
@@ -718,9 +734,12 @@ class Game:
                     self.holding_attack = False
             # Generic keyboard state mapping
             if event.type in (pygame.KEYDOWN, pygame.KEYUP):
-                state = 1 if event.type == pygame.KEYDOWN else 0
-                key_map = self.get_key_map()
-                if event.key in key_map: self.dict_kb[key_map[event.key]] = state
+                for key in self.key_map.keys():
+                    if event.key  == self.key_map[key]:
+                        if event.type == pygame.KEYDOWN:
+                            self.dict_kb[key] = 1
+                        else:
+                            self.dict_kb[key] = 0
 
     def run(self):
         """
@@ -744,7 +763,7 @@ class Game:
             elif self.state == self.VIDEO_SETTING_STATE:
                 self.menu.draw_video_settings_menu()
             elif self.state == self.KEYBOARD_STATE:
-                print("KEYBOARD SETTINGS")
+                self.menu.draw_keyboard_settings_menu()
             elif self.state == self.PLAYING_STATE:
                 self.main_game_logic()
             elif self.state == self.PAUSE_STATE:

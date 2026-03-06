@@ -4,8 +4,13 @@ import json
 import os
 
 
-def load_game_font(font_name=None, size=36):
-    # This function tries to load a font for the game, falling back to alternatives if the primary font fails
+def load_game_font(size=36):
+    """
+    This function tries to load a font for the game, falling back to alternatives if the primary font fails
+    :param size:
+    :return:
+    """
+
     try:
         return pygame.font.SysFont('Times New Roman', size, bold=True)
     except Exception:

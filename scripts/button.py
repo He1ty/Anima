@@ -33,8 +33,8 @@ class MenuButton:
         self.rect = self.text_surf.get_rect(center=pos_center)
         self.text_color = text_color
         self.hover = False
-        self.hover_image = load_image("Opera_senza_titolo.png")
-        self.hover2_image = pygame.transform.flip(load_image("Opera_senza_titolo.png"), True, False)
+        self.hover_image = load_image("ui/Opera_senza_titolo.png")
+        self.hover2_image = pygame.transform.flip(load_image("ui/Opera_senza_titolo.png"), True, False)
 
 
     def draw(self, screen):
@@ -113,7 +113,7 @@ class DiscreteSlider:
         self.text_rect = self.text_surf.get_rect(centery=self.rect.centery, x=textx) if self.text_surf else None
 
         self.hover = False
-        self.hover_image_left = pygame.image.load('assets/images/Opera_senza_titolo.png')
+        self.hover_image_left = pygame.image.load('assets/images/ui/Opera_senza_titolo.png')
         self.hover_image_right = pygame.transform.flip(self.hover_image_left, True, False)
         self.hover_image_width = self.hover_image_right.get_width()
         self.dragging = False
@@ -252,7 +252,7 @@ class ToggleSwitch:
         self.text_rect = self.text_surf.get_rect(x=textx ,centery=self.rect.centery) if self.text_surf is not None else None
 
         self.hover = False
-        self.hover_image_left = pygame.image.load('assets/images/Opera_senza_titolo.png')
+        self.hover_image_left = pygame.image.load('assets/images/ui/Opera_senza_titolo.png')
         self.hover_image_right = pygame.transform.flip(self.hover_image_left, True, False)
         self.hover_image_width = self.hover_image_right.get_width()
 
@@ -347,7 +347,7 @@ class ArrowSelector:
 
         # Hover effect
         self.hover = True
-        self.hover_image_left = pygame.image.load('assets/images/Opera_senza_titolo.png')
+        self.hover_image_left = pygame.image.load('assets/images/ui/Opera_senza_titolo.png')
         self.hover_image_right = pygame.transform.flip(self.hover_image_left, True, False)
         self.hover_image_width = self.hover_image_right.get_width()
 
@@ -440,7 +440,8 @@ class SaveSlotUI:
 
         self.colors = colors
 
-        self.souls_icon = load_image("pickups/soul/idle/01.png")
+        self.souls_icon = load_image("ui/soul.png")
+        self.death_icon = load_image("ui/skull.png")
 
         self.save_data = None
         self.thumbnail = None
@@ -496,6 +497,7 @@ class SaveSlotUI:
             time_str = str(datetime.timedelta(seconds=int(play_seconds)))
             date_str = self.save_data.get("date", "----")
 
+
             y_start = self.rect.top + 10
             spacing = 5
 
@@ -523,7 +525,7 @@ class SaveSlotUI:
                          (self.delete_rect.centerx - del_txt.get_width() // 2,
                           self.delete_rect.centery - del_txt.get_height() // 2))
 
-            deaths = self.save_data.get("deaths", 0)
+            deaths = self.save_data.get("death", 0)
             souls = self.save_data.get("souls", 0)
 
             stats_y = img_rect.bottom + 10
@@ -534,7 +536,7 @@ class SaveSlotUI:
                                  img_rect.top+5,
                                  icon_size,
                                  icon_size)
-            pygame.draw.rect(surface, (200, 50, 50), death_icon)
+            surface.blit(pygame.transform.scale(self.death_icon, (icon_size, icon_size)), death_icon)
 
             # Texte
             death_txt = self.detail_font.render(f"{deaths}",True,(200, 200, 200))
@@ -590,5 +592,4 @@ class SaveSlotUI:
 
     def end_hover_effect(self):
         self.hover = False
-
 

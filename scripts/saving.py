@@ -60,6 +60,7 @@ class Save:
                 "position": self.game.spawn_point["pos"].copy(),
                 "spawn_point": self.game.spawn_point,
                 "current_checkpoint": self.game.current_checkpoint,
+                "death": self.game.death_counter,
             },
             "camera": {
                 "scroll_limits":self.game.spawn_point["scroll_limits"],
@@ -154,6 +155,8 @@ class Save:
                     self.game.spawn_point = save_data["player"]["spawn_point"]
                 if "current_checkpoint" in save_data["player"]:
                     self.game.current_checkpoint = save_data["player"]["current_checkpoint"]
+                if "death" in save_data["player"]:
+                    self.game.death_counter = save_data["player"]["death"]
 
             if "camera" in save_data:
                 if "scroll_limits" in save_data["camera"]:
@@ -221,7 +224,8 @@ class Save:
                         "level": level,
                         "keyboard_layout": save_data.get("settings", {}).get("keyboard_layout", "unknown"),
                         "playtime": save_data.get("playtime", 0),
-                        "souls":len(save_data.get("collected_souls",[]))
+                        "souls":len(save_data.get("collected_souls",[])),
+                        "death": save_data["player"]["death"]
                     }
 
                     saves.append(save_info)
@@ -271,6 +275,8 @@ class Save:
         except Exception as e:
             print(f"Error saving settings: {e}")
             return False
+
+
 
     def load_settings(self):
         save_path = os.path.join(self.save_folder, f"settings.json")
