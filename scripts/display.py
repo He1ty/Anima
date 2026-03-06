@@ -193,9 +193,9 @@ def draw_cutscene_border(surf, color=(0, 0, 0), width=20, opacity=255):
 
 def check_screen(game):
     if game.fullscreen:
-        game.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME, vsync=game.vsync_on)
+        game.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME | pygame.DOUBLEBUF, vsync=game.vsync_on)
     else:
-        game.screen = pygame.display.set_mode((1000, 600), pygame.RESIZABLE,vsync=game.vsync_on)
+        game.screen = pygame.display.set_mode((1000, 600),vsync=game.vsync_on)
 
     game.menu.save_current_button_states()
     game.menu.init_buttons()

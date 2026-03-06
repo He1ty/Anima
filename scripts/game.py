@@ -91,6 +91,7 @@ class Game:
             self.menu = Menu(self)
 
 
+
         # The internal rendering surface (half size for a pixel-art aesthetic)
         self.display = pygame.Surface((self.screen_width/2, self.screen_height/2))
         self.clock = pygame.time.Clock()
@@ -779,7 +780,7 @@ class Game:
             alpha = int((0.5-self.brightness) *2* 200)
             overlay.fill((0,0,0,alpha))
         elif self.brightness > 0.5:
-            alpha = int((self.brightness-0.5) *2* 80)
+            alpha = int((self.brightness-0.5) *2* 50)
             overlay.fill((255,255,255,alpha))
         else:
             return
