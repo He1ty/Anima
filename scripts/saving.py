@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import pygame
 from typing import SupportsFloat
 
 import pygame as py
@@ -9,10 +10,30 @@ from scripts.display import check_screen
 
 
 class Save:
+
     def __init__(self, game):
         self.game = game
         self.save_folder = "saves"
         self.ensure_save_folder_exists()
+        self.DEFAULT_BINDINGS = {
+    "Movement": {
+        "Up"        : pygame.K_z,
+        "Down"      : pygame.K_s,
+        "Left"      : pygame.K_q,
+        "Right"     : pygame.K_d,
+        "Jump"      : pygame.K_SPACE,
+        "Dash"      : pygame.K_g
+    },
+    "Action": {
+        "Select"      : pygame.K_RETURN,
+        "Interact"    : pygame.K_e,
+    },
+    "Debug":{
+        "Show hitbox"  : pygame.K_h,
+        "No clip"      : pygame.K_n
+    }
+}
+
 
     def ensure_save_folder_exists(self):
         """Creates the save directory if it doesn't exist."""
@@ -277,8 +298,6 @@ class Save:
             print(f"Error saving settings: {e}")
             return False
 
-
-
     def load_settings(self):
         save_path = os.path.join(self.save_folder, f"settings.json")
 
@@ -305,6 +324,7 @@ class Save:
             self.game.vsync_on = save_data.get("vsync_on", True)
             self.game.brightness = save_data.get("brightness", 0.5)
             self.game.debug_mode = save_data.get("debug_mode", False)
+            self.game.set_keymap(self.load_bindings())
 
             check_screen(self.game)
             if hasattr(self.game, "menu"):
@@ -315,3 +335,23 @@ class Save:
             import traceback
             traceback.print_exc()
             return False
+
+    def load_bindings(self) -> dict:
+        if os.path.exists(self.save_folder+"/keybindings.json"):
+            try:
+                with open(self.save_folder+"/keybindings.json", "r") as f:
+                    data = json.load(f)
+                bindings = {}
+                for cat, actions in self.DEFAULT_BINDINGS.items():
+                    bindings[cat] = {}
+                    for action, default_key in actions.items():
+                        bindings[cat][action] = data.get(cat, {}).get(action, default_key)
+                return bindings
+            except Exception:
+                pass
+        return {cat: dict(actions) for cat, actions in self.DEFAULT_BINDINGS.items()}
+
+    def save_bindings(self,bindings: dict):
+        with open(self.save_folder+"/keybindings.json", "w") as f:
+            json.dump(bindings, f, indent=2)
+        self.game.set_keymap(bindings)

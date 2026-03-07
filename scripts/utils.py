@@ -146,6 +146,21 @@ def draw_rect_alpha(surface, color, rect, alpha):
     shape_surf.fill((color[0], color[1], color[2], alpha))
     surface.blit(shape_surf, (rect[0], rect[1]))
 
+def key_name(keycode: int) -> str:
+    if keycode is None:
+        return ""
+    name = pygame.key.name(keycode)
+    return name.upper() if len(name) == 1 else name.capitalize()
+
+def build_items(bindings: dict) -> list:
+    """Liste plate : ('cat', nom) ou ('bind', cat, action)"""
+    items = []
+    for cat, actions in bindings.items():
+        items.append(("cat", cat))
+        for action in actions:
+            items.append(("bind", cat, action))
+    return items
+
 class Animation:
     def __init__(self, images, img_dur = 5, loop = True):
         self.images = images

@@ -4,71 +4,9 @@ import json
 import os
 from scripts.button import MenuButton
 from scripts.text import load_game_font
-from scripts.utils import load_image, draw_rect_alpha
+from scripts.utils import load_image, draw_rect_alpha,key_name,build_items
 
 pygame.init()
-
-DEFAULT_BINDINGS = {
-    "Movement": {
-        "Up"        : pygame.K_z,
-        "Down"      : pygame.K_s,
-        "Left"      : pygame.K_q,
-        "Right"     : pygame.K_d,
-        "Jump"      : pygame.K_SPACE,
-        "Dash"      : pygame.K_g
-    },
-    "Action": {
-        "Select"      : pygame.K_RETURN,
-        "Interact"    : pygame.K_e,
-    },
-    "Debug":{
-        "Show hitbox"  : pygame.K_h,
-        "No clip"      : pygame.K_n
-    }
-}
-
-SAVE_FILE = "saves/keybindings.json"
-
-
-def load_bindings() -> dict:
-    if os.path.exists(SAVE_FILE):
-        try:
-            with open(SAVE_FILE, "r") as f:
-                data = json.load(f)
-            bindings = {}
-            for cat, actions in DEFAULT_BINDINGS.items():
-                bindings[cat] = {}
-                for action, default_key in actions.items():
-                    bindings[cat][action] = data.get(cat, {}).get(action, default_key)
-            return bindings
-        except Exception:
-            pass
-    return {cat: dict(actions) for cat, actions in DEFAULT_BINDINGS.items()}
-
-
-def save_bindings(bindings: dict,game):
-    with open(SAVE_FILE, "w") as f:
-        json.dump(bindings, f, indent=2)
-    game.set_keymap(bindings)
-
-
-def key_name(keycode: int) -> str:
-    if keycode is None:
-        return ""
-    name = pygame.key.name(keycode)
-    return name.upper() if len(name) == 1 else name.capitalize()
-
-
-def build_items(bindings: dict) -> list:
-    """Liste plate : ('cat', nom) ou ('bind', cat, action)"""
-    items = []
-    for cat, actions in bindings.items():
-        items.append(("cat", cat))
-        for action in actions:
-            items.append(("bind", cat, action))
-    return items
-
-
 # ─── CLASSE PRINCIPALE ────────────────────────────────────────────────────────
 
 class ControlsMenu:
@@ -105,7 +43,7 @@ class ControlsMenu:
         self.font_hint   = pygame.font.SysFont("Consolas", 12)
 
         # Données
-        self.bindings     = load_bindings()
+        self.bindings     = self.game.save_system.load_bindings()
         self.items        = build_items(self.bindings)
         self.bind_indices = [i for i, it in enumerate(self.items) if it[0] == "bind"]
 
@@ -213,7 +151,7 @@ class ControlsMenu:
                     self.items        = build_items(self.bindings)
                     self.bind_indices = [i for i, it in enumerate(self.items) if it[0] == "bind"]
                     self._compute_layout()
-                    save_bindings(self.bindings,self.game)
+                    self.game.save_system.save_bindings(self.bindings)
                     self.flash_timer = 90
                     self.rebinding   = False
             return None
@@ -235,21 +173,21 @@ class ControlsMenu:
                 self.rebinding = True
 
             elif event.key == pygame.K_ESCAPE:
-                save_bindings(self.bindings,self.game)
+                self.game.save_system.save_bindings(self.bindings)
                 self.command_nb = 0
                 return "back"
 
             elif event.key == pygame.K_r:
-                self.bindings     = {cat: dict(actions) for cat, actions in DEFAULT_BINDINGS.items()}
+                self.bindings     = {cat: dict(actions) for cat, actions in self.game.save_system.DEFAULT_BINDINGS.items()}
                 self.items        = build_items(self.bindings)
                 self.bind_indices = [i for i, it in enumerate(self.items) if it[0] == "bind"]
                 self._compute_layout()
-                save_bindings(self.bindings,self.game)
+                self.game.save_system.save_bindings(self.bindings)
                 self.flash_timer  = 90
 
         # ── Bouton BACK (clic souris ou ENTRÉE quand hover) ──────────────────
         if self.back_button.handle_event(event):
-            save_bindings(self.bindings,self.game)
+            self.game.save_system.save_bindings(self.bindings)
             self.command_nb = 0
             return "back"
 
