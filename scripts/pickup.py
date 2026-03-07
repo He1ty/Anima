@@ -49,8 +49,7 @@ class Pickup:
                 if self.game.player.dashtime_cur != 0:
 
                     if self.type == "soul":
-                        pos = f"{self.initial_pos[0]};{self.initial_pos[1]}"
-                        self.game.collected_souls.append(pos)
+                        self.game.collected_souls.append(self.initial_pos.copy())
                         self.game.save_game(self.game.current_slot)
 
                     self.animation.frame = 0

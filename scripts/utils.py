@@ -21,65 +21,37 @@ def load_images(path, tile_size=None):#Sort in alpha order every images of a giv
         images.append(load_image(path + '/' + img_name, (tile_size[0], tile_size[1]) if tile_size else None))
     return images
 
-def pil_to_pygame(pil_image):
-    # Get the image dimensions and raw pixel data
-    mode = pil_image.mode
-    size = pil_image.size
-    data = pil_image.tobytes()
+def load_tileset(image_path, tile_width, tile_height, spiral_order=False):
+    """
+    Slices a tileset image into a list of individual surfaces.
+    """
+    # Load the master sheet
+    sheet = pygame.image.load(image_path).convert_alpha()
+    sheet_width, sheet_height = sheet.get_size()
 
-    # Create the Pygame surface from the raw string data
-    surface = pygame.image.fromstring(data, size, mode)
+    tiles = []
 
-    # .convert_alpha() optimizes the surface for Pygame rendering
-    return surface.convert_alpha()
+    # Iterate through the sheet by tile dimensions
+    for y in range(0, sheet_height, tile_height):
+        for x in range(0, sheet_width, tile_width):
+            # Define the rectangular area of the tile
+            rect = pygame.Rect(x, y, tile_width, tile_height)
 
-def slice_tileset_to_memory(image_path, tile_width, tile_height, spiral_order=False):
-    tiles = []  # This list will hold all our image objects
+            # Extract the subsurface and store it
+            tile = sheet.subsurface(rect)
+            tiles.append(tile)
 
-    try:
-        # Open the source image
-        img = Image.open(image_path)
-        img_width, img_height = img.size
+    if spiral_order:
+        if len(tiles) > 3:
+            tmp = tiles.copy()
+            transformation = {7: 3, 8: 4, 3: 5, 4: 8, 5: 7}
+            for i in transformation:
+                try:
+                    tiles[i] = tmp[transformation[i]]
+                except IndexError:
+                    pass
 
-        # Calculate the number of columns and rows
-        columns = img_width // tile_width
-        rows = img_height // tile_height
-
-        # Loop through the grid
-        for row in range(rows):
-            for col in range(columns):
-                # Calculate the bounding box for the current tile
-                left = col * tile_width
-                upper = row * tile_height
-                right = left + tile_width
-                lower = upper + tile_height
-
-                # Crop the image using the bounding box
-                bounding_box = (left, upper, right, lower)
-                tile = img.crop(bounding_box)
-
-                # Add the tile object to our list instead of saving it
-                tiles.append(pil_to_pygame(tile))
-
-        if spiral_order:
-            if len(tiles) > 3:
-                tmp = tiles.copy()
-                transformation = {7:3, 8:4, 3:5, 4:8, 5:7}
-                for i in transformation:
-                    try:
-                        tiles[i] = tmp[transformation[i]]
-                    except IndexError:
-                        pass
-
-        #print(f"Successfully sliced {len(tiles)} tiles into memory.")
-        return tiles
-
-    except FileNotFoundError:
-        print(f"Error: The file {image_path} was not found.")
-        return []
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return []
+    return tiles
 
 def round_up(x):#pretty basic
     return int(x) + 1 if x % 1 != 0 and x > 0 else int(x)
@@ -90,7 +62,7 @@ def load_tiles(env=None):#load every tiles (graphic components) coresponding to 
         for tile in sorted(os.listdir(BASE_IMG_PATH + 'tiles/' + environment)):
             images = load_images('tiles/' + environment + '/' + tile)
             if "tileset.png" in os.listdir(f'{BASE_IMG_PATH}/tiles/{environment}/{tile}'):
-                tiles[tile] = slice_tileset_to_memory(image_path=f'{BASE_IMG_PATH}/tiles/{environment}/{tile}/tileset.png', tile_width=16, tile_height=16, spiral_order=True)
+                tiles[tile] = load_tileset(image_path=f'{BASE_IMG_PATH}/tiles/{environment}/{tile}/tileset.png', tile_width=16, tile_height=16, spiral_order=True)
             else:
                 tiles[tile] = images
     return tiles
