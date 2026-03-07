@@ -50,8 +50,13 @@ class Pickup:
 
                     if self.type == "soul":
                         pos = f"{self.initial_pos[0]};{self.initial_pos[1]}"
+                        self.game.nb_souls += 1
                         self.game.collected_souls.append(pos)
+                        self.game.menu.is_souls_collected = True
+                        ratio = self.game.screen.get_width() / self.game.display.get_width()
+                        self.game.menu.souls_pos = [(self.initial_pos[0] - self.game.scroll[0]) * ratio, (self.initial_pos[1] - self.game.scroll[1]) * ratio]
                         self.game.save_game(self.game.current_slot)
+
 
                     self.animation.frame = 0
                     self.state = "taking"

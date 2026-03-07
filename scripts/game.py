@@ -228,6 +228,7 @@ class Game:
         self.player_dead = False
 
         self.collected_souls = []
+        self.nb_souls = 0
 
         self.holding_attack = False
         self.attacking = False
@@ -746,6 +747,7 @@ class Game:
                 self.menu.draw_keyboard_settings_menu()
             elif self.state == self.PLAYING_STATE:
                 self.main_game_logic()
+                self.menu.draw_player_souls()
             elif self.state == self.PAUSE_STATE:
                 self.menu.draw_pause_menu()
             self.apply_brightness()

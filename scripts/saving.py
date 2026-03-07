@@ -166,6 +166,7 @@ class Save:
 
             if "collected_souls" in save_data:
                self.game.collected_souls = save_data["collected_souls"]
+               self.game.nb_souls = len(self.game.collected_souls)
 
             if "playtime" in save_data:
                self.game.playtime = save_data["playtime"]

@@ -11,14 +11,20 @@ import datetime
 from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
 from scripts.display import toggle_fullscreen, check_screen
 from scripts.keybing_menu import ControlsMenu
-from scripts.utils import load_images, load_image
+from scripts.utils import load_images, load_image, Animation
 from scripts.text import load_game_font
 
 class Menu:
 
-    def __init__(self, game): #Basic definitions: Keyboard layout,languages, volume, screen resolutions,buttons configurations
+
+    def __init__(self, game):
+        """
+        Basic definitions: Keyboard layout,languages, volume, screen resolutions,buttons configurations
+        """
         self.game = game
         self.screen = game.screen
+        self.SW, self.SH = self.screen.get_size()
+
         self.original_background = None
 
         self.cap = cv2.VideoCapture("assets/images/start_video.mp4")
@@ -165,7 +171,17 @@ class Menu:
         self.controls_menu = None
         self.controls_command_nb = 0
 
+        self.is_souls_collected = False
+        self.souls_collected_timer = 0
+
         self.init_buttons()
+
+        # --- Souls Animation --- #
+        self.souls_animation = Animation(load_images('pickups/soul/idle'),5,True)
+        self.souls_pos = []
+        self.souls_end_pos = [self.SH * 0.1, self.SH * 0.1]
+        self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
+        self.nb_souls_pos = [self.SH * 0.1 +self.SW*0.04, self.SH * 0.1]
 
     def init_buttons(self):
         """
@@ -319,6 +335,17 @@ class Menu:
             button_font=self.button_font
         )
 
+
+    def reload_menu(self):
+        self.screen = self.game.screen
+        self.save_current_button_states()
+        self.init_buttons()
+        self.SW, self.SH = self.screen.get_size()
+        self.souls_end_pos = [self.SH * 0.1, self.SH * 0.1]
+        self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
+        self.nb_souls_pos = [self.SH * 0.1+self.SW*0.04, self.SH * 0.1]
+
+
     def save_current_button_states(self):
         """Update the dictionary with the current button state."""
 
@@ -430,15 +457,6 @@ class Menu:
                     command_nb += 1
 
         return command_nb
-
-    def update_settings_from_game(self):
-        """
-        Takes the saved settings to apply them to our keyboard and language (which is not graphically working for the moment)
-        """
-        self.volume = self.game.volume
-        self.keyboard_layout = self.game.keyboard_layout.upper()
-        if self.game.selected_language in self.languages:
-            self.selected_language = self.game.selected_language
 
     def capture_background(self):
         """
@@ -816,6 +834,7 @@ class Menu:
                 self.controls_menu.scroll_y = 0
                 self.controls_menu.target_scroll = 0
                 self.game.state = self.game.OPTION_STATE
+        self.controls_menu.draw_controls_menu()
 
     def draw_pause_menu(self):
         current_screen_size = self.screen.get_size()
@@ -909,6 +928,53 @@ class Menu:
                             pygame.quit()
                             sys.exit()
 
+    def draw_player_souls(self):
+        if not self.is_souls_collected:
+            return
+
+
+
+        self.souls_animation.update()
+
+        # --- Progression normalisée (0.0 → 1.0) ---
+        duration = 120
+        t = self.souls_collected_timer / duration  # 0.0 à 1.0
+
+        nb_souls = self.button_font.render(f"x{self.game.nb_souls-1}",True,self.COLORS["white"])if self.souls_collected_timer <duration/2 else self.button_font.render(f"x{self.game.nb_souls}",True,self.COLORS["white"])
+        self.screen.blit(nb_souls,nb_souls.get_rect(center=self.nb_souls_pos))
+
+        # --- Easing : ease-in (accélère vers la fin) ---
+        t_eased = t ** 2  # ou t ** 3 pour plus prononcé
+
+        # --- Interpolation position ---
+        start_pos = self.souls_pos
+        end_pos = self.souls_end_pos
+
+        self.souls_pos[0] = start_pos[0] + (end_pos[0] - start_pos[0]) * t_eased
+        self.souls_pos[1] = start_pos[1] + (end_pos[1] - start_pos[1]) * t_eased
+
+        # --- Interpolation taille (rétrécit en approchant) ---
+        start_size = self.souls_start_size  # ex: [60, 60]
+        end_size = [20, 20]
+
+        current_w = int(start_size[0] + (end_size[0] - start_size[0]) * t_eased)
+        current_h = int(start_size[1] + (end_size[1] - start_size[1]) * t_eased)
+
+        # --- Fade out progressif ---
+        alpha = int(255 * (1 - t_eased))
+
+        # --- Rendu ---
+        souls_icon = pygame.transform.scale(self.souls_animation.img(), (current_w, current_h))
+        souls_icon.set_alpha(alpha)
+
+        soul_rect = souls_icon.get_rect(centerx=int(self.souls_pos[0]), centery=int(self.souls_pos[1]))
+        self.screen.blit(souls_icon, soul_rect)
+
+        # --- Timer ---
+        self.souls_collected_timer += 1
+        if self.souls_collected_timer >= duration:
+            self.souls_collected_timer = 0
+            self.is_souls_collected = False
 
     def update_setting_by_button(self,button,setting):
         """

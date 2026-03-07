@@ -197,8 +197,7 @@ def check_screen(game):
     else:
         game.screen = pygame.display.set_mode((1000, 600),vsync=game.vsync_on)
 
-    game.menu.save_current_button_states()
-    game.menu.init_buttons()
+    game.menu.reload_menu()
 
 def toggle_fullscreen(game):
     game.fullscreen = not game.fullscreen
