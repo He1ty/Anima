@@ -486,7 +486,6 @@ class SaveSlotUI:
                                80, 80)
             if self.thumbnail:
                 img = pygame.transform.scale(self.thumbnail, img_rect.size)
-                img.set_alpha(128)
                 surface.blit(img, img_rect.topleft)
 
             right_margin = 30

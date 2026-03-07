@@ -19,7 +19,6 @@ DEFAULT_BINDINGS = {
     },
     "Action": {
         "Select"      : pygame.K_RETURN,
-        "Cancel"      : pygame.K_ESCAPE,
         "Interact"    : pygame.K_e,
     },
     "Debug":{
@@ -112,13 +111,18 @@ class ControlsMenu:
 
         # Navigation
         self.command_nb  = 0      # index parmi bind_indices (= ligne sélectionnée)
-        self.scroll_y    = 0
+        self.scroll_y = 0  # This will be our "current" interpolated position
+        self.target_scroll = 0  # This is where we WANT to go
+        self.scroll_speed = 0.3  # Adjust between 0.05 (slow) and 0.3 (fast)
         self.rebinding   = False
         self.flash_timer = 0
 
         # Bouton retour (même style que MenuButton dans ton projet)
         self._init_back_button()
         self._compute_layout()
+
+        self.pressing_down = False
+        self.pressing_up = False
 
     # ── Init bouton retour ───────────────────────────────────────────────────
 
@@ -139,7 +143,7 @@ class ControlsMenu:
 
     def _compute_layout(self):
         sw, sh = self.screen.get_size()
-        y = 90  # espace sous le titre
+        y = 50  # espace sous le titre
         self.row_rects = []
         for it in self.items:
             h = self.CAT_H if it[0] == "cat" else self.ITEM_H
@@ -164,12 +168,29 @@ class ControlsMenu:
 
 
     def _ensure_visible(self):
-        idx   = self.bind_indices[self.command_nb]
-        y_abs = self.row_rects[idx][0]
-        if y_abs - self.scroll_y < 0:
-            self.scroll_y = max(0, y_abs - self.PADDING)
-        elif y_abs + self.ITEM_H - self.scroll_y > self.view_h:
-            self.scroll_y = min(self.max_scroll, y_abs + self.ITEM_H - self.view_h + self.PADDING)
+        idx = self.bind_indices[self.command_nb]
+        y_abs, h = self.row_rects[idx]
+
+        # Include the category header if it's right above us
+        top_margin = self.PADDING
+        if idx > 0 and self.items[idx - 1][0] == "cat":
+            top_margin += self.row_rects[idx - 1][1] + self.PADDING
+
+        # We update target_scroll instead of scroll_y directly
+        if y_abs - self.target_scroll < top_margin:
+            self.target_scroll = max(0, y_abs - top_margin)
+        elif y_abs + h - self.target_scroll > self.view_h:
+            self.target_scroll = min(self.max_scroll, y_abs + h - self.view_h + self.PADDING)
+
+    def update_scroll(self):
+        """Call this every frame to handle the sliding motion."""
+        diff = self.target_scroll - self.scroll_y
+
+        # If the distance is tiny, just snap to avoid micro-stuttering
+        if abs(diff) < 0.5:
+            self.scroll_y = self.target_scroll
+        else:
+            self.scroll_y += diff * self.scroll_speed
 
     # ── Gestion des événements (même signature que les autres menus) ──────────
 
@@ -200,11 +221,11 @@ class ControlsMenu:
         # ── Navigation normale ──────────────────────────────────────────────
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_DOWN:
-                self.command_nb = (self.command_nb + 1) % len(self.bind_indices)
+                self.command_nb = min(self.command_nb + 1, len(self.bind_indices) - 1)
                 self._ensure_visible()
 
             elif event.key == pygame.K_UP:
-                self.command_nb = (self.command_nb - 1) % len(self.bind_indices)
+                self.command_nb = max(0, self.command_nb - 1)
                 self._ensure_visible()
 
             elif event.key == pygame.K_RETURN:
@@ -248,6 +269,7 @@ class ControlsMenu:
         else:
             self.screen.fill(self.game.menu.COLORS["black"])
 
+        self.update_scroll()
 
         # Overlay semi-transparent
 

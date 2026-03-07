@@ -70,12 +70,11 @@ class PhysicsPlayer:
         self.anti_dash_buffer = False
         self.stop_dash_momentum = {"y": False, "x": False}
         self.can_walljump = {"sliding": False, "wall": 0, "buffer": False, "timer": 0, "blocks_around": False,
-                             "cooldown": 0, "allowed": True, "available": False, "count":0}
+                             "cooldown": 0, "allowed": True, "available": False, "count": 0}
         self.max_walljumps = 3
-        self.force_movement_direction = {"r":[False,0],"l":[False,0]}
+        self.force_movement_direction = {"r": [False, 0], "l": [False, 0]}
         self.force_movement = ""
-        
-        
+
         self.prevent_walking = False
         # available used to know if you can walljump, wall to know where the wall is located,
         # buffer to deal with logic conflicts in collision_check, timer for walljump coyote time
@@ -108,7 +107,7 @@ class PhysicsPlayer:
         self.action = "idle"
         self.animation = self.game.assets['player/' + "idle"].copy()
         self.collision = {'left': False, 'right': False, 'bottom': False, 'top': False}
-        self.get_block_on = {'left': False, 'right': False, 'top':False, 'bottom':False}
+        self.get_block_on = {'left': False, 'right': False, 'top': False, 'bottom': False}
         self.air_time = 0
         self.disablePlayerInput = False
         self.collide_with_passable_blocks = True
@@ -157,9 +156,8 @@ class PhysicsPlayer:
         """Input : tilemap (map), dict_kb (dict)
         output : sends new coords for the PC to move to in accordance with player input and stage data (tilemap)"""
         self.dict_kb = dict_kb
-        #self.force_player_movement_direction()
+        # self.force_player_movement_direction()
         self.force_player_movement()
-
 
         if self.disablePlayerInput:
             self.dict_kb = {"key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0, "key_jump": 0, "key_dash": 0,
@@ -173,7 +171,8 @@ class PhysicsPlayer:
 
             if stun_elapsed < stun_duration:
                 if self.stunned_by:
-                    self.velocity = list(deal_knockback(self.stunned_by, self, self.knockback_strenght, self.knockback_duration))
+                    self.velocity = list(
+                        deal_knockback(self.stunned_by, self, self.knockback_strenght, self.knockback_duration))
 
                 # Jouer le son de stun
                 if stun_elapsed < 0.05:  # Pour ne jouer le son qu'une fois au début du stun
@@ -212,10 +211,9 @@ class PhysicsPlayer:
             # Spin based on direction (Clockwise if facing right, CCW if left)
             # We use last_direction so you keep spinning even if you stop pressing keys in mid-air
 
-
             if not self.can_walljump["sliding"] or self.rotation_angle % 90 != 0:
                 if self.last_direction == 1:
-                    self.rotation_angle -= rotation_speed # Negative is clockwise in Pygame
+                    self.rotation_angle -= rotation_speed  # Negative is clockwise in Pygame
                 else:
                     self.rotation_angle += rotation_speed
 
@@ -263,16 +261,17 @@ class PhysicsPlayer:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
 
-
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
             if self.force_movement_direction["l"][0]:
-                self.walk(-1,1)
+                self.walk(-1, 1)
             else:
-                self.walk(1,1)
-            if (-1 < self.force_movement_direction["l"][1] < 1 and self.force_movement_direction["l"][0]) or (self.force_movement_direction["r"][0] and -1 < self.force_movement_direction["r"][1] < 1) or self.is_on_floor():
-                self.force_movement_direction = {"r":[False,0],"l":[False,0]}
+                self.walk(1, 1)
+            if (-1 < self.force_movement_direction["l"][1] < 1 and self.force_movement_direction["l"][0]) or (
+                    self.force_movement_direction["r"][0] and -1 < self.force_movement_direction["r"][
+                1] < 1) or self.is_on_floor():
+                self.force_movement_direction = {"r": [False, 0], "l": [False, 0]}
             elif self.force_movement_direction["l"][1] != -1 or self.force_movement_direction["r"][1] != -1:
                 self.force_movement_direction["l"][1] -= 1
                 self.force_movement_direction["r"][1] -= 1
@@ -306,9 +305,9 @@ class PhysicsPlayer:
             pass
 
     def set_action(self, action):
-        if action != self.action :
+        if action != self.action:
             self.action = action
-            #self.animation = self.game.assets['player/' + self.action].copy()
+            # self.animation = self.game.assets['player/' + self.action].copy()
 
     def apply_animations(self):
         """
@@ -343,7 +342,9 @@ class PhysicsPlayer:
                 animation_applied = True
 
         # THIRD PRIORITY: Wall sliding
-        if not animation_applied and (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0) and not self.is_on_floor() and self.can_walljump[
+        if not animation_applied and (
+                self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0 or self.GRAVITY_DIRECTION == -1 and self.velocity[
+            1] < 0) and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]:
             if self.collision["right"]:
                 self.set_action("wall_slide/right")
@@ -379,9 +380,13 @@ class PhysicsPlayer:
                 animation_applied = True
             # Falling
             else:
-                if (self.get_direction("x") == 1 or (self.action == 'falling/right' and self.get_direction("x") != -1) or self.force_movement_direction["r"][0]) and not self.force_movement_direction["l"][0]:
+                if (self.get_direction("x") == 1 or (
+                        self.action == 'falling/right' and self.get_direction("x") != -1) or
+                    self.force_movement_direction["r"][0]) and not self.force_movement_direction["l"][0]:
                     self.set_action('falling/right')
-                elif self.get_direction("x") == -1 or (self.action == 'falling/left' and self.get_direction("x") != 1) or self.force_movement_direction["l"][0]:
+                elif self.get_direction("x") == -1 or (
+                        self.action == 'falling/left' and self.get_direction("x") != 1) or \
+                        self.force_movement_direction["l"][0]:
                     self.set_action('falling/left')
                 elif self.get_direction("x") == 0:
                     self.set_action('falling/vertical')
@@ -415,7 +420,8 @@ class PhysicsPlayer:
         # Offset depends on gravity: +1 if normal (down), -1 if inverted (up)
         y_offset = self.GRAVITY_DIRECTION
 
-        for rect in self.tilemap.physics_rects_under(self.pos, self.size, self.GRAVITY_DIRECTION) + self.game.doors_rects:
+        for rect in self.tilemap.physics_rects_under(self.pos, self.size,
+                                                     self.GRAVITY_DIRECTION) + self.game.doors_rects:
             entity_rect = pygame.Rect(self.pos[0], self.pos[1] + y_offset, self.size[0], self.size[1])
             if entity_rect.colliderect(rect):
                 if self.GRAVITY_DIRECTION == 1:
@@ -444,19 +450,22 @@ class PhysicsPlayer:
                 if self.velocity[1] == 0 or abs(self.acceleration[1]) not in (0.42, 1):
                     if self.can_walljump["count"] < self.max_walljumps - 1:
                         if self.velocity[1] == 0:
-                            self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION # gravity acceleration while sliding
+                            self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding
                     elif self.can_walljump["count"] == self.max_walljumps - 1:
-                        self.acceleration[1] = 0.008 * self.GRAVITY_DIRECTION # gravity acceleration while sliding (last jump)
+                        self.acceleration[
+                            1] = 0.008 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding (last jump)
                     else:
                         self.acceleration[
                             1] = 0.3 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding (no more jumps left, walljump fatigue)
             else:
-                not_realising_jump_after_jump = not self.holding_jump and (self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[1] > 0 and self.GRAVITY_DIRECTION == -1) and not (self.collision["left"] and self.collision["right"])
+                not_realising_jump_after_jump = not self.holding_jump and (
+                            self.velocity[1] < 0 and self.GRAVITY_DIRECTION == 1 or self.velocity[
+                        1] > 0 and self.GRAVITY_DIRECTION == -1) and not (
+                            self.collision["left"] and self.collision["right"])
                 if not_realising_jump_after_jump:
                     self.acceleration[1] = self.GRAVITY_DIRECTION
                 else:
-                    self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION # Normal gravity acceleration
-
+                    self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION  # Normal gravity acceleration
 
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
@@ -465,10 +474,10 @@ class PhysicsPlayer:
                 self.velocity[1] = max(-6.0, self.velocity[1] + (self.acceleration[1] * dt))
 
         elif self.is_on_floor():
-            self.pos[1] = int(self.pos[1]) # Take only the integer part in order to avoid some pixels overlap
+            self.pos[1] = int(self.pos[1])  # Take only the integer part in order to avoid some pixels overlap
             # (for example when we jump, if player stops at 80.399999, we make sure that player coordinate is at 80 before setting vertical velocity to 0)
             if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or \
-           (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
+                    (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
                 self.velocity[1] = 0
 
             # Stop unintended horizontal movement if no input is given
@@ -490,7 +499,6 @@ class PhysicsPlayer:
             self.holding_jump = False
             self.buffering_jump = False
             self.holding_walljump = False
-
 
         if self.dict_kb["key_jump"] == 1:
 
@@ -519,12 +527,12 @@ class PhysicsPlayer:
                         if self.dash_started_in_air:
                             self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
                             self.velocity[1] = 1.4 * self.velocity[
-                                                   1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                                1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
                         # On floor mono superjump
                         elif self.dash_direction[1] == 0:
                             self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
                             self.velocity[1] = self.velocity[
-                                1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                                                   1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
                         # Double input superjump
                         else:
@@ -548,7 +556,6 @@ class PhysicsPlayer:
                     # Jouer le son de wall jump
                     self.game.play_se('wall_jump')
 
-
                     if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
                         self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
                         self.velocity[1] *= 1
@@ -565,7 +572,6 @@ class PhysicsPlayer:
                     self.game.play_se("wall_jump")
                     self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                     self.wall_jump_logic_helper()
-
 
             self.buffering_jump = True
 
@@ -596,7 +602,7 @@ class PhysicsPlayer:
         self.dash_startup_cur = max(self.dash_startup_cur - dt, 0)
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - dt, 0)
         if not self.anti_dash_buffer:
-            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur <= 0: #and self.dash_direction != [0, -1]
+            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur <= 0:  # and self.dash_direction != [0, -1]
                 if self.game.player_grabbing:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
@@ -612,14 +618,15 @@ class PhysicsPlayer:
 
                     # Jouer le son de dash
                     self.game.play_se('dash')
-                    #self.play_sound('dash', force=True)
+                    # self.play_sound('dash', force=True)
                 if not self.is_on_floor():
                     self.dash_started_in_air = True
                 self.dash_startup_cur = self.DASH_STARTUP_FRAMES
                 self.anti_dash_buffer = True
                 self.dash_cooldown_cur = self.DASH_COOLDOWN
 
-            if (self.dashtime_cur != 0 and self.get_direction("x") == -self.dash_direction[0] and self.get_direction("x") != 0 or
+            if (self.dashtime_cur != 0 and self.get_direction("x") == -self.dash_direction[0] and self.get_direction(
+                    "x") != 0 or
                     (self.get_direction("y") == -self.dash_direction[1] and self.get_direction("y") != 0)):
                 self.dashtime_cur = 0
 
@@ -648,7 +655,7 @@ class PhysicsPlayer:
                 if self.dashtime_cur <= 0:
                     self.dash_end_movement = True
                     mult = 2
-                    self.velocity[1] = (abs(self.velocity[1])/self.velocity[1])*mult if self.velocity[1] != 0 else 0
+                    self.velocity[1] = (abs(self.velocity[1]) / self.velocity[1]) * mult if self.velocity[1] != 0 else 0
                     if self.collision["left"] or self.collision["right"]:
                         self.velocity[0] = 0
 
@@ -673,9 +680,11 @@ class PhysicsPlayer:
 
             if self.can_walljump["timer"] <= 0:
                 self.can_walljump["sliding"] = False
-            for rect in tilemap.physics_rects_under(self.pos, self.size, self.GRAVITY_DIRECTION) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_under(self.pos, self.size,
+                                                    self.GRAVITY_DIRECTION) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
-                    if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
+                    if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or (
+                            self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
                         # --- GROUND CORNER CORRECTION ---
                         # If falling and clipping a corner, try to nudge onto the ledge
                         nudged = False
@@ -683,15 +692,19 @@ class PhysicsPlayer:
                                 (self.dash_direction[0] == 0 or self.dash_direction[1] == 0)):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 if not any(
-                                        pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
-                                        for r in tilemap.physics_rects_under([self.pos[0] + i, self.pos[1]], self.size, self.GRAVITY_DIRECTION)):
+                                        pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0],
+                                                    self.size[1]).colliderect(r)
+                                        for r in tilemap.physics_rects_under([self.pos[0] + i, self.pos[1]], self.size,
+                                                                             self.GRAVITY_DIRECTION)):
                                     self.pos[0] += i
                                     nudged = True
                                     break
                                 # Check Left nudge
                                 if not any(
-                                        pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
-                                        for r in tilemap.physics_rects_under([self.pos[0] - i, self.pos[1]], self.size, self.GRAVITY_DIRECTION)):
+                                        pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0],
+                                                    self.size[1]).colliderect(r)
+                                        for r in tilemap.physics_rects_under([self.pos[0] - i, self.pos[1]], self.size,
+                                                                             self.GRAVITY_DIRECTION)):
                                     self.pos[0] -= i
                                     nudged = True
                                     break
@@ -703,32 +716,41 @@ class PhysicsPlayer:
                             elif self.GRAVITY_DIRECTION == -1:
                                 self.pos[1] = rect.bottom
                                 self.collision['top'] = True
-                            #self.velocity[1] = 0
+                            # self.velocity[1] = 0
                             self.can_walljump["buffer"] = True
                             self.can_walljump["sliding"] = False
 
-                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y + self.size[1] >= rect.y > entity_rect.y and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width) or
-                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y > rect.y >= entity_rect.y - self.size[1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
+                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y + self.size[
+                    1] >= rect.y > entity_rect.y and entity_rect.x + self.size[
+                         0] > rect.x and entity_rect.x < rect.x + rect.width) or
+                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y > rect.y >= entity_rect.y - self.size[
+                            1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
                     b_b.add(True)
 
             for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
-                    if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] < 0) or (self.GRAVITY_DIRECTION == -1 and self.velocity[1] > 0):
+                    if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] < 0) or (
+                            self.GRAVITY_DIRECTION == -1 and self.velocity[1] > 0):
                         # If jumping and hitting a head-block corner, nudge to the side
                         nudged = False
-                        if rect not in self.game.doors_rects and (self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
+                        if rect not in self.game.doors_rects and (
+                                self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 # Try nudging Right
                                 if not any(
-                                        pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
-                                        for r in tilemap.physics_rects_around([self.pos[0] + i, self.pos[1]], self.size)):
+                                        pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0],
+                                                    self.size[1]).colliderect(r)
+                                        for r in
+                                        tilemap.physics_rects_around([self.pos[0] + i, self.pos[1]], self.size)):
                                     self.pos[0] += i
                                     nudged = True
                                     break
                                 # Try nudging Left
                                 if not any(
-                                        pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0], self.size[1]).colliderect(r)
-                                        for r in tilemap.physics_rects_around([self.pos[0] - i, self.pos[1]], self.size)):
+                                        pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0],
+                                                    self.size[1]).colliderect(r)
+                                        for r in
+                                        tilemap.physics_rects_around([self.pos[0] - i, self.pos[1]], self.size)):
                                     self.pos[0] -= i
                                     nudged = True
                                     break
@@ -746,8 +768,11 @@ class PhysicsPlayer:
 
                     self.stop_dash_momentum["y"] = True
 
-                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y - self.size[1] <= rect.y < entity_rect.y and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width) or
-                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y <= rect.y < entity_rect.y + self.size[1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
+                if ((self.GRAVITY_DIRECTION == 1 and entity_rect.y - self.size[
+                    1] <= rect.y < entity_rect.y and entity_rect.x + self.size[
+                         0] > rect.x and entity_rect.x < rect.x + rect.width) or
+                        (self.GRAVITY_DIRECTION == -1 and entity_rect.y <= rect.y < entity_rect.y + self.size[
+                            1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
                     b_t.add(True)
 
             self.get_block_on["top"] = bool(b_t)
@@ -762,18 +787,21 @@ class PhysicsPlayer:
                     # --- HORIZONTAL CORNER CORRECTION ---
                     # If hitting a wall, try to nudge the player Up or Down to bypass the corner
                     nudged = False
-                    if rect not in self.game.doors_rects and self.dashtime_cur and (self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
+                    if rect not in self.game.doors_rects and self.dashtime_cur and (
+                            self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                         for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                             # 1. Try nudging UP (Useful for stepping onto a ledge automatically)
                             if not any(
-                                    pygame.Rect(self.pos[0], self.pos[1] - i, self.size[0], self.size[1]).colliderect(r) for
+                                    pygame.Rect(self.pos[0], self.pos[1] - i, self.size[0], self.size[1]).colliderect(r)
+                                    for
                                     r in tilemap.physics_rects_around([self.pos[0], self.pos[1] - i], self.size)):
                                 self.pos[1] = self.pos[1] - i
                                 nudged = True
                                 break
                             # 2. Try nudging DOWN (Useful for clearing a ceiling corner)
                             if not any(
-                                    pygame.Rect(self.pos[0], self.pos[1] + i, self.size[0], self.size[1]).colliderect(r) for
+                                    pygame.Rect(self.pos[0], self.pos[1] + i, self.size[0], self.size[1]).colliderect(r)
+                                    for
                                     r in tilemap.physics_rects_around([self.pos[0], self.pos[1] + i], self.size)):
                                 self.pos[1] = self.pos[1] + i
                                 nudged = True
@@ -784,14 +812,14 @@ class PhysicsPlayer:
                         if self.velocity[0] > 0:
                             entity_rect.right = rect.left
                             self.collision['right'] = True
-                            #self.anti_dash_buffer = True
-                            #self.dash_cooldown = 5
+                            # self.anti_dash_buffer = True
+                            # self.dash_cooldown = 5
 
                         if self.velocity[0] < 0:
                             entity_rect.left = rect.right
                             self.collision['left'] = True
-                            #self.anti_dash_buffer = True
-                            #self.dash_cooldown = 5
+                            # self.anti_dash_buffer = True
+                            # self.dash_cooldown = 5
                         self.pos[0] = entity_rect.x
                         self.stop_dash_momentum["x"] = True
 
@@ -806,15 +834,15 @@ class PhysicsPlayer:
                     if entity_rect.x + self.size[0] >= rect.x > entity_rect.x:
                         b_r.add(True)
 
-
             self.get_block_on["left"] = bool(b_l)
             self.get_block_on["right"] = bool(b_r)
 
-    def collision_check_walljump_helper(self,axis):
+    def collision_check_walljump_helper(self, axis):
         """Avoids redundancy"""
-        #The condition checks if there is no buffer, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
+        # The condition checks if there is no buffer, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
         if (not self.can_walljump["buffer"] and not self.dash_end_movement and not self.holding_jump_from_ground and
-                not self.is_on_floor() and self.can_walljump["blocks_around"] and (self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"])):
+                not self.is_on_floor() and self.can_walljump["blocks_around"] and (
+                self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"])):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
             self.can_walljump["sliding"] = True
@@ -829,17 +857,22 @@ class PhysicsPlayer:
     def wall_jump_blocks_around_check(self):
         vertical_offset = 2
 
-        check_right = (self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().y + vertical_offset), transparent_check=False) or
-                                              self.tilemap.solid_check((self.rect().centerx + 8.5*1, self.rect().bottom - vertical_offset), transparent_check=False))
-        check_left = (self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().y + 2), transparent_check=False) or
-                                              self.tilemap.solid_check((self.rect().centerx + 8.5*(-1), self.rect().bottom - vertical_offset), transparent_check=False))
+        check_right = (self.tilemap.solid_check((self.rect().centerx + 8.5 * 1, self.rect().y + vertical_offset),
+                                                transparent_check=False) or
+                       self.tilemap.solid_check((self.rect().centerx + 8.5 * 1, self.rect().bottom - vertical_offset),
+                                                transparent_check=False))
+        check_left = (self.tilemap.solid_check((self.rect().centerx + 8.5 * (-1), self.rect().y + 2),
+                                               transparent_check=False) or
+                      self.tilemap.solid_check((self.rect().centerx + 8.5 * (-1), self.rect().bottom - vertical_offset),
+                                               transparent_check=False))
         if check_right and check_left:
             self.can_walljump["blocks_around"] = (
-                        self.tilemap.solid_check((self.rect().centerx + 8.5 * self.last_direction, self.rect().y + vertical_offset),
-                                                 transparent_check=False) or
-                        self.tilemap.solid_check(
-                            (self.rect().centerx + 8.5 * self.last_direction, self.rect().bottom - vertical_offset),
-                            transparent_check=False))
+                    self.tilemap.solid_check(
+                        (self.rect().centerx + 8.5 * self.last_direction, self.rect().y + vertical_offset),
+                        transparent_check=False) or
+                    self.tilemap.solid_check(
+                        (self.rect().centerx + 8.5 * self.last_direction, self.rect().bottom - vertical_offset),
+                        transparent_check=False))
         else:
             self.can_walljump["blocks_around"] = check_right or check_left
 
@@ -858,14 +891,13 @@ class PhysicsPlayer:
         self.pos[0] += self.velocity[0] * dt
         self.collision_check("x", dt)
 
-
         move_y = self.velocity[1] * dt
         move_y = max(-7, min(move_y, 7))
 
         self.pos[1] += move_y
         self.collision_check("y", dt)
 
-        if abs(int(self.velocity[1])) ==  0:
+        if abs(int(self.velocity[1])) == 0:
             self.dash_end_movement = False
 
         if self.collision["right"] or self.collision["left"]:
@@ -885,7 +917,7 @@ class PhysicsPlayer:
             if self.can_walljump["wall"] != 0:
                 self.can_walljump["wall"] = 0
 
-        if not(not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
+        if not (not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
             self.can_walljump["sliding"] = False
 
@@ -912,7 +944,6 @@ class PhysicsPlayer:
                         self.velocity[0] *= math.pow(0.98, dt)
         else:
             self.velocity[0] *= math.pow(0.95, dt)
-
 
     def get_direction(self, axis):
         """Gets the current direction the player is holding towards. Takes an axis as argument ('x' or 'y')
@@ -959,14 +990,13 @@ class PhysicsPlayer:
         if 1 <= self.visual_scale[1] <= 1.2:
             self.visual_scale[1] = 1
 
-
         # Force = -k * x
         force_x = -self.stiffness * (self.visual_scale[0] - 1.0)
         force_y = -self.stiffness * (self.visual_scale[1] - 1.0)
 
         # Acceleration = Force (mass is 1)
-        self.spring_velocity[0] = (self.spring_velocity[0] + force_x*dt) * self.damping
-        self.spring_velocity[1] = (self.spring_velocity[1] + force_y*dt) * self.damping
+        self.spring_velocity[0] = (self.spring_velocity[0] + force_x * dt) * self.damping
+        self.spring_velocity[1] = (self.spring_velocity[1] + force_y * dt) * self.damping
 
         self.visual_scale[0] += self.spring_velocity[0] * dt
         self.visual_scale[1] += self.spring_velocity[1] * dt
@@ -978,14 +1008,14 @@ class PhysicsPlayer:
             self.visual_scale = [1.0 + impact, 1.0 - impact]  # Widen and flatten
 
         # Hitting a Wall (Wall Splash)
-        if not self.rotation_angle and (self.collision['left'] or self.collision['right']) and abs(self.last_velocity[0]) > 1:
+        if not self.rotation_angle and (self.collision['left'] or self.collision['right']) and abs(
+                self.last_velocity[0]) > 1:
             impact = abs(self.last_velocity[0]) * 0.08
             self.visual_scale = [1.0 - impact, 1.0 + impact]  # Thin and tall'''
 
         # 3. Jumping Stretch
         if self.jumping and abs(self.velocity[1]) > 4:
             self.visual_scale = [0.8, 1.2]  # Stretch upward when leaving ground
-
 
         # Capture velocity for the next frame's impact calculation
         self.last_velocity = list(self.velocity)
@@ -1040,7 +1070,8 @@ class PhysicsPlayer:
 
             # Apply transparency
             ghost_surf.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
-            ghost_surf.fill((109, 156, 159, 70) if "color" not in ghost else ghost["color"], special_flags=pygame.BLEND_RGBA_MIN)
+            ghost_surf.fill((109, 156, 159, 70) if "color" not in ghost else ghost["color"],
+                            special_flags=pygame.BLEND_RGBA_MIN)
             ghost_surf.set_alpha(alpha)
 
             # Rotate Ghost
@@ -1087,7 +1118,6 @@ class PhysicsPlayer:
         # Create a surface the same size as the image
         color_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
 
-
         if self.dash_amt == 0:
             scaled_img = pygame.transform.grayscale(scaled_img)
             color = (0, self.dashtime_cur * 6, self.dashtime_cur * 8, 0)
@@ -1114,9 +1144,8 @@ class PhysicsPlayer:
                 scaled_img = pygame.transform.grayscale(scaled_img)
                 scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
 
-            if self.walljump_fatigue_frame_count > (30 if self.can_walljump['count'] == self.max_walljumps - 1 else 10) :
+            if self.walljump_fatigue_frame_count > (30 if self.can_walljump['count'] == self.max_walljumps - 1 else 10):
                 self.walljump_fatigue_frame_count = 0
-
 
         if self.rotation_angle != 0:
             # Rotate the image

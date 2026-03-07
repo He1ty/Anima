@@ -319,8 +319,6 @@ class Menu:
             button_font=self.button_font
         )
 
-
-
     def save_current_button_states(self):
         """Update the dictionary with the current button state."""
 
@@ -810,12 +808,14 @@ class Menu:
 
     def draw_keyboard_settings_menu(self):
         self.draw_title_screen_background_animation()
+        self.controls_menu.draw_controls_menu()
         for event in pygame.event.get():
             result = self.controls_menu.handle_event(event)
             if result == "back":
                 self.controls_command_nb = 0
+                self.controls_menu.scroll_y = 0
+                self.controls_menu.target_scroll = 0
                 self.game.state = self.game.OPTION_STATE
-        self.controls_menu.draw_controls_menu()
 
     def draw_pause_menu(self):
         current_screen_size = self.screen.get_size()

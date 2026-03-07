@@ -33,7 +33,7 @@ def pil_to_pygame(pil_image):
     # .convert_alpha() optimizes the surface for Pygame rendering
     return surface.convert_alpha()
 
-def slice_tileset_to_memory(image_path, tile_width, tile_height):
+def slice_tileset_to_memory(image_path, tile_width, tile_height, spiral_order=False):
     tiles = []  # This list will hold all our image objects
 
     try:
@@ -61,14 +61,15 @@ def slice_tileset_to_memory(image_path, tile_width, tile_height):
                 # Add the tile object to our list instead of saving it
                 tiles.append(pil_to_pygame(tile))
 
-        if len(tiles) > 3:
-            tmp = tiles.copy()
-            transformation = {7:3, 8:4, 3:5, 4:8, 5:7}
-            for i in transformation:
-                try:
-                    tiles[i] = tmp[transformation[i]]
-                except IndexError:
-                    pass
+        if spiral_order:
+            if len(tiles) > 3:
+                tmp = tiles.copy()
+                transformation = {7:3, 8:4, 3:5, 4:8, 5:7}
+                for i in transformation:
+                    try:
+                        tiles[i] = tmp[transformation[i]]
+                    except IndexError:
+                        pass
 
         #print(f"Successfully sliced {len(tiles)} tiles into memory.")
         return tiles
@@ -89,7 +90,7 @@ def load_tiles(env=None):#load every tiles (graphic components) coresponding to 
         for tile in sorted(os.listdir(BASE_IMG_PATH + 'tiles/' + environment)):
             images = load_images('tiles/' + environment + '/' + tile)
             if "tileset.png" in os.listdir(f'{BASE_IMG_PATH}/tiles/{environment}/{tile}'):
-                tiles[tile] = slice_tileset_to_memory(image_path=f'{BASE_IMG_PATH}/tiles/{environment}/{tile}/tileset.png', tile_width=16, tile_height=16)
+                tiles[tile] = slice_tileset_to_memory(image_path=f'{BASE_IMG_PATH}/tiles/{environment}/{tile}/tileset.png', tile_width=16, tile_height=16, spiral_order=True)
             else:
                 tiles[tile] = images
     return tiles

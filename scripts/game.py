@@ -35,11 +35,8 @@ class Game:
         """
         pygame.init()
 
-
-
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
-
 
         if full_setup:
             # --- Debug Mode ---
@@ -89,8 +86,6 @@ class Game:
                             "key_select" : pygame.K_RETURN}
 
             self.menu = Menu(self)
-
-
 
         # The internal rendering surface (half size for a pixel-art aesthetic)
         self.display = pygame.Surface((self.screen_width/2, self.screen_height/2))
@@ -319,22 +314,6 @@ class Game:
             if level in self.environments[environment]:
                 return environment
         return "green_cave"
-
-    def get_key_map(self):
-        """
-        Maps physical keys to game actions based on the current keyboard layout setting.
-
-        Returns:
-            dict: A mapping of pygame key constants to internal action strings.
-        """
-        layout = self.keyboard_layout.lower()
-        if layout == "azerty":
-            return {pygame.K_z: "key_up", pygame.K_s: "key_down", pygame.K_q: "key_left",
-                    pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
-                    pygame.K_n: "key_noclip"}
-        return {pygame.K_w: "key_up", pygame.K_s: "key_down", pygame.K_a: "key_left",
-                pygame.K_d: "key_right", pygame.K_g: "key_dash", pygame.K_SPACE: "key_jump",
-                pygame.K_n: "key_noclip"}
 
     def set_keymap(self,bindings: dict):
         for cat in bindings:
