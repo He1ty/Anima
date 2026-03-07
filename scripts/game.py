@@ -344,7 +344,7 @@ class Game:
 
         self.pickups = []
         for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(BASE_IMG_PATH + 'pickups'))]):
-            if f"{pickup["pos"][0]};{pickup["pos"][1]}" not in self.collected_souls:
+            if pickup["pos"] not in self.collected_souls:
                 self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
 
         self.spikes = []
