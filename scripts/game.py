@@ -102,9 +102,6 @@ class Game:
         self.PROFILE_SELECTION_STATE = "PROFILE_SELECTION"
         self.PLAYING_STATE = "PLAYING"
 
-        self.FAKE_TILES_LAYER = "6"
-        self.ACTIVATORS_LAYER = "3"
-
         self.previous_state = None
         self.state = "START_SCREEN"
         self.game_initialized = False
@@ -148,9 +145,9 @@ class Game:
             "blue_vine_door_h": {"size": (64, 16), "img_dur": 5}
         }
 
-        self.b_info = {"white_space": "animated",
-                        "green_cave": "static",
-                        "blue_cave": "static"}
+        self.b_info = {"white_space": {"animated":True, "img_dur": 6, "loop": True},
+                        "green_cave": {"animated":False},
+                        "blue_cave": {"animated":False}}
         path = 'data/environments.json'
         if os.path.exists(path):
             with open(path, 'r') as f:
@@ -221,7 +218,7 @@ class Game:
 
         self.activators = []
         self.projectiles = []
-        self.activators_actions = load_activators_actions(self.level)
+        self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
         self.spawner_pos = {}
 
         self.checkpoints = []
@@ -347,7 +344,7 @@ class Game:
         self.display = pygame.Surface((self.screen_width*mult, self.screen_height*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
-        self.activators_actions = load_activators_actions(self.level)
+        self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
 
         # --- Checkpoints & Traps ---
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
@@ -431,22 +428,21 @@ class Game:
                 for variant in range(len(self.assets[tile])):
                     fake_tiles_id_pairs.append((tile, variant))
 
-        if self.FAKE_TILES_LAYER in self.tilemap.tilemap:
-            if not hasattr(self, "fake_tile_groups"):
-                self.fake_tile_groups = []
-                for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=(self.FAKE_TILES_LAYER,)):
-                    fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
-                    fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
-                    g_check = True
-                    for group in self.fake_tile_groups:
-                        if fake_tile in group:
-                            g_check = False
-                            continue
-                    if g_check:
-                        group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.FAKE_TILES_LAYER)
-                        if group not in self.fake_tile_groups:
-                            self.fake_tile_groups.append(group)
-            self.tilemap.extract(fake_tiles_id_pairs, layers=(self.FAKE_TILES_LAYER,))
+        if not hasattr(self, "fake_tile_groups"):
+            self.fake_tile_groups = []
+            for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
+                fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
+                fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
+                g_check = True
+                for group in self.fake_tile_groups:
+                    if fake_tile in group:
+                        g_check = False
+                        continue
+                if g_check:
+                    group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.tilemap.layers["fake_tiles"])
+                    if group not in self.fake_tile_groups:
+                        self.fake_tile_groups.append(group)
+        self.tilemap.extract(fake_tiles_id_pairs, layers=tuple(self.tilemap.layers["fake_tiles"]))
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
@@ -710,7 +706,7 @@ class Game:
                     # Interact with items or levers
                     update_throwable_objects_action(self)
                     if not self.player_grabbing:
-                        update_activators_actions(self, self.level)
+                        update_activators_actions(self)
 
                 if event.key == pygame.K_F11: toggle_fullscreen(self)
                 if event.key == pygame.K_f and not self.holding_attack:

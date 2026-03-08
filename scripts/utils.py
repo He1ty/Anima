@@ -129,8 +129,8 @@ def load_pickups(one_image=False):
 def load_backgrounds(b_info):
     tiles = {}
     for environment in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/')):
-        if b_info[environment] == 'animated':
-            tiles[environment] = Animation(load_images('backgrounds/' + environment))
+        if b_info[environment]["animated"]:
+            tiles[environment] = Animation(load_images('backgrounds/' + environment), img_dur=b_info[environment]["img_dur"], loop=b_info[environment]["loop"])
             continue
         for bg in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/' + environment)):
             tiles[environment + "/" + bg[:-4]] = load_image('backgrounds/' + environment + "/" + bg,

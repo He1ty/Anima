@@ -11246,14 +11246,6 @@
      8
     ]
    },
-   "8;5": {
-    "type": "spawners",
-    "variant": 0,
-    "pos": [
-     8,
-     5
-    ]
-   },
    "22;7": {
     "type": "mossy_stone",
     "variant": 8,
@@ -37347,6 +37339,14 @@
      -5,
      74
     ]
+   },
+   "8;5": {
+    "type": "spawners",
+    "variant": 0,
+    "pos": [
+     8,
+     5
+    ]
    }
   },
   "5": {
@@ -39459,14 +39459,6 @@
      -8
     ]
    },
-   "37;-7": {
-    "type": "fake_mossy_stone",
-    "variant": 7,
-    "pos": [
-     37,
-     -7
-    ]
-   },
    "37;-6": {
     "type": "fake_mossy_stone",
     "variant": 7,
@@ -40290,6 +40282,14 @@
      11,
      45
     ]
+   },
+   "37;-7": {
+    "type": "fake_mossy_stone",
+    "variant": 7,
+    "pos": [
+     37,
+     -7
+    ]
    }
   },
   "7": {}
@@ -40538,6 +40538,17 @@
    }
   },
   "0": {}
+ },
+ "layers": {
+  "player": [
+   "4"
+  ],
+  "activators": [
+   "3"
+  ],
+  "fake_tiles": [
+   "6"
+  ]
  },
  "tilesize": 16
 }

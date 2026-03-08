@@ -11,7 +11,6 @@ from unicodedata import category
 from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators, load_pickups
 from scripts.tilemap import Tilemap
 from scripts.button import EditButton
-from scripts.activators import load_activators_actions
 
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200
@@ -978,11 +977,26 @@ class Editor:
         if self.clicking and self.ongrid and mpos_in_mainarea:
             if not self.window_mode:
                 if not self.edit_properties_mode_on:
+                    print(self.categories["Activators"])
+                    if self.tile_list[
+                        self.tile_group] in self.categories["Activators"] and self.current_layer not in self.tilemap.layers["activators"]:
+
+                        self.tilemap.layers["activators"] += [self.current_layer]
+
+                    if "fake" in self.tile_list[self.tile_group] and self.current_layer not in self.tilemap.layers["fake_tiles"]:
+
+                        self.tilemap.layers["fake_tiles"] += [self.current_layer]
+
+                    if self.tile_list[
+                        self.tile_group] == "spawners" and self.tile_variant == 0 and not self.tilemap.extract(
+                            [("spawners", 0)], keep=True):
+                        self.tilemap.layers["player"] = [self.current_layer]
+
+
                     if self.tile_list[
                         self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
                             [("spawners", 0)], keep=True):
                         print("Player spawner alredy placed in this map")
-
                     else:
                         t = self.tile_list[self.tile_group]
                         self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {

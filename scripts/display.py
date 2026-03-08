@@ -6,6 +6,7 @@ class Shader:
 
     def __init__(self, game):
         self.game = game
+        self.display = game.display
 
     def generate_fog(self, surface, color=(220, 230, 240), opacity=40):
         fog_surface = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
@@ -150,6 +151,36 @@ class Shader:
             obj.light_properties = properties
         self.game.light_emitting_objects.append(obj)
 
+    def apply_chromatic_aberration(self, offset_x, offset_y):
+        """
+        Takes a surface and returns a new surface with chromatic aberration applied.
+        """
+        self.display = self.game.display
+        width, height = self.display.get_size()
+
+        # 2. Create copies for the Red, Green, and Blue channels
+        r_surf = self.display.copy()
+        g_surf = self.display.copy()
+        b_surf = self.display.copy()
+
+        # 3. Isolate the channels using BLEND_RGB_MULT
+        # This multiplies the pixels by the given color.
+        # E.g., multiplying by pure red (255,0,0) removes all green and blue.
+        r_surf.fill((255, 0, 0), special_flags=pygame.BLEND_RGB_MULT)
+        g_surf.fill((0, 255, 0), special_flags=pygame.BLEND_RGB_MULT)
+        b_surf.fill((0, 0, 255), special_flags=pygame.BLEND_RGB_MULT)
+
+        # 4. Create a black final surface to compose the channels back together
+        final_surf = pygame.Surface((width, height))
+
+        # 5. Blit them together using BLEND_RGB_ADD to reconstruct the original colors
+        # Offset the Red channel positively, and the Blue channel negatively
+        final_surf.blit(r_surf, (offset_x, offset_y), special_flags=pygame.BLEND_RGB_ADD)
+        final_surf.blit(g_surf, (0, 0), special_flags=pygame.BLEND_RGB_ADD)  # Green stays centered
+        final_surf.blit(b_surf, (-offset_x, -offset_y), special_flags=pygame.BLEND_RGB_ADD)
+
+        self.game.display = final_surf
+
 def display_bg(surf, img, pos):
     n = pos[0]//img.get_width()
     if pos[0] - n*img.get_width() > 0:
@@ -168,9 +199,12 @@ def display_level_bg(game, map_id):
             break
 
     if environment in game.assets:
-        game.display.blit(game.assets[f'green_cave/0'], (0, 0))
+        pygame.draw.rect(game.display, (0, 0, 0), game.display.get_rect())
         game.assets[environment].update()
         game.display.blit(game.assets[environment].img(), (0, 0))
+        fog_surface = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
+        fog_surface.fill((0, 0, 0, 190))
+        game.display.blit(fog_surface, (0, 0))
     else:
         game.display.blit(game.assets[f'{environment}/0'], (0, 0))
         display_bg(game.display, game.assets[f'{environment}/1'], (game.scroll[0]/20, 0))

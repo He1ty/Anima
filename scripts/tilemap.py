@@ -30,7 +30,6 @@ PHYSICS_TILES = {'white_blocks', 'purpur_rock', 'stone', 'vine','mossy_stone', '
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
 AUTOTILE_TYPES = {'white_blocks', 'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
 AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
-PLAYER_LAYER = "3"
 
 class Tilemap:
     def __init__(self, game, tile_size = 16):
@@ -38,6 +37,9 @@ class Tilemap:
         self.tile_size = tile_size
         self.tilemap = {}
         self.offgrid_tiles = {}
+        self.layers = {"player":["0"],
+                       "activators":[],
+                       "fake_tiles":[]}
         self.show_collisions = False
         self.fake_tile_opacity = 255
         self.fake_tile_groups = []
@@ -147,6 +149,7 @@ class Tilemap:
 
         json.dump({'tilemap': self.tilemap,
                         'offgrid':self.offgrid_tiles,
+                   'layers': self.layers,
                    'tilesize': self.tile_size},
                   f, indent=1)
         f.close()
@@ -158,6 +161,8 @@ class Tilemap:
 
         self.tilemap = map_data['tilemap']
         self.offgrid_tiles = map_data['offgrid']
+        if "layers" in map_data:
+            self.layers = map_data["layers"]
         self.tile_size = map_data['tilesize']
 
     def autotile(self):
@@ -244,18 +249,23 @@ class Tilemap:
            return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
                    offset[1] - additional_offset[1] <= pos[1] <= offset[1] + additional_offset[1] + surf.get_height())
 
-    def get_same_type_connected_tiles(self, tile, layer):
+    def get_same_type_connected_tiles(self, tile, layers):
         connected_tiles = [tile]
         offsets = [(0,1), (0,-1), (1,0), (-1,0)]
-        for t in connected_tiles:
-            for offset in offsets:
-                check_loc = f"{t["pos"][0] + offset[0]};{t["pos"][1] + offset[1]}"
-                if check_loc in self.tilemap[layer]:
-                    checked_tile = self.tilemap[layer][check_loc].copy()
-                    if checked_tile["type"] != tile["type"]:
-                        continue
-                    if checked_tile not in connected_tiles:
-                        connected_tiles.append(checked_tile)
+        layer_detected = False
+        for layer in layers:
+            for t in connected_tiles:
+                for offset in offsets:
+                    check_loc = f"{t["pos"][0] + offset[0]};{t["pos"][1] + offset[1]}"
+                    if check_loc in self.tilemap[layer]:
+                        layer_detected = True
+                        checked_tile = self.tilemap[layer][check_loc].copy()
+                        if checked_tile["type"] != tile["type"]:
+                            continue
+                        if checked_tile not in connected_tiles:
+                            connected_tiles.append(checked_tile)
+            if layer_detected:
+                break
 
         return connected_tiles
 
@@ -276,10 +286,10 @@ class Tilemap:
                     tiles_opacity = 255
 
             if with_player:
-                if layer == PLAYER_LAYER:
+                if layer in self.layers["player"]:
                     pickups_render_and_update(self.game, offset=offset)
                     self.game.player.render(surf, offset=offset)
-                if layer == self.game.FAKE_TILES_LAYER:
+                if layer in self.layers["fake_tiles"]:
                     self.game.fake_tiles_render(offset=offset)
                     continue
 

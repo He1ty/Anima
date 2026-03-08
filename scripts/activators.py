@@ -4,8 +4,6 @@ import json
 import random
 from scripts.particle import Particle
 
-ACTIVATORS_LAYER = "3"
-
 class Activator:
     def __init__(self, game, pos, a_type, size=(16, 16), i=0):#Define basic attributes, that will be useful to track multiple elements from the lever(Position, activated, etc)
         self.game = game
@@ -34,11 +32,14 @@ class Activator:
     def render(self, surface, offset=(0, 0)):#Just display the marvellous lever design of our dear designer
         surface.blit(self.game.assets[self.type][self.state], (self.pos[0] - offset[0], self.pos[1] - offset[1]))
 
-def load_activators_actions(map_id):
+def load_activators_actions(map_id, activators_layers):
     try:
         with open(f"data/maps/{map_id}.json", "r") as file:
             actions_data = json.load(file)
-            return actions_data["tilemap"][ACTIVATORS_LAYER]
+            a = []
+            for layer in activators_layers:
+                a += actions_data["tilemap"][layer]
+            return a
 
     except Exception as e:
         print(f"Error loading activators actions: {e}")
@@ -59,7 +60,7 @@ def update_teleporter(game, t_id):
             game.teleporting = False
             game.tp_id = None
 
-def update_activators_actions(game, level):
+def update_activators_actions(game):
     for activator in game.activators:
         if activator.can_interact(game.player):
             activator_pos = f"{activator.pos[0]//game.tile_size};{activator.pos[1]//game.tile_size}"

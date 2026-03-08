@@ -443,5 +443,12 @@
   "7": {}
  },
  "offgrid": {},
+ "layers": {
+  "player": [
+   "3"
+  ],
+  "activators": [],
+  "fake_tiles": []
+ },
  "tilesize": 16
 }
