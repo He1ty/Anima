@@ -480,17 +480,17 @@ class Menu:
     def draw_delete_confirm_popup(self, confirm_delete_id, text_font):
         """Draws the delete confirmation popup. Returns (yes_btn_rect, no_btn_rect)."""
         current_screen_size = self.screen.get_size()
-        center_x = current_screen_size[0] // 2
+        center_x = self.SW // 2
 
-        popup_rect = py.Rect(center_x - 200, current_screen_size[1] // 2 - 100, 400, 200)
+        popup_rect = py.Rect(center_x - int(self.SW/5), self.SH // 2 - self.SH//6, self.SW*0.4, self.SH//3)
         py.draw.rect(self.screen, (20, 20, 20), popup_rect)
         py.draw.rect(self.screen, self.COLORS["white"], popup_rect, 2)
 
         msg = text_font.render(f"DELETE PROFILE {confirm_delete_id}?", True, self.COLORS["white"])
         self.screen.blit(msg, (center_x - msg.get_width() // 2, popup_rect.top + 40))
 
-        yes_btn = py.Rect(center_x - 120, popup_rect.bottom - 60, 100, 40)
-        no_btn = py.Rect(center_x + 20, popup_rect.bottom - 60, 100, 40)
+        yes_btn = py.Rect(center_x - self.SW*0.12, popup_rect.bottom - self.SH/10, self.SW/10, self.SH/15)
+        no_btn = py.Rect(center_x + self.SW*0.02, popup_rect.bottom - self.SH/10, self.SW/10, self.SH/15)
 
         yes_color = (150,0,0) if self.delete_command_nb == 1 else (100,0,0)
         no_color = (100,100,100) if self.delete_command_nb == 0 else (50,50,50)
@@ -500,8 +500,8 @@ class Menu:
 
         yes_txt = text_font.render("YES", True, (255, 255, 255))
         no_txt = text_font.render("NO", True, (255, 255, 255))
-        self.screen.blit(yes_txt, (yes_btn.centerx - yes_txt.get_width() // 2, yes_btn.centery - 15))
-        self.screen.blit(no_txt, (no_btn.centerx - no_txt.get_width() // 2, no_btn.centery - 15))
+        self.screen.blit(yes_txt, (yes_btn.centerx - yes_txt.get_width() // 2, yes_btn.centery - self.SH/40))
+        self.screen.blit(no_txt, (no_btn.centerx - no_txt.get_width() // 2, no_btn.centery - self.SH/40))
 
         return yes_btn, no_btn
 
@@ -526,7 +526,7 @@ class Menu:
 
         options_title_color = self.COLORS["white"]
         options_title = self.title_font.render("SELECT PROFILE", True, options_title_color)
-        self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+        self.screen.blit(options_title, options_title.get_rect(center=(self.SW / 2, 50)))
 
 
         if self.delete_slot_id is not None:
@@ -613,10 +613,10 @@ class Menu:
 
         options_title_color = self.COLORS["white"]
         options_title = self.title_font.render("OPTIONS", True, options_title_color)
-        self.screen.blit(options_title, options_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+        self.screen.blit(options_title, options_title.get_rect(center=(self.SW / 2, 50)))
         top_image = load_image("ui/Opera_senza_titolo 2.png")
         bottom_image = load_image("ui/Opera_senza_titolo 1.png")
-        image_x = (current_screen_size[0] - top_image.get_width()) // 2
+        image_x = (self.SW - top_image.get_width()) // 2
         top_image_y = self.option_buttons[0].rect.y - top_image.get_height() - 20
         bottom_image_y = self.option_buttons[-2].rect.y + self.BUTTON_HEIGHT + 10
 
@@ -699,7 +699,7 @@ class Menu:
 
         game_title_color = self.COLORS["white"]
         game_title = self.title_font.render("GAME", True, game_title_color)
-        self.screen.blit(game_title, game_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+        self.screen.blit(game_title, game_title.get_rect(center=(self.SW / 2, 50)))
 
         for i,button in enumerate(self.game_buttons):
             if i == self.game_command_nb:
@@ -740,7 +740,7 @@ class Menu:
         self.screen.blit(overlay, (0, 0))
         audio_title_color =  self.COLORS["white"]
         audio_title = self.title_font.render("AUDIO", True, audio_title_color)
-        self.screen.blit(audio_title, audio_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+        self.screen.blit(audio_title, audio_title.get_rect(center=(self.SW / 2, 50)))
 
         for i, button in enumerate(self.audio_buttons):
             if i == self.audio_command_nb:
@@ -785,7 +785,7 @@ class Menu:
 
         video_title_color = self.COLORS["white"]
         video_title = self.title_font.render("VIDEO", True, video_title_color)
-        self.screen.blit(video_title, video_title.get_rect(center=(current_screen_size[0] / 2, 50)))
+        self.screen.blit(video_title, video_title.get_rect(center=(self.SW / 2, 50)))
         for i, button in enumerate(self.video_buttons):
             if i == self.video_command_nb:
                 button.start_hover_effect()
@@ -838,7 +838,7 @@ class Menu:
 
         top_image = load_image("ui/Opera_senza_titolo 2.png")
         bottom_image = load_image("ui/Opera_senza_titolo 1.png")
-        image_x = (current_screen_size[0] - top_image.get_width()) // 2
+        image_x = (self.SW - top_image.get_width()) // 2
         top_image_y = self.pause_buttons[0].rect.y - top_image.get_height() - 20
         bottom_image_y = self.pause_buttons[-1].rect.y + self.BUTTON_HEIGHT + 10
 
