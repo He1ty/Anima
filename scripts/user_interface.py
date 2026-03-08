@@ -31,25 +31,15 @@ class Menu:
 
         self.volume = 0.5
 
-        self.dropdown_expanded = False
-        self.dragging_volume = False
-        self.options_visible = False
-
-        self.BUTTON_WIDTH = 200
-        self.BUTTON_HEIGHT = 50
-        self.KNOB_RADIUS = 8
-
-        self.slider_rect = py.Rect(50, 100, 200, 5)
-        self.dropdown_rect = py.Rect(50, 150, 200, 30)
-        self.keyboard_button_rect = py.Rect(50, 250, 200, 40)
+        self.BUTTON_WIDTH = self.SW / 5
+        self.BUTTON_HEIGHT = self.SH / 12
 
         py.font.init()
         self.control_font = load_game_font(size=24)
         self.keyboard_font = load_game_font(size=20)
-        self.title_font = load_game_font(size=44)
-        self.button_font = load_game_font(size=36)
-        self.hover_image = load_image("ui/Opera_senza_titolo.png")
-        self.hover2_image = py.transform.flip(load_image("ui/Opera_senza_titolo.png"), True, False)
+        self.title_font = load_game_font(size=int(self.SH*0.07))
+        self.button_font = load_game_font(size=int(self.SH*0.06))
+
 
         self.button_font.set_bold(True)
 
@@ -179,9 +169,9 @@ class Menu:
         # --- Souls Animation --- #
         self.souls_animation = Animation(load_images('pickups/soul/idle'),5,True)
         self.souls_pos = []
-        self.souls_end_pos = [self.SH * 0.1, self.SH * 0.1]
+        self.souls_end_pos = [self.SH/12, self.SH/12]
         self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
-        self.nb_souls_pos = [self.SH * 0.1 +self.SW*0.04, self.SH * 0.1]
+        self.nb_souls_pos = [self.SH/12 +self.SW*0.04, self.SH/12]
 
     def init_buttons(self):
         """
@@ -196,51 +186,50 @@ class Menu:
         self.game_buttons = []
         self.profile_selection_slots = []
 
-        current_screen_size = self.screen.get_size()
 
-        button_x = 3*current_screen_size[0] /4
+        button_x = 3*self.SW /4
 
         # TITLE SCREEN BUTTONS
-        start_title_btn_y = (current_screen_size[1] / 2)
+        start_title_btn_y = (self.SH / 2)
         button_y = start_title_btn_y
 
         for label in self.title_buttons_labels:
-            button = MenuButton(label,self.button_font,(button_x,button_y),self.COLORS['white'])
+            button = MenuButton(self,label,self.button_font,(button_x,button_y),self.COLORS['white'])
             button_y += self.BUTTON_HEIGHT
             self.title_buttons.append(button)
 
-        button_x = (current_screen_size[0]) / 2
+        button_x = self.SW / 2
 
 
         #  OPTION BUTTONS
-        start_option_btn_y = (current_screen_size[1] - (len(self.option_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        start_option_btn_y = (self.SH - (len(self.option_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
         button_y = start_option_btn_y
 
         for label in self.option_buttons_labels:
-            button = MenuButton(label, self.button_font, (button_x, button_y), self.COLORS['white'])
+            button = MenuButton(self,label, self.button_font, (button_x, button_y), self.COLORS['white'])
             button_y += self.BUTTON_HEIGHT
             self.option_buttons.append(button)
 
-        button_y = current_screen_size[1] - 90
-        back_btn = MenuButton("BACK", self.button_font, (button_x, button_y), self.COLORS['white'])
+        button_y = self.SH - self.SH*0.18
+        back_btn = MenuButton(self,"BACK", self.button_font, (button_x, button_y), self.COLORS['white'])
         self.option_buttons.append(back_btn)
 
         #  PAUSE BUTTONS
-        start_pause_btn_y =(current_screen_size[1] - (len(self.pause_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        start_pause_btn_y =(self.SH - (len(self.pause_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
         button_y = start_pause_btn_y
         for label in self.pause_buttons_labels:
-            button = MenuButton(label, self.button_font, (button_x, button_y), self.COLORS['white'])
+            button = MenuButton(self,label, self.button_font, (button_x, button_y), self.COLORS['white'])
             button_y += self.BUTTON_HEIGHT
             self.pause_buttons.append(button)
 
         #  AUDIO SETTINGS BUTTON
 
-        button_x = (current_screen_size[0]) / 8
-        start_audio_btn_y = (current_screen_size[1] - (len(self.audio_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        button_x = self.SW / 8
+        start_audio_btn_y = (self.SH - (len(self.audio_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
         button_y = start_audio_btn_y
         for label in self.audio_buttons_labels:
             value = self.settings_categories["AUDIO"][label]["current"]
-            button = DiscreteSlider(current_screen_size[0]-button_x-current_screen_size[0]*0.3-60,button_y,current_screen_size[0]*0.3,10,10,font=self.button_font,text=label+":",textx= button_x)
+            button = DiscreteSlider(self,self.SW * 0.64 -button_x,button_y,self.SW*0.3,self.SH/60,10,font=self.button_font,text=label+":",textx= button_x)
             button_y += self.BUTTON_HEIGHT
             button.set_normalized_value(float(value))
             self.audio_buttons.append(button)
@@ -248,9 +237,9 @@ class Menu:
 
         # VIDEO SETTINGS BUTTON
 
-        button_x = (current_screen_size[0]) / 8
+        button_x = self.SW / 8
 
-        start_video_btn = (current_screen_size[1] - (len(self.video_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
+        start_video_btn = (self.SH - (len(self.video_buttons_labels) * self.BUTTON_HEIGHT) ) / 2
         button_y = start_video_btn
 
         for label in self.video_buttons_labels:
@@ -259,18 +248,18 @@ class Menu:
             value = self.settings_categories["VIDEO"][label]["current"]
             match self.settings_categories["VIDEO"][label]["type"]:
                 case "drag":
-                    button = DiscreteSlider(current_screen_size[0]-button_x-current_screen_size[0]*0.3-60,button_y,current_screen_size[0]*0.3,10,10,font=self.button_font,text=label+":",textx= button_x)
+                    button = DiscreteSlider(self,self.SW * 0.64 -button_x,button_y,self.SW*0.3,self.SH/60,10,font=self.button_font,text=label+":",textx= button_x)
                     button.set_normalized_value(float(value))
                 case "switch":
-                    button = ToggleSwitch(current_screen_size[0]-button_x-60 ,button_y,font=self.button_font,text=label+":",textx= button_x)
+                    button = ToggleSwitch(self,self.SW * 0.94-button_x ,button_y,width=int(self.SW*0.06),height=int(self.SH/20),font=self.button_font,text=label+":",textx= button_x)
                     button.set_state(bool(value))
             button_y += self.BUTTON_HEIGHT
             self.video_buttons.append(button)
         self.video_buttons.append(back_btn)
 
         # GAME SETTINGS BUTTON
-        button_x = (current_screen_size[0]) / 8
-        start_video_btn = (current_screen_size[1] - (len(self.game_buttons_labels) * self.BUTTON_HEIGHT)) / 2
+        button_x = self.SW / 8
+        start_video_btn = (self.SH - (len(self.game_buttons_labels) * self.BUTTON_HEIGHT)) / 2
         button_y = start_video_btn
 
         for label in self.game_buttons_labels:
@@ -279,17 +268,17 @@ class Menu:
             value = self.settings_categories["GAME"][label]["current"]
             match self.settings_categories["GAME"][label]["type"]:
                 case "drag":
-                    button = DiscreteSlider(current_screen_size[0] - button_x - current_screen_size[0] * 0.3 - 60,
-                                            button_y, current_screen_size[0] * 0.3, 10, 10, font=self.button_font,
-                                            text=label + ":", textx=button_x)
+                    button = DiscreteSlider(self,self.SW * 0.64 -button_x,button_y,
+                                            self.SW*0.3,self.SH/60,10,font=self.button_font,
+                                            text=label+":",textx= button_x)
                     button.set_normalized_value(float(value))
                 case "switch":
-                    button = ToggleSwitch(current_screen_size[0] - button_x - 60, button_y, font=self.button_font,
-                                          text=label + ":", textx=button_x)
+                    button = ToggleSwitch(self,self.SW * 0.94-button_x ,button_y,width=int(self.SW*0.06),
+                                          height=int(self.SH/20),font=self.button_font,text=label+":",
+                                          textx= button_x)
                     button.set_state(bool(value))
                 case "multiple_choices":
-                    button = ArrowSelector(current_screen_size[0] - current_screen_size[0] / 8 - current_screen_size[0] * 0.2 - 35,
-                                           button_y, current_screen_size[0] * 0.2,40,self.button_font,
+                    button = ArrowSelector(self,self.SW * 0.64,button_y, self.SW * 0.2,self.SH/15,self.button_font,
                                            self.settings_categories["GAME"][label]["choices"],text=label + ":", textx=button_x,text_color2=(255,255,255))
                     button.set_selected(str(value))
             button_y += self.BUTTON_HEIGHT
@@ -300,20 +289,20 @@ class Menu:
         saves = self.game.save_system.list_saves()
         used_slots = {save["slot"]: save for save in saves}
 
-        slot_width = current_screen_size[0] * 0.7
-        slot_height = 110
-        start_y = 160
-        slot_x = (current_screen_size[0] - slot_width) / 2
+        slot_width = self.SW * 0.7
+        slot_height = (11*self.SH)/60
+        start_y = (4*self.SH)/15
+        slot_x = (self.SW - slot_width) / 2
 
         fonts = {
-            "number": load_game_font(size=48),
-            "text": load_game_font(size=30),
-            "detail": load_game_font(size=22),
+            "number": load_game_font(size=int(self.SH*0.08)),
+            "text": load_game_font(size=int(self.SH*0.05)),
+            "detail": load_game_font(size=int(self.SH*0.03)),
         }
         fonts["number"].set_bold(True)
 
         for i in range(1, 4):
-            slot = SaveSlotUI(
+            slot = SaveSlotUI(self,
                 slot_id=i,
                 x=slot_x,
                 y=start_y + (i - 1) * slot_height,
@@ -328,7 +317,7 @@ class Menu:
             self.profile_selection_slots.append(slot)
         self.profile_selection_slots.append(back_btn)
 
-        self.controls_menu = ControlsMenu(
+        self.controls_menu = ControlsMenu(self,
             screen=self.screen,
             game=self.game,
             title_font=self.title_font,  # même police que les autres menus
@@ -338,12 +327,16 @@ class Menu:
 
     def reload_menu(self):
         self.screen = self.game.screen
-        self.save_current_button_states()
-        self.init_buttons()
         self.SW, self.SH = self.screen.get_size()
+        self.title_font = load_game_font(size=int(self.SH * 0.07))
+        self.button_font = load_game_font(size=int(self.SH * 0.06))
+        self.BUTTON_WIDTH = self.SW / 5
+        self.BUTTON_HEIGHT = self.SH / 12
         self.souls_end_pos = [self.SH * 0.1, self.SH * 0.1]
         self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
         self.nb_souls_pos = [self.SH * 0.1+self.SW*0.04, self.SH * 0.1]
+        self.save_current_button_states()
+        self.init_buttons()
 
 
     def save_current_button_states(self):
@@ -538,9 +531,6 @@ class Menu:
 
         if self.delete_slot_id is not None:
             self.draw_delete_confirm_popup(self.delete_slot_id, self.profile_selection_slots[0].text_font)
-
-
-
             for event in pygame.event.get():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RIGHT and self.delete_command_nb == 1:
@@ -649,7 +639,6 @@ class Menu:
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.option_command_nb = 0
-                    self.options_visible = False
                     self.game.save_settings()
                     self.game.state = self.game.previous_state
                     self.game.previous_state = "SETTINGS"
@@ -661,7 +650,6 @@ class Menu:
                     match button.text:
                         case "BACK":
                                 self.option_command_nb = 0
-                                self.options_visible = False
                                 self.game.save_settings()
                                 self.game.state = self.game.previous_state
                                 self.game.previous_state = "SETTINGS"
@@ -709,7 +697,7 @@ class Menu:
         overlay.fill(self.COLORS["overlay"])
         self.screen.blit(overlay, (0, 0))
 
-        game_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
+        game_title_color = self.COLORS["white"]
         game_title = self.title_font.render("GAME", True, game_title_color)
         self.screen.blit(game_title, game_title.get_rect(center=(current_screen_size[0] / 2, 50)))
 
@@ -795,7 +783,7 @@ class Menu:
         overlay.fill(self.COLORS["overlay"])
         self.screen.blit(overlay, (0, 0))
 
-        video_title_color = self.COLORS["dimmed"] if self.dropdown_expanded else self.COLORS["white"]
+        video_title_color = self.COLORS["white"]
         video_title = self.title_font.render("VIDEO", True, video_title_color)
         self.screen.blit(video_title, video_title.get_rect(center=(current_screen_size[0] / 2, 50)))
         for i, button in enumerate(self.video_buttons):

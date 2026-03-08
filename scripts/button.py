@@ -26,15 +26,18 @@ class EditButton:
         pygame.draw.rect(surf, color, self.rect)
 
 class MenuButton:
-    def __init__(self, text:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int]):
+    def __init__(self,menu, text:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int]):
+        self.menu=menu
         self.text_surf = font.render(text, True, text_color)
         self.text = text
         self.font = font
         self.rect = self.text_surf.get_rect(center=pos_center)
         self.text_color = text_color
         self.hover = False
-        self.hover_image = load_image("ui/Opera_senza_titolo.png")
-        self.hover2_image = pygame.transform.flip(load_image("ui/Opera_senza_titolo.png"), True, False)
+
+        self.hover_image = load_image("ui/Opera_senza_titolo.png",size=(font.get_height()*1.3,font.get_height()*1.3))
+        self.hover2_image = pygame.transform.flip(self.hover_image, True, False)
+
 
 
     def draw(self, screen):
@@ -54,15 +57,10 @@ class MenuButton:
 
     def is_clicked(self, event):
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN:
+            if event.key == self.menu.game.key_map["key_select"]:
                 return True
             return False
 
-    def is_selected(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            if self.rect.collidepoint(event.pos):
-                return True
-        return False
 
     def handle_event(self,event):
         if self.hover:
@@ -75,7 +73,7 @@ class MenuButton:
         self.hover = False
 
 class DiscreteSlider:
-    def __init__(self, x, y, width, height, steps,
+    def __init__(self,menu, x, y, width, height, steps,
                  active_color=(255, 255, 255),
                  inactive_color=(180, 180, 180),
                  knob_color=(255, 255, 255),
@@ -84,6 +82,7 @@ class DiscreteSlider:
                  font=None,
                  text=None,
                  textx=None):
+        self.menu = menu
 
         self.rect = pygame.Rect(x, y, width, height)
 
@@ -106,14 +105,14 @@ class DiscreteSlider:
         self.font = font
         self.nb_text_surf = font.render(str(self.value), True, active_color) if self.font else None
         self.nb_text_rect = self.nb_text_surf.get_rect(
-            center=(self.rect.x + self.rect.width + 50, self.rect.centery)) if self.nb_text_surf else None
+            center=(self.rect.x + self.rect.width*1.16, self.rect.centery)) if self.nb_text_surf else None
         self.text = text
         self.textx = textx
         self.text_surf = font.render(text, True, active_color) if self.text else None
         self.text_rect = self.text_surf.get_rect(centery=self.rect.centery, x=textx) if self.text_surf else None
 
         self.hover = False
-        self.hover_image_left = pygame.image.load('assets/images/ui/Opera_senza_titolo.png')
+        self.hover_image_left = load_image('/ui/Opera_senza_titolo.png',size = (width*0.16,width*0.16))
         self.hover_image_right = pygame.transform.flip(self.hover_image_left, True, False)
         self.hover_image_width = self.hover_image_right.get_width()
         self.dragging = False
@@ -182,7 +181,7 @@ class DiscreteSlider:
 
 
     def handle_event(self, event):
-        self._update_value(event)
+        self._update_value()
         if self.hover:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
@@ -193,7 +192,7 @@ class DiscreteSlider:
                         self.value += 1
         return None
 
-    def _update_value(self, mouse_x):
+    def _update_value(self):
         #
         # # Clamp mouse
         # mouse_x = max(self.rect.x, min(mouse_x, self.rect.right))
@@ -224,13 +223,14 @@ class DiscreteSlider:
         self.value = int(value*self.steps)
 
 class ToggleSwitch:
-    def __init__(self, x, y, width=60, height=30,
+    def __init__(self,menu, x, y, width=60, height=30,
                  bg_on=(255, 255, 255),
                  bg_off=(180, 180, 180),
                  circle_color=(100, 100, 100),
                  font=None,
                  text=None,
                  textx=None):
+        self.menu = menu
 
         self.rect = pygame.Rect(x, y, width, height)
         self.width = width
@@ -252,7 +252,7 @@ class ToggleSwitch:
         self.text_rect = self.text_surf.get_rect(x=textx ,centery=self.rect.centery) if self.text_surf is not None else None
 
         self.hover = False
-        self.hover_image_left = pygame.image.load('assets/images/ui/Opera_senza_titolo.png')
+        self.hover_image_left = load_image('/ui/Opera_senza_titolo.png',size = (width*0.8,width*0.8))
         self.hover_image_right = pygame.transform.flip(self.hover_image_left, True, False)
         self.hover_image_width = self.hover_image_right.get_width()
 
@@ -290,7 +290,7 @@ class ToggleSwitch:
     def handle_event(self, event):
         if self.hover:
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
+                if event.key == self.menu.game.key_map["key_select"]:
                     self.state = not self.state
                     return True
 
@@ -306,13 +306,14 @@ class ToggleSwitch:
         self.hover = False
 
 class ArrowSelector:
-    def __init__(self, x, y, width, height, font, options,
+    def __init__(self,menu, x, y, width, height, font, options,
                  bg_color=(180, 180, 180),
                  arrow_color=(255, 255, 255),
                  text_color1=(0, 0, 0),
                  text=None,
                  textx=None,
                  text_color2=None):
+        self.menu = menu
 
 
         self.rect = pygame.Rect(x, y, width, height)
@@ -326,8 +327,8 @@ class ArrowSelector:
 
         # Zones flèches
         self.arrow_width = height
-        self.left_rect = pygame.Rect(x-40, y, self.arrow_width, height)
-        self.right_rect = pygame.Rect(x + width + 40 - self.arrow_width, y,
+        self.left_rect = pygame.Rect(x-height, y, self.arrow_width, height)
+        self.right_rect = pygame.Rect(x + width + height - self.arrow_width, y,
                                       self.arrow_width, height)
 
         # Zone texte centrale
@@ -347,7 +348,7 @@ class ArrowSelector:
 
         # Hover effect
         self.hover = True
-        self.hover_image_left = pygame.image.load('assets/images/ui/Opera_senza_titolo.png')
+        self.hover_image_left = load_image('ui/Opera_senza_titolo.png',size = (width*0.24,width*0.24))
         self.hover_image_right = pygame.transform.flip(self.hover_image_left, True, False)
         self.hover_image_width = self.hover_image_right.get_width()
 
@@ -366,16 +367,16 @@ class ArrowSelector:
 
         # Flèche gauche
         pygame.draw.polygon(surface, self.arrow_color, [
-            (self.left_rect.centerx + 5, self.left_rect.centery - 8),
-            (self.left_rect.centerx - 5, self.left_rect.centery),
-            (self.left_rect.centerx + 5, self.left_rect.centery + 8)
+            (self.left_rect.centerx + int(self.arrow_width/8), self.left_rect.centery - int(self.arrow_width/5)),
+            (self.left_rect.centerx - int(self.arrow_width/8), self.left_rect.centery),
+            (self.left_rect.centerx + int(self.arrow_width/8), self.left_rect.centery + int(self.arrow_width/5))
         ])
 
         # Flèche droite
         pygame.draw.polygon(surface, self.arrow_color, [
-            (self.right_rect.centerx - 5, self.right_rect.centery - 8),
-            (self.right_rect.centerx + 5, self.right_rect.centery),
-            (self.right_rect.centerx - 5, self.right_rect.centery + 8)
+            (self.right_rect.centerx - int(self.arrow_width/8), self.right_rect.centery - int(self.arrow_width/5)),
+            (self.right_rect.centerx + int(self.arrow_width/8), self.right_rect.centery),
+            (self.right_rect.centerx - int(self.arrow_width/8), self.right_rect.centery + int(self.arrow_width/5))
         ])
 
         if self.text:
@@ -427,7 +428,8 @@ class ArrowSelector:
         self.hover = False
 
 class SaveSlotUI:
-    def __init__(self, slot_id, x,y,width,height, fonts, colors):
+    def __init__(self,menu, slot_id, x,y,width,height, fonts, colors):
+        self.menu = menu
 
         self.slot_id = slot_id
         self.rect = pygame.Rect(x,y,4 * width / 5,height)
@@ -447,7 +449,7 @@ class SaveSlotUI:
         self.thumbnail = None
 
         self.delete_rect = pygame.Rect(
-            self.rect.right + 20,
+            self.rect.right + width/35,
             self.rect.top,
             width/5,
             height/2
@@ -474,16 +476,16 @@ class SaveSlotUI:
 
         num_txt = self.number_font.render(f"{self.slot_id}.", True, text_color)
         surface.blit(num_txt, (
-            self.rect.left + 20,
+            self.rect.left + self.width / 28,
             self.rect.centery - num_txt.get_height() // 2
         ))
 
 
 
         if self.save_data:
-            img_rect = pygame.Rect(self.rect.left + 80,
-                               self.rect.top + 15,
-                               80, 80)
+            img_rect = pygame.Rect(self.rect.left + self.width / 7,
+                               self.rect.top + self.width*0.026,
+                               self.width / 7, self.width / 7)
             if self.thumbnail:
                 img = pygame.transform.scale(self.thumbnail, img_rect.size)
                 surface.blit(img, img_rect.topleft)
@@ -573,7 +575,7 @@ class SaveSlotUI:
                     self.delete_hover = True
                 elif event.key == pygame.K_LEFT:
                     self.delete_hover = False
-                if event.key == pygame.K_RETURN:
+                if event.key == self.menu.game.key_map["key_select"]:
                     if self.save_data and self.delete_hover:
                         return "DELETE"
 

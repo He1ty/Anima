@@ -28,8 +28,9 @@ class ControlsMenu:
     MARGIN_X = 90
     SB_W     = 10
 
-    def __init__(self, screen: pygame.Surface, game, title_font: pygame.font.Font,
+    def __init__(self,menu, screen: pygame.Surface, game, title_font: pygame.font.Font,
                  button_font: pygame.font.Font):
+        self.menu = menu
         self.screen      = screen
         self.screen_size = screen.get_size()
         self.game        = game
@@ -70,7 +71,7 @@ class ControlsMenu:
         # On importe MenuButton localement pour éviter un import circulaire
         # si ce fichier est séparé ; sinon retire cet import
           # ← adapte selon ton chemin d'import
-        self.back_button = MenuButton(
+        self.back_button = MenuButton(self.menu,
             text="BACK",
             font=self.button_font,
             pos_center=(sw // 2, sh - 30),

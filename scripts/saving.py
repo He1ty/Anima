@@ -7,6 +7,7 @@ from typing import SupportsFloat
 import pygame as py
 
 from scripts.display import check_screen
+from scripts.utils import key_name
 
 
 class Save:
@@ -325,6 +326,8 @@ class Save:
             self.game.brightness = save_data.get("brightness", 0.5)
             self.game.debug_mode = save_data.get("debug_mode", False)
             self.game.set_keymap(self.load_bindings())
+            for key,bind in self.game.key_map.items():
+                print(f"{key}: {key_name(bind)}")
 
             check_screen(self.game)
             if hasattr(self.game, "menu"):

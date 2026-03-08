@@ -205,7 +205,7 @@ class Game:
         # --- Input & Level Tracking ---
         self.keybindings = {}
         self.dict_kb = {"key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
-                        "key_jump": 0, "key_dash": 0, "key_noclip": 0, "key_attack": 0}
+                        "key_jump": 0, "key_dash": 0, "key_noclip": 0}
 
         self.tilemap = Tilemap(self, self.tile_size)
         self.level = 0
@@ -319,7 +319,12 @@ class Game:
     def set_keymap(self,bindings: dict):
         for cat in bindings:
             for bind in bindings[cat]:
-                self.key_map[f"key_{bind.lower()}"] = bindings[cat][bind]
+                if bind.lower() == "show hitbox":
+                    self.key_map["key_hitbox"] = bindings[cat][bind]
+                elif bind.lower() == "no clip":
+                    self.key_map["key_noclip"] = bindings[cat][bind]
+                else:
+                    self.key_map[f"key_{bind.lower()}"] = bindings[cat][bind]
 
 
     def load_level(self, map_id, transition_effect=True):
@@ -695,7 +700,7 @@ class Game:
 
                     #self.menu.menu_display()
                     for key in self.dict_kb.keys(): self.dict_kb[key] = 0
-                if event.key == pygame.K_e:
+                if event.key == self.key_map["key_interact"]:
                     # Interact with items or levers
                     update_throwable_objects_action(self)
                     if not self.player_grabbing:
@@ -705,7 +710,7 @@ class Game:
                 if event.key == pygame.K_f and not self.holding_attack:
                     self.dict_kb["key_attack"] = 1
                     self.holding_attack = True
-                if event.key == pygame.K_h and self.debug_mode:
+                if event.key == self.key_map["key_hitbox"] and self.debug_mode:
                     self.toggle_hitboxes()
                 if event.key == pygame.K_r:
                     kill_player(self)
@@ -731,6 +736,7 @@ class Game:
         self.load_settings()
         pygame.mouse.set_visible(False)
         while True:
+
             if self.state == self.TITLE_STATE:
                 self.menu.draw_title_menu()
             elif self.state == self.OPTION_STATE:
