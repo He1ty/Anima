@@ -10,7 +10,7 @@ import datetime
 
 from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
 from scripts.display import toggle_fullscreen, check_screen
-from scripts.keybing_menu import ControlsMenu
+from scripts.keybind_menu import ControlsMenu
 from scripts.utils import load_images, load_image, Animation
 from scripts.text import load_game_font
 

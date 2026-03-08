@@ -72,18 +72,27 @@ class LevelManager:
         except FileNotFoundError:
             # Create the file if it doesn't exist (e.g. new map)
             with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
-                json.dump({'tilemap': {"0":{}}, 'tilesize': 16, 'offgrid': {}}, f)
+                json.dump({'tilemap': {"0":{},
+                                            "1":{},
+                                            "2":{},
+                                            "3":{},
+                                            "4":{},
+                                            "5":{},
+                                            "6":{}},
+                           'tilesize': 16, 'offgrid': {}}, f)
             self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
 
         self.editor.scroll = [0, 0]
 
         # Reload assets
         new_env = self.editor.get_environment(self.editor.level)
+        self.editor.categories = {}
         self.editor.assets = self.editor.base_assets | load_tiles(new_env)
         self.editor.assets.update(load_doors('editor', new_env))
         self.editor.assets.update(load_activators(new_env))
 
         self.editor.assets.update(load_pickups(one_image=True))
+        self.editor.get_categories()
 
         # ... (rest of function: update tile_list, ids, etc) ...
         self.editor.tile_list = list(self.editor.assets)
@@ -113,7 +122,7 @@ class LevelManager:
                 return json.load(f)
         else:
             # Default fallback if file doesn't exist
-            return {"green_cave": [0, 1, 2], "blue_cave": []}
+            return {"white_space":[0,], "green_cave": [1, 2], "blue_cave": []}
 
     def save_environments(self):
         with open('data/environments.json', 'w') as f:
@@ -379,7 +388,7 @@ class Editor:
                 return environment
         if len(self.environments) > 0:
             return list(self.environments.keys())[0]
-        return "green_cave"
+        return "white_space"
 
     def render_environment_selection_window(self):
         # Create a centered window

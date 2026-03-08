@@ -161,21 +161,23 @@ def display_bg(surf, img, pos):
         surf.blit(img, (pos[0] + n* img.get_width(), pos[1]))
         
 def display_level_bg(game, map_id):
-    if map_id in (0, 1, 2):
-        game.display.blit(game.assets['green_cave/0'], (0, 0))
-        display_bg(game.display, game.assets['green_cave/1'], (game.scroll[0]/20, 0))
-        game.display.blit(game.assets['green_cave/2'], (0, 0))
+    environment = "white_zone"
+    for env in game.environments:
+        if map_id in game.environments[env]:
+            environment = env
+            break
+
+    if environment in game.assets:
+        game.display.blit(game.assets[f'green_cave/0'], (0, 0))
+        game.assets[environment].update()
+        game.display.blit(game.assets[environment].img(), (0, 0))
+    else:
+        game.display.blit(game.assets[f'{environment}/0'], (0, 0))
+        display_bg(game.display, game.assets[f'{environment}/1'], (game.scroll[0]/20, 0))
+        game.display.blit(game.assets[f'{environment}/2'], (0, 0))
         fog_surface = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
         fog_surface.fill((0,0,0,100))
         game.display.blit(fog_surface, (0, 0))
-
-
-    if map_id in (3,4):
-        game.display.blit(pygame.transform.scale(game.assets['blue_cave/0'], game.display.get_size()), (0, 0))
-        display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/1'], game.display.get_size()), (-game.scroll[0] / 10, 0))
-        display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/2'], game.display.get_size()), (-game.scroll[0] / 30, 0))
-        display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/3'], game.display.get_size()), (game.scroll[0] / 30, 0))
-        display_bg(game.display, pygame.transform.scale(game.assets['blue_cave/4'], game.display.get_size()), (game.scroll[0] / 50, 0))
 
 def draw_cutscene_border(surf, color=(0, 0, 0), width=20, opacity=255):
 

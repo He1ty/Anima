@@ -1,6 +1,5 @@
 import pygame
 import os
-from PIL import Image
 
 
 
@@ -21,7 +20,7 @@ def load_images(path, tile_size=None):#Sort in alpha order every images of a giv
         images.append(load_image(path + '/' + img_name, (tile_size[0], tile_size[1]) if tile_size else None))
     return images
 
-def load_tileset(image_path, tile_width, tile_height, spiral_order=False):
+def load_tileset(image_path, tile_width, tile_height, spiral_order=False, size=None):
     """
     Slices a tileset image into a list of individual surfaces.
     """
@@ -39,6 +38,8 @@ def load_tileset(image_path, tile_width, tile_height, spiral_order=False):
 
             # Extract the subsurface and store it
             tile = sheet.subsurface(rect)
+            if size:
+                tile = pygame.transform.scale(tile, size)
             tiles.append(tile)
 
     if spiral_order:
@@ -128,9 +129,12 @@ def load_pickups(one_image=False):
 def load_backgrounds(b_info):
     tiles = {}
     for environment in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/')):
+        if b_info[environment] == 'animated':
+            tiles[environment] = Animation(load_images('backgrounds/' + environment))
+            continue
         for bg in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/' + environment)):
             tiles[environment + "/" + bg[:-4]] = load_image('backgrounds/' + environment + "/" + bg,
-                                                       b_info[str(environment + "/" + bg[:-4])]["size"] if str(environment + "/" + bg[:-4]) in b_info else None)
+                                                       (480, 288))
     return tiles
 
 

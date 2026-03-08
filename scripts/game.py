@@ -1,7 +1,5 @@
 import sys
 
-import pygame
-
 # --- Game Script Imports ---
 # These modules handle specific game logic like physics, entities, and UI.
 from scripts.entities import *
@@ -15,7 +13,7 @@ from scripts.saving import Save
 from scripts.doors import Door, doors_render_and_update
 from scripts.display import *
 from scripts.camera import CameraSetup, Camera
-from scripts.text import load_game_texts, display_bottom_text, update_bottom_text
+from scripts.text import load_game_texts, update_bottom_text
 from scripts.sound import Sound
 from scripts.pickup import Pickup
 
@@ -42,8 +40,8 @@ class Game:
             # --- Debug Mode ---
             self.debug_mode = False
             # The actual window size
-            self.screen_width = 1000
-            self.screen_height = 600
+            self.screen_width = 960
+            self.screen_height = 576
             self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
 
             # --- Sound manager System ---
@@ -150,15 +148,22 @@ class Game:
             "blue_vine_door_h": {"size": (64, 16), "img_dur": 5}
         }
 
-        self.b_info = {"green_cave/0": {"size": self.display.get_size()}}
-        self.environments = {"green_cave": (0, 1, 2), "blue_cave": (3, 4, 5)}
+        self.b_info = {"white_space": "animated",
+                        "green_cave": "static",
+                        "blue_cave": "static"}
+        path = 'data/environments.json'
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                # Convert lists back to specific types if needed, json loads arrays as lists
+                self.environments = json.load(f)
         self.spawners = {}
 
         # --- Camera Constraints ---
         # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
         self.camera = Camera(self)
 
-        self.scroll_limits = {"x": (64, 624), "y": (-176, 144)}
+        self.scroll_limits = {"x": (0, 0), "y":(-1230, 1233)}
+        #"x": (64, 624), "y": (-176, 144)
         self.camera_center = None
 
         # --- Asset Loading ---
@@ -339,7 +344,7 @@ class Game:
         self.tilemap.load("data/maps/" + str(map_id) + ".json")
         self.tilemap.tile_size = self.tile_size
         mult=0.5
-        self.display = pygame.Surface((1000*mult, 600*mult))
+        self.display = pygame.Surface((self.screen_width*mult, self.screen_height*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
         self.activators_actions = load_activators_actions(self.level)
@@ -426,21 +431,22 @@ class Game:
                 for variant in range(len(self.assets[tile])):
                     fake_tiles_id_pairs.append((tile, variant))
 
-        if not hasattr(self, "fake_tile_groups"):
-            self.fake_tile_groups = []
-            for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=(self.FAKE_TILES_LAYER,)):
-                fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
-                fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
-                g_check = True
-                for group in self.fake_tile_groups:
-                    if fake_tile in group:
-                        g_check = False
-                        continue
-                if g_check:
-                    group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.FAKE_TILES_LAYER)
-                    if group not in self.fake_tile_groups:
-                        self.fake_tile_groups.append(group)
-        self.tilemap.extract(fake_tiles_id_pairs, layers=(self.FAKE_TILES_LAYER,))
+        if self.FAKE_TILES_LAYER in self.tilemap.tilemap:
+            if not hasattr(self, "fake_tile_groups"):
+                self.fake_tile_groups = []
+                for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=(self.FAKE_TILES_LAYER,)):
+                    fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
+                    fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
+                    g_check = True
+                    for group in self.fake_tile_groups:
+                        if fake_tile in group:
+                            g_check = False
+                            continue
+                    if g_check:
+                        group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.FAKE_TILES_LAYER)
+                        if group not in self.fake_tile_groups:
+                            self.fake_tile_groups.append(group)
+            self.tilemap.extract(fake_tiles_id_pairs, layers=(self.FAKE_TILES_LAYER,))
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2

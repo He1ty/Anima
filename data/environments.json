@@ -1,6 +1,8 @@
 {
+    "white_space": [
+        0
+    ],
     "green_cave": [
-        0,
         1
     ],
     "blue_cave": []

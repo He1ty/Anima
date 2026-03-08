@@ -6,6 +6,19 @@ from scripts.sound import *
 from scripts.entities import deal_knockback, update_throwable_objects_action
 
 class PhysicsPlayer:
+
+    # Constants for movement
+    GRAVITY_ACCELERATION = 0.42
+    GRAVITY_DIRECTION = 1
+    SPEED = 2.3
+    DASH_SPEED = 6
+    JUMP_VELOCITY = -6
+    DASHTIME = 10
+    JUMPTIME = 10
+    DASH_COOLDOWN = 18
+    FIRST_JUMP_WALLJUMP_COOLDOWN = 0
+    WALLJUMP_COOLDOWN = 15
+
     def __init__(self, game, tilemap, pos, size):
 
         # Hitbox util vars
@@ -15,17 +28,6 @@ class PhysicsPlayer:
         self.velocity = [0, 0]  # [vel_x, vel_y]
         self.acceleration = [0.0, 0.0]
         self.show_hitbox = False
-
-        # Constants for movement
-        self.GRAVITY_DIRECTION = 1
-        self.SPEED = 2.3
-        self.DASH_SPEED = 6
-        self.JUMP_VELOCITY = -6
-        self.DASHTIME = 10
-        self.JUMPTIME = 10
-        self.DASH_COOLDOWN = 18
-        self.FIRST_JUMP_WALLJUMP_COOLDOWN = 0
-        self.WALLJUMP_COOLDOWN = 15
 
         self.DASH_STARTUP_FRAMES = 3
         self.dash_startup_cur = 0
@@ -440,14 +442,14 @@ class PhysicsPlayer:
                     self.dash_direction = [0, 0]
 
                 # Initial deceleration when player try to slide on a block with an initial vertical speed (usually falling speed)
-                if abs(self.acceleration[1]) in (0.42, 1) and self.can_walljump["count"] < self.max_walljumps:
+                if abs(self.acceleration[1]) in (self.GRAVITY_ACCELERATION, 1) and self.can_walljump["count"] < self.max_walljumps:
                     if self.GRAVITY_DIRECTION == 1:
                         self.velocity[1] = max(0, self.velocity[1] - 2)
                     else:
                         self.velocity[1] = min(0, self.velocity[1] + 2)
 
                 # Sliding gravity accelerations
-                if self.velocity[1] == 0 or abs(self.acceleration[1]) not in (0.42, 1):
+                if self.velocity[1] == 0 or abs(self.acceleration[1]) not in (self.GRAVITY_ACCELERATION, 1):
                     if self.can_walljump["count"] < self.max_walljumps - 1:
                         if self.velocity[1] == 0:
                             self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding
@@ -465,7 +467,7 @@ class PhysicsPlayer:
                 if not_realising_jump_after_jump:
                     self.acceleration[1] = self.GRAVITY_DIRECTION
                 else:
-                    self.acceleration[1] = 0.42 * self.GRAVITY_DIRECTION  # Normal gravity acceleration
+                    self.acceleration[1] = self.GRAVITY_ACCELERATION * self.GRAVITY_DIRECTION  # Normal gravity acceleration
 
             # Cap terminal velocity based on direction
             if self.GRAVITY_DIRECTION == 1:
@@ -528,15 +530,16 @@ class PhysicsPlayer:
                             self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
                             self.velocity[1] = 1.4 * self.velocity[
                                 1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+
                         # On floor mono superjump
                         elif self.dash_direction[1] == 0:
                             self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
                             self.velocity[1] = self.velocity[
                                                    1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
-                        # Double input superjump
+                        # Double input superjump (Bunny Jump)
                         else:
-                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
+                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 2.5
                             self.velocity[1] = 1.1 * self.velocity[
                                 1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
                         self.superjump = True
@@ -848,7 +851,7 @@ class PhysicsPlayer:
             self.can_walljump["sliding"] = True
             if self.can_walljump["wall"] != axis:
                 if self.get_block_on["left"] and self.get_block_on["right"]:
-                    self.acceleration[1] = 0.42
+                    self.acceleration[1] = self.GRAVITY_ACCELERATION
             self.can_walljump["wall"] = axis
             self.can_walljump["timer"] = 2
         elif self.can_walljump["wall"] != axis:
