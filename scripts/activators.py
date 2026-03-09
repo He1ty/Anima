@@ -36,9 +36,9 @@ def load_activators_actions(map_id, activators_layers):
     try:
         with open(f"data/maps/{map_id}.json", "r") as file:
             actions_data = json.load(file)
-            a = []
+            a = {}
             for layer in activators_layers:
-                a += actions_data["tilemap"][layer]
+                a |= actions_data["tilemap"][layer]
             return a
 
     except Exception as e:

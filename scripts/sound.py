@@ -28,9 +28,12 @@ class Sound:
         :return:
         """
         if self.is_music:
-            pygame.mixer.music.load(self.music_paths[name])
-            pygame.mixer.music.set_volume(self.volume*self.master_volume)
-            pygame.mixer.music.play(loops)
+            try:
+                pygame.mixer.music.load(self.music_paths[name])
+                pygame.mixer.music.set_volume(self.volume*self.master_volume)
+                pygame.mixer.music.play(loops)
+            except KeyError:
+                pass
         else:
             self.sounds[name].play()
 
