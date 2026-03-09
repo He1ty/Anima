@@ -5,16 +5,23 @@ import pygame as py
 import sys
 import numpy as np
 import cv2
-import os
-import datetime
 
 from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
-from scripts.display import toggle_fullscreen, check_screen
+from scripts.display import  check_screen
 from scripts.keybind_menu import ControlsMenu
 from scripts.utils import load_images, load_image, Animation
 from scripts.text import load_game_font
 
 class Menu:
+    # --- State Management --- #
+    TITLE_STATE = "START_SCREEN"
+    PAUSE_STATE = "PAUSE"
+    OPTION_STATE = "SETTINGS"
+    AUDIO_SETTING_STATE = "AUDIO_SETTINGS"
+    VIDEO_SETTING_STATE = "VIDEO_SETTINGS"
+    GAME_SETTING_STATE = "GAME_SETTINGS"
+    KEYBOARD_STATE = "KEYBOARD_SETTINGS"
+    PROFILE_SELECTION_STATE = "PROFILE_SELECTION"
 
 
     def __init__(self, game):
@@ -24,6 +31,8 @@ class Menu:
         self.game = game
         self.screen = game.screen
         self.SW, self.SH = self.screen.get_size()
+        self.menu_state = self.TITLE_STATE
+        self.previous_state = None
 
         self.original_background = None
 
@@ -324,7 +333,6 @@ class Menu:
             button_font=self.button_font
         )
 
-
     def reload_menu(self):
         self.screen = self.game.screen
         self.SW, self.SH = self.screen.get_size()
@@ -337,6 +345,25 @@ class Menu:
         self.nb_souls_pos = [self.SH * 0.1+self.SW*0.04, self.SH * 0.1]
         self.save_current_button_states()
         self.init_buttons()
+
+    def draw(self):
+        match self.menu_state:
+            case self.TITLE_STATE:
+                self.draw_title_menu()
+            case self.OPTION_STATE:
+                self.draw_option_menu()
+            case self.AUDIO_SETTING_STATE:
+                self.draw_audio_settings_menu()
+            case self.VIDEO_SETTING_STATE:
+                self.draw_video_settings_menu()
+            case self.GAME_SETTING_STATE:
+                self.draw_game_settings_menu()
+            case self.KEYBOARD_STATE:
+                self.draw_keyboard_settings_menu()
+            case self.PROFILE_SELECTION_STATE:
+                self.draw_profile_selection_menu()
+            case self.PAUSE_STATE:
+                self.draw_pause_menu()
 
 
     def save_current_button_states(self):
@@ -511,7 +538,7 @@ class Menu:
         :return:
         """
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.TITLE_STATE:
+        if self.previous_state == self.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -552,8 +579,6 @@ class Menu:
                                 self.profile_selection_slots[self.delete_slot_id-1].update_data(save_data=save_data)
                                 self.delete_slot_id = None
                                 self.delete_command_nb = 0
-
-
             return
 
         for event in pygame.event.get():
@@ -562,22 +587,26 @@ class Menu:
             if event.type == pygame.KEYDOWN:
                 self.profile_command_nb = self.handle_key_input(event, self.profile_command_nb, len(self.profile_selection_slots)-1)
                 if event.key == pygame.K_ESCAPE:
-                    self.game.state = self.game.TITLE_STATE
+                    self.menu_state = self.game.TITLE_STATE
                     self.profile_command_nb = 0
             for slots in self.profile_selection_slots:
                 action = slots.handle_event(event)
                 match action:
                     case True:
-                        self.game.state = self.game.TITLE_STATE
+                        self.menu_state = self.TITLE_STATE
                         self.profile_command_nb = 0
                     case "LOAD":
                         if self.game.load_game(slots.slot_id):
+                            self.souls_collected_timer = 0
+                            self.is_souls_collected = False
                             self.game.state = self.game.PLAYING_STATE
                             self.profile_command_nb = 0
                             self.game.play_music(f"level_{self.game.level}")
                             pygame.mouse.set_visible(False)
                     case "START":
                         # START NEW GAME
+                        self.souls_collected_timer = 0
+                        self.is_souls_collected = False
                         self.game.level = 0
                         self.game.load_level(self.game.default_level, transition_effect=False)
                         # Crucial: Tell the game which slot is currently active for future saves
@@ -597,7 +626,7 @@ class Menu:
     def draw_option_menu(self):
 
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.TITLE_STATE:
+        if self.previous_state == self.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -614,8 +643,8 @@ class Menu:
         options_title_color = self.COLORS["white"]
         options_title = self.title_font.render("OPTIONS", True, options_title_color)
         self.screen.blit(options_title, options_title.get_rect(center=(self.SW / 2, 50)))
-        top_image = load_image("ui/Opera_senza_titolo 2.png")
-        bottom_image = load_image("ui/Opera_senza_titolo 1.png")
+        top_image = load_image("ui/Opera_senza_titolo 2.png",size=(self.SW*0.16,self.SH*0.08))
+        bottom_image = load_image("ui/Opera_senza_titolo 1.png",size=(self.SW*0.16,self.SH*0.08))
         image_x = (self.SW - top_image.get_width()) // 2
         top_image_y = self.option_buttons[0].rect.y - top_image.get_height() - 20
         bottom_image_y = self.option_buttons[-2].rect.y + self.BUTTON_HEIGHT + 10
@@ -640,8 +669,8 @@ class Menu:
                 if event.key == pygame.K_ESCAPE:
                     self.option_command_nb = 0
                     self.game.save_settings()
-                    self.game.state = self.game.previous_state
-                    self.game.previous_state = "SETTINGS"
+                    self.menu_state = self.previous_state
+                    self.previous_state = "SETTINGS"
 
             self.option_command_nb = self.handle_key_input(event,self.option_command_nb,len(self.option_buttons)-1)
             for button in self.option_buttons:
@@ -651,16 +680,16 @@ class Menu:
                         case "BACK":
                                 self.option_command_nb = 0
                                 self.game.save_settings()
-                                self.game.state = self.game.previous_state
-                                self.game.previous_state = "SETTINGS"
+                                self.menu_state = self.previous_state
+                                self.previous_state = "SETTINGS"
                         case "AUDIO":
-                                self.game.state = self.game.AUDIO_SETTING_STATE
+                                self.menu_state = self.AUDIO_SETTING_STATE
                         case "VIDEO":
-                            self.game.state = self.game.VIDEO_SETTING_STATE
+                            self.menu_state = self.VIDEO_SETTING_STATE
                         case "GAME":
-                            self.game.state = self.game.GAME_SETTING_STATE
+                            self.menu_state = self.GAME_SETTING_STATE
                         case "KEYBOARD":
-                            self.game.state = self.game.KEYBOARD_STATE
+                            self.menu_state = self.KEYBOARD_STATE
         return
 
     def draw_title_screen_background_animation(self):
@@ -684,7 +713,7 @@ class Menu:
 
     def draw_game_settings_menu(self):
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.TITLE_STATE:
+        if self.previous_state == self.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -712,7 +741,7 @@ class Menu:
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.game_command_nb = 0
-                    self.game.state = self.game.OPTION_STATE
+                    self.menu_state = self.OPTION_STATE
             self.game_command_nb = self.handle_key_input(event,self.game_command_nb,len(self.game_buttons)-1)
             for button in self.game_buttons:
                 match button.text:
@@ -722,11 +751,11 @@ class Menu:
                         self.game.debug_mode = button.get_state()
                 if button.handle_event(event) and isinstance(button,MenuButton):
                     self.game_command_nb = 0
-                    self.game.state = self.game.OPTION_STATE
+                    self.menu_state = self.OPTION_STATE
 
     def draw_audio_settings_menu(self):
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.TITLE_STATE:
+        if self.previous_state == self.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -752,7 +781,7 @@ class Menu:
         for event in py.event.get():
             for i,button in enumerate(self.audio_buttons):
                 if button.handle_event(event):
-                    self.game.state = self.game.OPTION_STATE
+                    self.menu_state = self.OPTION_STATE
                     self.audio_command_nb = 0
                 match button.text:
                     case "MUSIC:":
@@ -766,11 +795,11 @@ class Menu:
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.audio_command_nb = 0
-                    self.game.state = self.game.OPTION_STATE
+                    self.menu_state = self.OPTION_STATE
 
     def draw_video_settings_menu(self):
         current_screen_size = self.screen.get_size()
-        if self.game.previous_state == self.game.TITLE_STATE:
+        if self.previous_state == self.TITLE_STATE:
             self.draw_title_screen_background_animation()
         else:
             if self.original_background is not None:
@@ -803,14 +832,14 @@ class Menu:
                     check_screen(self.game)
                     if isinstance(button, MenuButton):
                         self.video_command_nb = 0
-                        self.game.state = self.game.OPTION_STATE
+                        self.menu_state = self.OPTION_STATE
                 if button.text == "BRIGHTNESS:":
                     self.game.brightness = button.get_normalized()
             self.video_command_nb = self.handle_key_input(event, self.video_command_nb, len(self.video_buttons) - 1)
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.video_command_nb = 0
-                    self.game.state = self.game.OPTION_STATE
+                    self.menu_state = self.OPTION_STATE
 
     def draw_keyboard_settings_menu(self):
         self.draw_title_screen_background_animation()
@@ -821,7 +850,7 @@ class Menu:
                 self.controls_command_nb = 0
                 self.controls_menu.scroll_y = 0
                 self.controls_menu.target_scroll = 0
-                self.game.state = self.game.OPTION_STATE
+                self.menu_state = self.OPTION_STATE
         self.controls_menu.draw_controls_menu()
 
     def draw_pause_menu(self):
@@ -836,8 +865,8 @@ class Menu:
         overlay.fill(self.COLORS["overlay"])
         self.screen.blit(overlay, (0, 0))
 
-        top_image = load_image("ui/Opera_senza_titolo 2.png")
-        bottom_image = load_image("ui/Opera_senza_titolo 1.png")
+        top_image = load_image("ui/Opera_senza_titolo 2.png",size=(self.SW*0.16,self.SH*0.08))
+        bottom_image = load_image("ui/Opera_senza_titolo 1.png",size=(self.SW*0.16,self.SH*0.08))
         image_x = (self.SW - top_image.get_width()) // 2
         top_image_y = self.pause_buttons[0].rect.y - top_image.get_height() - 20
         bottom_image_y = self.pause_buttons[-1].rect.y + self.BUTTON_HEIGHT + 10
@@ -861,8 +890,8 @@ class Menu:
             if event.type == py.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.pause_command_nb = 0
-                    self.game.state = "PLAYING"
-                    self.game.previous_state = "PAUSE"
+                    self.game.state = self.game.PLAYING_STATE
+                    self.previous_state = self.PAUSE_STATE
 
             self.pause_command_nb = self.handle_key_input(event, self.pause_command_nb, len(self.pause_buttons) - 1)
             for button in self.pause_buttons:
@@ -870,11 +899,11 @@ class Menu:
                     match button.text:
                         case "RESUME":
                                 self.pause_command_nb = 0
-                                self.game.state = "PLAYING"
-                                self.game.previous_state = "PAUSE"
+                                self.game.state = self.game.PLAYING_STATE
+                                self.previous_state = self.PAUSE_STATE
                         case "SETTINGS":
-                            self.game.state = "SETTINGS"
-                            self.game.previous_state = "PAUSE"
+                            self.menu_state = self.OPTION_STATE
+                            self.previous_state = self.PAUSE_STATE
                         case "SAVE AND QUIT":
                             self.game.save_system.update_playtime(self.game.current_slot)
                             self.game.save_game( self.game.current_slot)
@@ -882,8 +911,8 @@ class Menu:
                             self.game.__init__(full_setup=False)
                             self.settings_categories = settings_categories
                             self.init_buttons()
-                            self.game.state = self.game.TITLE_STATE
-                            self.game.previous_state = self.game.PAUSE_STATE
+                            self.menu_state = self.TITLE_STATE
+                            self.previous_state = self.PAUSE_STATE
                             self.game.music_sound_manager.play(name="title_screen",loops=-1)
 
     def draw_title_menu(self):
@@ -906,11 +935,11 @@ class Menu:
                 if button.handle_event(event):
                     match button.text:
                         case "PLAY":
-                            self.game.previous_state = self.game.TITLE_STATE
-                            self.game.state = self.game.PROFILE_SELECTION_STATE
+                            self.previous_state = self.TITLE_STATE
+                            self.menu_state = self.PROFILE_SELECTION_STATE
                         case "SETTINGS":
-                            self.game.previous_state = self.game.TITLE_STATE
-                            self.game.state = self.game.OPTION_STATE
+                            self.previous_state = self.TITLE_STATE
+                            self.menu_state = self.OPTION_STATE
                         case "QUIT":
                             self.cap.release()
                             pygame.quit()

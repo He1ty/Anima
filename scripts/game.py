@@ -26,6 +26,12 @@ class Game:
     asset loading, level streaming, and the rendering pipeline (lighting, particles, UI).
     """
 
+    # --- State Management ---
+    # Controls which 'loop' the game is currently running
+
+    MENU_STATE = "MENU"
+    PLAYING_STATE = "PLAYING"
+
     def __init__(self, full_setup=True):
         """
         Initializes the Pygame context, display settings, and global game variables.
@@ -89,21 +95,10 @@ class Game:
         self.display = pygame.Surface((self.screen_width/2, self.screen_height/2))
         self.clock = pygame.time.Clock()
 
-        # --- State Management ---
-        # Controls which 'loop' the game is currently running
 
-        self.TITLE_STATE = "START_SCREEN"
-        self.PAUSE_STATE = "PAUSE"
-        self.OPTION_STATE = "SETTINGS"
-        self.AUDIO_SETTING_STATE = "AUDIO_SETTINGS"
-        self.VIDEO_SETTING_STATE = "VIDEO_SETTINGS"
-        self.GAME_SETTING_STATE = "GAME_SETTINGS"
-        self.KEYBOARD_STATE = "KEYBOARD_SETTINGS"
-        self.PROFILE_SELECTION_STATE = "PROFILE_SELECTION"
-        self.PLAYING_STATE = "PLAYING"
 
         self.previous_state = None
-        self.state = "START_SCREEN"
+        self.state = self.MENU_STATE
         self.game_initialized = False
 
         # --- Icon Setup ---
@@ -700,8 +695,8 @@ class Game:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.menu.capture_background()
-                    self.state = "PAUSE"
-
+                    self.state = self.MENU_STATE
+                    self.menu.menu_state = self.menu.PAUSE_STATE
                     #self.menu.menu_display()
                     for key in self.dict_kb.keys(): self.dict_kb[key] = 0
                 if event.key == self.key_map["key_interact"]:
@@ -740,26 +735,12 @@ class Game:
         self.load_settings()
         pygame.mouse.set_visible(False)
         while True:
-
-            if self.state == self.TITLE_STATE:
-                self.menu.draw_title_menu()
-            elif self.state == self.OPTION_STATE:
-                self.menu.draw_option_menu()
-            elif self.state == self.PROFILE_SELECTION_STATE:
-                self.menu.draw_profile_selection_menu()
-            elif self.state == self.GAME_SETTING_STATE:
-                self.menu.draw_game_settings_menu()
-            elif self.state == self.AUDIO_SETTING_STATE:
-                self.menu.draw_audio_settings_menu()
-            elif self.state == self.VIDEO_SETTING_STATE:
-                self.menu.draw_video_settings_menu()
-            elif self.state == self.KEYBOARD_STATE:
-                self.menu.draw_keyboard_settings_menu()
-            elif self.state == self.PLAYING_STATE:
-                self.main_game_logic()
-                self.menu.draw_player_souls()
-            elif self.state == self.PAUSE_STATE:
-                self.menu.draw_pause_menu()
+            match self.state:
+                case self.MENU_STATE:
+                    self.menu.draw()
+                case self.PLAYING_STATE:
+                    self.main_game_logic()
+                    self.menu.draw_player_souls()
             self.apply_brightness()
             pygame.display.update()
 
@@ -776,16 +757,21 @@ class Game:
         else:
             return
         self.screen.blit(overlay, (0, 0))
+
     def play_music(self, name):
         self.music_sound_manager.play(name=name, loops=-1)
+
     def play_se(self, name):
         self.sound_effect_manager.play(name=name)
+
     def update_music_volume(self, volume):
         self.music_sound_manager.volume = volume
         self.music_sound_manager.set_volume(self.music_sound_manager.volume)
+
     def update_sound_effect_volume(self, volume):
         self.sound_effect_manager.volume = volume
         self.sound_effect_manager.set_volume(self.sound_effect_manager.volume)
+
     def update_master_volume(self, volume):
         self.master_volume = volume
         self.sound_effect_manager.master_volume = self.master_volume
