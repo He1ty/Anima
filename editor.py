@@ -15,6 +15,7 @@ from scripts.button import EditButton
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200
 UNDERBAR_HEIGHT = 200
+TOOLBAR_WIDTH = 50
 
 #If layers are moved, check constants in activators.py (ACTIVATORS_LAYER), main.py (FAKE_TILES_LAYER) and tilemap.py (PLAYER_LAYER)
 
@@ -177,6 +178,11 @@ class LevelManager:
         self.editor.active_maps = list(range(len(self.editor.active_maps)))
 
         print("Full Save Complete: Maps reordered and deleted files removed.")
+
+class UI:
+    def __init__(self, editor, screen):
+        self.editor = editor
+        self.screen = screen
 
 class Editor:
 
@@ -454,20 +460,56 @@ class Editor:
 
     # New method to centralize level changing logic
 
-    def render_sidebar(self):
-        # LOGIC
-        if self.category_changed and not self.clicking:
-            self.category_changed = False
+    def render_tiles_bar(self, avail_width, mpos):
+        next_category = EditButton(avail_width - 30, 5, 24, 24, self.clicking)
+        previous_category = EditButton(10, 5, 24, 24, self.clicking)
 
-        # Offset mouse for sidebar interaction
-        mpos = (pygame.mouse.get_pos()[0] - (self.screen.get_size()[0] - SIDEBAR_WIDTH), pygame.mouse.get_pos()[1])
+        if not self.category_changed:
+            if next_category.pressed(mpos):
+                self.current_category = (self.current_category + 1) % len(self.categories.keys())
+                self.category_changed = True
+            if previous_category.pressed(mpos):
+                self.current_category = (self.current_category - 1) % len(self.categories.keys())
+                self.category_changed = True
+            self.current_category_name = list(self.categories.keys())[self.current_category]
 
-        # SIDEBAR BACKGROUND
-        self.sidebar = pygame.Surface((SIDEBAR_WIDTH, self.screen_height))
-        self.sidebar.fill((40, 40, 40))
+        category_text = self.font.render(self.current_category_name, True, (255, 255, 255))
+        # Center text in available space
+        self.sidebar.blit(category_text, ((avail_width - category_text.get_width()) / 2, 10))
 
-        # --- MAP NAVIGATION COLUMN (Right side of sidebar) ---
-        map_col_width = 40
+        next_category.draw(self.sidebar, (50, 50, 50), mpos)
+        previous_category.draw(self.sidebar, (50, 50, 50), mpos)
+
+        pygame.draw.line(self.sidebar, (0, 0, 0), (10, 30), (avail_width - 10, 30))
+
+        # --- TILE ELEMENTS ---
+        pos = [10, 50]
+        for element in self.categories[self.current_category_name]:
+            # Check if we are running out of vertical space
+            if pos[1] > self.screen_height - 60: break
+
+            category_text = self.small_font.render(element if self.current_category_name != "Entities" else str(
+                self.categories["Entities"].index(element)), True, (255, 255, 255))
+
+            # Adjusted width for button
+            button = EditButton(pos[0], pos[1] - 5, avail_width - 20, 34, self.clicking)
+            button.draw(self.sidebar, (30, 30, 30), mpos)
+
+            self.sidebar.blit(category_text, (pos[0] + 34, pos[1] + 5))
+            self.sidebar.blit(
+                pygame.transform.scale(self.assets[element][0] if self.current_category_name != "Entities" else element,
+                                       (24, 24)), pos)
+
+            if button.pressed(mpos):
+                if self.current_category_name != "Entities":
+                    self.tile_group = self.tile_list.index(element)
+                    self.tile_variant = 0
+                else:
+                    self.tile_group = 0
+                    self.tile_variant = self.categories["Entities"].index(element)
+            pos[1] += 40
+
+    def render_map_selection_menu(self, map_col_width, mpos):
         pygame.draw.rect(self.sidebar, (30, 30, 30),
                          (SIDEBAR_WIDTH - map_col_width, 0, map_col_width, self.screen_height))
 
@@ -529,56 +571,35 @@ class Editor:
         pygame.draw.line(self.sidebar, (0, 0, 0), (SIDEBAR_WIDTH - map_col_width, 0),
                          (SIDEBAR_WIDTH - map_col_width, self.screen_height))
 
-        # --- CATEGORY HEADER (Shifted left to not overlap map nav) ---
+    def render_sidebar(self):
+        # LOGIC
+        if self.category_changed and not self.clicking:
+            self.category_changed = False
+
+        # Offset mouse for sidebar interaction
+        mpos = (pygame.mouse.get_pos()[0] - (self.screen.get_size()[0] - SIDEBAR_WIDTH), pygame.mouse.get_pos()[1])
+
+        # SIDEBAR BACKGROUND
+        self.sidebar = pygame.Surface((SIDEBAR_WIDTH, self.screen_height))
+        self.sidebar.fill((40, 40, 40))
+
+        # --- MAP NAVIGATION COLUMN (Right side of sidebar) ---
+        map_col_width = 40
         avail_width = SIDEBAR_WIDTH - map_col_width
 
-        next_category = EditButton(avail_width - 30, 5, 24, 24, self.clicking)
-        previous_category = EditButton(10, 5, 24, 24, self.clicking)
+        self.render_map_selection_menu(map_col_width, mpos)
+        self.render_tiles_bar(avail_width, mpos)
 
-        if not self.category_changed:
-            if next_category.pressed(mpos):
-                self.current_category = (self.current_category + 1) % len(self.categories.keys())
-                self.category_changed = True
-            if previous_category.pressed(mpos):
-                self.current_category = (self.current_category - 1) % len(self.categories.keys())
-                self.category_changed = True
-            self.current_category_name = list(self.categories.keys())[self.current_category]
+    def render_tools_bar(self):
+        mpos = (pygame.mouse.get_pos()[0] - (self.screen.get_size()[0] - SIDEBAR_WIDTH), pygame.mouse.get_pos()[1])
 
-        category_text = self.font.render(self.current_category_name, True, (255, 255, 255))
-        # Center text in available space
-        self.sidebar.blit(category_text, ((avail_width - category_text.get_width()) / 2, 10))
+        # SIDEBAR BACKGROUND
+        self.tools_bar = pygame.Surface((SIDEBAR_WIDTH, self.screen_height))
+        self.tools_bar.fill((40, 40, 40))
 
-        next_category.draw(self.sidebar, (50, 50, 50), mpos)
-        previous_category.draw(self.sidebar, (50, 50, 50), mpos)
-
-        pygame.draw.line(self.sidebar, (0, 0, 0), (10, 30), (avail_width - 10, 30))
-
-        # --- TILE ELEMENTS ---
-        pos = [10, 50]
-        for element in self.categories[self.current_category_name]:
-            # Check if we are running out of vertical space
-            if pos[1] > self.screen_height - 60: break
-
-            category_text = self.small_font.render(element if self.current_category_name != "Entities" else str(
-                self.categories["Entities"].index(element)), True, (255, 255, 255))
-
-            # Adjusted width for button
-            button = EditButton(pos[0], pos[1] - 5, avail_width - 20, 34, self.clicking)
-            button.draw(self.sidebar, (30, 30, 30), mpos)
-
-            self.sidebar.blit(category_text, (pos[0] + 34, pos[1] + 5))
-            self.sidebar.blit(
-                pygame.transform.scale(self.assets[element][0] if self.current_category_name != "Entities" else element,
-                                       (24, 24)), pos)
-
-            if button.pressed(mpos):
-                if self.current_category_name != "Entities":
-                    self.tile_group = self.tile_list.index(element)
-                    self.tile_variant = 0
-                else:
-                    self.tile_group = 0
-                    self.tile_variant = self.categories["Entities"].index(element)
-            pos[1] += 40
+        # --- MAP NAVIGATION COLUMN (Right side of sidebar) ---
+        pygame.draw.rect(self.tools_bar, (30, 30, 30),
+                         (0, 0, TOOLBAR_WIDTH, self.screen_height))
 
     def move_visual_to(self, pos):
         scale_x = 960 / (self.screen.get_size()[0] - SIDEBAR_WIDTH)
