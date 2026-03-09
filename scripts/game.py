@@ -159,7 +159,10 @@ class Game:
         # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
         self.camera = Camera(self)
 
-        self.scroll_limits = {"x": (0, 0), "y":(-1230, 1233)}
+        self.scroll_limits_per_level = {"0": {"x": (0, 0), "y":(-1230, 1233)},
+                                        "1": {"x": (64, 624), "y": (-176, 144)}}
+
+        self.scroll_limits = self.scroll_limits_per_level["0"]
         #"x": (64, 624), "y": (-176, 144)
         self.camera_center = None
 
@@ -364,9 +367,6 @@ class Game:
         for n in range(9):
             spike_block_types += [("spike_roots", n)]
 
-
-
-
         for spike in self.tilemap.extract(spike_types, keep=True):
             self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]], hitbox_type='spike', rotation=spike["rotation"]))
 
@@ -493,6 +493,8 @@ class Game:
             if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
                     self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
                 self.level = int(transition["destination"])
+                self.scroll_limits = self.scroll_limits_per_level[str(self.level)]
+                delattr(self, "fake_tile_groups")
                 self.load_level(self.level, transition_effect=False)
                 self.player.pos = [transition["dest_pos"][0] * self.tile_size, transition["dest_pos"][1] * self.tile_size]
 

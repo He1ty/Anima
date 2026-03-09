@@ -1,6 +1,21 @@
 {
  "tilemap": {
-  "0": {},
+  "0": {
+   "-1;7": {
+    "type": "transition",
+    "variant": 0,
+    "pos": [
+     -1,
+     7
+    ],
+    "destination": "1",
+    "dest_pos": [
+     8,
+     5
+    ],
+    "infos_type": "transition"
+   }
+  },
   "1": {},
   "2": {},
   "3": {
