@@ -35,7 +35,7 @@ class PhysicsPlayer:
 
         self.buffering_jump = False
 
-        self.dash_max_amt = 4
+        self.dash_max_amt = 1
 
         # Slime physics constants
         self.visual_scale = [1.0, 1.0]

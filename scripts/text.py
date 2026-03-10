@@ -12,7 +12,7 @@ def load_game_font(size=36):
     """
 
     try:
-        return pygame.font.SysFont('Times New Roman', size, bold=True)
+        return pygame.font.Font('assets/RomanAntique.ttf', size)
     except Exception:
         try:
             times_path = os.path.join(os.path.dirname(__file__), 'fonts', 'TimesNewRoman-Bold.ttf')

@@ -587,7 +587,7 @@ class Menu:
             if event.type == pygame.KEYDOWN:
                 self.profile_command_nb = self.handle_key_input(event, self.profile_command_nb, len(self.profile_selection_slots)-1)
                 if event.key == pygame.K_ESCAPE:
-                    self.menu_state = self.game.TITLE_STATE
+                    self.menu_state = self.TITLE_STATE
                     self.profile_command_nb = 0
             for slots in self.profile_selection_slots:
                 action = slots.handle_event(event)
