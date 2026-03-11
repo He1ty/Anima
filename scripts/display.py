@@ -231,7 +231,7 @@ def check_screen(game):
     if game.fullscreen:
         game.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN | pygame.NOFRAME | pygame.DOUBLEBUF, vsync=game.vsync_on)
     else:
-        game.screen = pygame.display.set_mode((1000, 600),vsync=game.vsync_on)
+        game.screen = pygame.display.set_mode((game.SCREEN_WIDTH, game.SCREEN_HEIGHT),vsync=game.vsync_on)
 
     game.menu.reload_menu()
 

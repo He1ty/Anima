@@ -105,7 +105,7 @@ class Tilemap:
 
     def tiles_around(self, pos, size):
         tiles = []
-        tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1]+size[0]/2) // self.tile_size))
+        tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1]+size[1]/2) // self.tile_size))
         for offset in self.neighbor_offset(size):
             check_loc = str(tile_loc[0] + offset[0]) + ';' + str(tile_loc[1] + offset[1])
             if self.show_collisions:
@@ -121,7 +121,7 @@ class Tilemap:
 
     def tiles_under(self, pos, size, gravity_dir):
         u_tiles = []
-        u_tile_loc = (int((pos[0] + size[0]/2) // self.tile_size), int((pos[1] + size[0]/2) // self.tile_size))
+        u_tile_loc = (int((pos[0] + size[0]/2) // self.tile_size), int((pos[1] + size[1]/2) // self.tile_size))
         for offset in self.under_offset(size, gravity_dir):
             check_loc = str(u_tile_loc[0] + offset[0]) + ';' + str(u_tile_loc[1] + offset[1])
             if self.show_collisions:
@@ -213,20 +213,23 @@ class Tilemap:
                 elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
                     return self.tilemap[layer][tile_loc]
 
-    def physics_rects_around(self, pos, size):
+    def physics_rects_around(self, hitbox: pygame.Rect):
+        pos, size = hitbox.topleft, hitbox.size
         rects = []
         for tile in self.tiles_around(pos, size):
             if tile['type'] in PHYSICS_TILES:
                 rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
         return rects
 
-    def physics_rects_under(self, pos, size, gravity_dir):
+    def physics_rects_under(self, hitbox: pygame.Rect, gravity_dir):
         u_rects = []
+        pos, size = hitbox.topleft, hitbox.size
         for tile in self.tiles_under(pos, size, gravity_dir):
             if tile['type'] in PHYSICS_TILES:
                 u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
             elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
                 if not self.game.player.collide_with_passable_blocks: #System in order to make collision with passable blocks more clean (bigger vertical collision offset)
+                    print(pos[1] + size[1], tile["pos"][1]*self.tile_size)
                     if pos[1] + size[1] <= tile["pos"][1]*self.tile_size:
                         self.game.player.collide_with_passable_blocks = True
                 if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:

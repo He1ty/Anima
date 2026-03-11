@@ -134,7 +134,7 @@ class Menu:
             "medium_gray": (200, 200, 200),
             "dark_gray": (160, 160, 160),
             "highlight": (255, 255, 255, 50),
-            "overlay": (0, 0, 0, 200),
+            "overlay": (0, 0, 0),
             "dimmed": (255, 255, 255, 80)
         }
 
@@ -916,7 +916,12 @@ class Menu:
                             self.game.music_sound_manager.play(name="title_screen",loops=-1)
 
     def draw_title_menu(self):
-        self.draw_title_screen_background_animation()
+        #self.draw_title_screen_background_animation()
+
+        current_screen_size = self.screen.get_size()
+        overlay = py.Surface(current_screen_size, py.SRCALPHA)
+        overlay.fill(self.COLORS["overlay"])
+        self.screen.blit(overlay, (0, 0))
 
         for i,button in enumerate(self.title_buttons):
             if i == self.title_command_nb:

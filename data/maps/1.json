@@ -10603,6 +10603,102 @@
     "size": "3;1",
     "x_limits": "272;784",
     "y_limits": "1056;1488"
+   },
+   "28;-13": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     28,
+     -13
+    ]
+   },
+   "28;-14": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     28,
+     -14
+    ]
+   },
+   "28;-15": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     28,
+     -15
+    ]
+   },
+   "28;-16": {
+    "type": "vine_transp",
+    "variant": 0,
+    "pos": [
+     28,
+     -16
+    ]
+   },
+   "29;-16": {
+    "type": "vine_transp",
+    "variant": 1,
+    "pos": [
+     29,
+     -16
+    ]
+   },
+   "29;-15": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     29,
+     -15
+    ]
+   },
+   "29;-14": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     29,
+     -14
+    ]
+   },
+   "29;-13": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     29,
+     -13
+    ]
+   },
+   "30;-15": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     30,
+     -15
+    ]
+   },
+   "30;-14": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     30,
+     -14
+    ]
+   },
+   "30;-13": {
+    "type": "vine_transp",
+    "variant": 7,
+    "pos": [
+     30,
+     -13
+    ]
+   },
+   "30;-16": {
+    "type": "vine_transp",
+    "variant": 2,
+    "pos": [
+     30,
+     -16
+    ]
    }
   },
   "4": {

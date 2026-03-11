@@ -32,6 +32,9 @@ class Game:
     MENU_STATE = "MENU"
     PLAYING_STATE = "PLAYING"
 
+    SCREEN_WIDTH = 960
+    SCREEN_HEIGHT = 600
+
     def __init__(self, full_setup=True):
         """
         Initializes the Pygame context, display settings, and global game variables.
@@ -46,9 +49,7 @@ class Game:
             # --- Debug Mode ---
             self.debug_mode = False
             # The actual window size
-            self.screen_width = 960
-            self.screen_height = 576
-            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+            self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
 
             # --- Sound manager System ---
             self.master_volume = 1
@@ -92,7 +93,7 @@ class Game:
             self.menu = Menu(self)
 
         # The internal rendering surface (half size for a pixel-art aesthetic)
-        self.display = pygame.Surface((self.screen_width/2, self.screen_height/2))
+        self.display = pygame.Surface((self.SCREEN_WIDTH/2, self.SCREEN_HEIGHT/2))
         self.clock = pygame.time.Clock()
 
 
@@ -339,7 +340,7 @@ class Game:
         self.tilemap.load("data/maps/" + str(map_id) + ".json")
         self.tilemap.tile_size = self.tile_size
         mult=0.5
-        self.display = pygame.Surface((self.screen_width*mult, self.screen_height*mult))
+        self.display = pygame.Surface((self.SCREEN_WIDTH*mult, self.SCREEN_HEIGHT*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
         self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])

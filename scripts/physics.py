@@ -424,7 +424,7 @@ class PhysicsPlayer:
         # Offset depends on gravity: +1 if normal (down), -1 if inverted (up)
         y_offset = self.GRAVITY_DIRECTION
 
-        for rect in self.tilemap.physics_rects_under(self.pos, self.size,
+        for rect in self.tilemap.physics_rects_under(self.rect(),
                                                      self.GRAVITY_DIRECTION) + self.game.doors_rects:
             entity_rect = pygame.Rect(round(self.pos[0]), round(self.pos[1]) + y_offset, self.size[0], self.size[1])
             if entity_rect.colliderect(rect):
@@ -691,7 +691,7 @@ class PhysicsPlayer:
 
             if self.can_walljump["timer"] <= 0:
                 self.can_walljump["sliding"] = False
-            for rect in tilemap.physics_rects_under(self.pos, self.size,
+            for rect in tilemap.physics_rects_under(self.rect(),
                                                     self.GRAVITY_DIRECTION) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or (
@@ -702,19 +702,20 @@ class PhysicsPlayer:
                         if (rect not in self.game.doors_rects and not self.was_on_floor and self.dashtime_cur and
                                 (self.dash_direction[0] == 0 or self.dash_direction[1] == 0)):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
+                                right_shifted_hitbox_rect = pygame.Rect(round(self.pos[0]) + i, round(self.pos[1]), self.size[0],
+                                                    self.size[1])
                                 if not any(
-                                        pygame.Rect(round(self.pos[0]) + i, round(self.pos[1]), self.size[0],
-                                                    self.size[1]).colliderect(r)
-                                        for r in tilemap.physics_rects_under([self.pos[0] + i, self.pos[1]], self.size,
+                                        right_shifted_hitbox_rect.colliderect(r)
+                                        for r in tilemap.physics_rects_under(right_shifted_hitbox_rect,
                                                                              self.GRAVITY_DIRECTION)):
                                     self.pos[0] += i
                                     nudged = True
                                     break
                                 # Check Left nudge
-                                if not any(
-                                        pygame.Rect(round(self.pos[0]) - i, round(self.pos[1]), self.size[0],
-                                                    self.size[1]).colliderect(r)
-                                        for r in tilemap.physics_rects_under([self.pos[0] - i, self.pos[1]], self.size,
+                                left_shifted_hitbox_rect = pygame.Rect(round(self.pos[0]) - i, round(self.pos[1]), self.size[0],
+                                                    self.size[1])
+                                if not any(left_shifted_hitbox_rect.colliderect(r)
+                                        for r in tilemap.physics_rects_under(left_shifted_hitbox_rect,
                                                                              self.GRAVITY_DIRECTION)):
                                     self.pos[0] -= i
                                     nudged = True
@@ -738,7 +739,7 @@ class PhysicsPlayer:
                             1] and entity_rect.x + self.size[0] > rect.x and entity_rect.x < rect.x + rect.width)):
                     b_b.add(True)
 
-            for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect()) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] < 0) or (
                             self.GRAVITY_DIRECTION == -1 and self.velocity[1] > 0):
@@ -748,20 +749,22 @@ class PhysicsPlayer:
                                 self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 # Try nudging Right
+                                right_shifted_hitbox_rect = pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0],
+                                                    self.size[1])
                                 if not any(
-                                        pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0],
-                                                    self.size[1]).colliderect(r)
+                                        right_shifted_hitbox_rect.colliderect(r)
                                         for r in
-                                        tilemap.physics_rects_around([self.pos[0] + i, self.pos[1]], self.size)):
+                                        tilemap.physics_rects_around(right_shifted_hitbox_rect)):
                                     self.pos[0] += i
                                     nudged = True
                                     break
                                 # Try nudging Left
+                                left_shifted_hitbox_rect = pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0],
+                                                    self.size[1])
                                 if not any(
-                                        pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0],
-                                                    self.size[1]).colliderect(r)
+                                        left_shifted_hitbox_rect.colliderect(r)
                                         for r in
-                                        tilemap.physics_rects_around([self.pos[0] - i, self.pos[1]], self.size)):
+                                        tilemap.physics_rects_around(left_shifted_hitbox_rect)):
                                     self.pos[0] -= i
                                     nudged = True
                                     break
@@ -793,7 +796,7 @@ class PhysicsPlayer:
         if axe == "x":
             if self.can_walljump["cooldown"]:
                 self.can_walljump["cooldown"] = max(self.can_walljump["cooldown"] - dt, 0)
-            for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect()) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     # --- HORIZONTAL CORNER CORRECTION ---
                     # If hitting a wall, try to nudge the player Up or Down to bypass the corner
@@ -802,18 +805,20 @@ class PhysicsPlayer:
                             self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                         for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                             # 1. Try nudging UP (Useful for stepping onto a ledge automatically)
+                            top_shifted_hitbox = pygame.Rect(round(self.pos[0]), round(self.pos[1]) - i, self.size[0], self.size[1])
                             if not any(
-                                    pygame.Rect(round(self.pos[0]), round(self.pos[1]) - i, self.size[0], self.size[1]).colliderect(r)
+                                    top_shifted_hitbox.colliderect(r)
                                     for
-                                    r in tilemap.physics_rects_around([self.pos[0], self.pos[1] - i], self.size)):
+                                    r in tilemap.physics_rects_around(top_shifted_hitbox)):
                                 self.pos[1] = self.pos[1] - i
                                 nudged = True
                                 break
                             # 2. Try nudging DOWN (Useful for clearing a ceiling corner)
+                            bottom_shifted_hitbox = pygame.Rect(round(self.pos[0]), round(self.pos[1]) + i, self.size[0], self.size[1])
                             if not any(
-                                    pygame.Rect(round(self.pos[0]), round(self.pos[1]) + i, self.size[0], self.size[1]).colliderect(r)
+                                    bottom_shifted_hitbox.colliderect(r)
                                     for
-                                    r in tilemap.physics_rects_around([self.pos[0], self.pos[1] + i], self.size)):
+                                    r in tilemap.physics_rects_around(bottom_shifted_hitbox)):
                                 self.pos[1] = self.pos[1] + i
                                 nudged = True
                                 break
@@ -834,7 +839,7 @@ class PhysicsPlayer:
                         self.pos[0] = entity_rect.x
                         self.stop_dash_momentum["x"] = True
 
-            for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect()) + self.game.doors_rects:
                 if ((self.GRAVITY_DIRECTION == 1 and (entity_rect.y - self.size[1] < rect.y <= entity_rect.y or
                                                       entity_rect.y + self.size[1] > rect.y >= entity_rect.y)) or
                         (self.GRAVITY_DIRECTION == -1 and (entity_rect.y <= rect.y < entity_rect.y + self.size[1] or
