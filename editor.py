@@ -1,4 +1,6 @@
 import sys
+
+
 import pygame
 import json
 import os
@@ -10,7 +12,7 @@ from unicodedata import category
 # Assuming these exist in your project structure
 from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators, load_pickups
 from scripts.tilemap import Tilemap
-from scripts.button import EditButton
+from scripts.button import EditButton, EditorButton
 
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200
@@ -180,9 +182,62 @@ class LevelManager:
         print("Full Save Complete: Maps reordered and deleted files removed.")
 
 class UI:
-    def __init__(self, editor, screen):
+
+    def __init__(self, editor):
         self.editor = editor
-        self.screen = screen
+        self.screen = editor.screen
+        self.screen_width, self.screen_height = self.screen.get_size()
+
+        self.tools_buttons = []
+        self.tools_buttons_labels = ["Brush", "Eraser", "Selection"]
+        self.tools_buttons_images = {"Brush": load_image("ui/skull.png"),
+                                     "Eraser": load_image("ui/skull.png"),
+                                     "Selection": load_image("ui/skull.png")}
+
+        self.toolbar_width = self.screen_width * 5/116
+
+        self.init_buttons()
+
+    def init_buttons(self):
+        self.tools_buttons = []
+
+        button_x, button_y = self.toolbar_width/2, self.toolbar_width/2
+        for label in self.tools_buttons_labels:
+            button = EditorButton(label, self.tools_buttons_images[label] ,(button_x, button_y), self.toolbar_width*(3/5),self.toolbar_width*(3/5),(100,10,10))
+            self.tools_buttons.append(button)
+
+    def render_toolbar(self):
+
+        overlay = pygame.Surface((self.toolbar_width, self.screen_height))
+        overlay.fill((30, 30, 30))
+        pygame.draw.rect(overlay, (30, 30, 30),
+                         (self.screen_width-self.toolbar_width, 0, self.toolbar_width, self.screen_height))
+
+        for button in self.tools_buttons:
+            button.draw(overlay)
+
+        for event in pygame.event.get():
+            for button in self.tools_buttons:
+                if button.handle_event(event):
+                    self.editor.current_tool = button.label
+
+        self.screen.blit(overlay, (self.screen_width - self.toolbar_width, 0))
+
+    def reload(self):
+        self.screen_width, self.screen_height = self.editor.screen.get_size()
+        self.toolbar_width = self.screen_width * 5/116
+        self.init_buttons()
+
+
+    def test_render(self):
+        while True:
+            self.render_toolbar()
+            pygame.display.update()
+            for event in pygame.event.get():
+                if event.type == pygame.VIDEORESIZE:
+                    self.reload()
+
+
 
 class Editor:
 

@@ -365,7 +365,6 @@ class Menu:
             case self.PAUSE_STATE:
                 self.draw_pause_menu()
 
-
     def save_current_button_states(self):
         """Update the dictionary with the current button state."""
 

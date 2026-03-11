@@ -25,6 +25,44 @@ class EditButton:
             color = (0, 0, 0)
         pygame.draw.rect(surf, color, self.rect)
 
+class EditorButton:
+
+    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int],width:int,height:int, bg_color:tuple[int,int,int]):
+        self.img = img
+        self.img = pygame.transform.scale(self.img,(width,height))
+        self.rect = self.img.get_rect(center=pos_center)
+        self.bg_color = bg_color
+        self.hover = False
+        self.label = label
+        self.activated = False
+
+    def draw(self, screen):
+        pygame.draw.rect(screen,self.bg_color, self.rect)
+        if self.hover:
+            overlay = pygame.Surface(self.rect.size)
+            overlay.fill((0,0,0, 100))
+
+            self.img.blit(overlay, (0, 0))
+        screen.blit(self.img, self.rect)
+
+    def is_selected(self, event):
+        if event.type == pygame.MOUSEMOTION:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+
+    def is_clicked(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 0 and self.rect.collidepoint(event.pos):
+                return True
+        return False
+
+    def handle_event(self,event):
+        if self.activated:
+            self.hover = self.is_selected(event)
+            return self.is_clicked(event)
+
+
 class MenuButton:
     def __init__(self,menu, text:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int]):
         self.menu=menu
