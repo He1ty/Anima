@@ -1449,5 +1449,10 @@ class Editor:
         while True:
             self.main_editor_logic()
 
+
+
+
 if __name__ == "__main__":
-    Editor().run()
+    editor = Editor()
+    ui = UI(editor)
+    ui.test_render()
