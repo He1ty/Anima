@@ -196,10 +196,10 @@ class Menu:
         self.profile_selection_slots = []
 
 
-        button_x = 3*self.SW /4
+        button_x = self.SW / 2
 
         # TITLE SCREEN BUTTONS
-        start_title_btn_y = (self.SH / 2)
+        start_title_btn_y = (self.SH / 2) + (self.SH / 8)
         button_y = start_title_btn_y
 
         for label in self.title_buttons_labels:
@@ -917,11 +917,12 @@ class Menu:
 
     def draw_title_menu(self):
         #self.draw_title_screen_background_animation()
-
+        title = load_image("ui/Anima_Title.png",size=(self.SW, self.SH))
         current_screen_size = self.screen.get_size()
         overlay = py.Surface(current_screen_size, py.SRCALPHA)
         overlay.fill(self.COLORS["overlay"])
         self.screen.blit(overlay, (0, 0))
+        self.screen.blit(title, (0, -self.SH/6))
 
         for i,button in enumerate(self.title_buttons):
             if i == self.title_command_nb:
