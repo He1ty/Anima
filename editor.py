@@ -397,6 +397,8 @@ class Editor:
         self.current_category = 0
         self.current_category_name = []
 
+        self.current_tool = "Brush"
+
         self.save_action()
 
     # --- UNDO/REDO METHODS --- #
@@ -1010,10 +1012,70 @@ class Editor:
             if not self.window_mode:
                 if not self.edit_properties_mode_on:
                     if self.ongrid:
+                        # Tile image following cursor display
                         if 'spike' in self.tile_list[self.tile_group]:
                             current_tile_img = pygame.transform.rotate(current_tile_img, self.rotation * -90)
                         self.display.blit(current_tile_img, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
                                                              tile_pos[1] * self.tilemap.tile_size - self.scroll[1]))
+                        # Place tile
+                        if self.clicking:
+                            if self.tile_list[
+                                self.tile_group] in self.categories["Activators"] and self.current_layer not in \
+                                    self.tilemap.layers["activators"]:
+                                self.tilemap.layers["activators"] += [self.current_layer]
+
+                            if "fake" in self.tile_list[self.tile_group] and self.current_layer not in \
+                                    self.tilemap.layers["fake_tiles"]:
+                                self.tilemap.layers["fake_tiles"] += [self.current_layer]
+
+                            if self.tile_list[
+                                self.tile_group] == "spawners" and self.tile_variant == 0 and not self.tilemap.extract(
+                                [("spawners", 0)], keep=True):
+                                self.tilemap.layers["player"] = [self.current_layer]
+
+                            if self.tile_list[
+                                self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
+                                [("spawners", 0)], keep=True):
+                                print("Player spawner alredy placed in this map")
+                            else:
+                                t = self.tile_list[self.tile_group]
+                                self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
+                                    'type': self.tile_list[self.tile_group],
+                                    'variant': self.tile_variant,
+                                    'pos': tile_pos}
+
+                                tile = self.tilemap.tilemap[self.current_layer][
+                                    str(tile_pos[0]) + ";" + str(tile_pos[1])]
+
+                                if "spike" in t:
+                                    self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])][
+                                        "rotation"] = self.rotation
+
+                                else:
+                                    for c in self.infos_per_type_per_category:
+                                        if c.lower()[:-1] in t:
+                                            tile_category = self.get_infos_tile_category(tile)
+                                            self.setup_edit_window(tile_category, tile)
+                                            break
+
+                        # Remove tile
+                        if self.right_clicking:
+                            tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                            if tile_loc in self.tilemap.tilemap[self.current_layer]:
+                                del self.tilemap.tilemap[self.current_layer][tile_loc]
+
+                            if self.current_layer in self.tilemap.offgrid_tiles:
+                                for pos in self.tilemap.offgrid_tiles[self.current_layer].copy():
+                                    tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
+                                    tile_img = self.assets[tile['type']][tile['variant']]
+                                    tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                                         tile['pos'][1] - self.scroll[1],
+                                                         tile_img.get_width(),
+                                                         tile_img.get_height())
+                                    if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(
+                                            mpos):  # Check both to be safe
+                                        del self.tilemap.offgrid_tiles[self.current_layer][pos]
+
                     else:
                         self.display.blit(current_tile_img, mpos_scaled)
                 else:
@@ -1029,6 +1091,12 @@ class Editor:
                                 self.display.blit(shining_image, (tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
                                                                   tile_pos[1] * self.tilemap.tile_size - self.scroll[
                                                                       1]))
+                    if self.clicking:
+                        tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
+                        if tile_loc in self.tilemap.tilemap[self.current_layer]:
+                            tile = self.tilemap.tilemap[self.current_layer][tile_loc]
+                            tile_category = self.get_infos_tile_category(tile)
+                            self.setup_edit_window(tile_category, tile)
 
         if self.selecting_dest_pos and self.clicking and not self.waiting_for_click_release and mpos_in_mainarea:
             selected_pos = list(tile_pos)
@@ -1049,77 +1117,6 @@ class Editor:
             self.selecting_dest_pos = False
             self.clicking = False  # Prevent accidental placement on return
             self.save_action()
-
-        if self.clicking and self.ongrid and mpos_in_mainarea:
-            if not self.window_mode:
-                if not self.edit_properties_mode_on:
-                    print(self.categories["Activators"])
-                    if self.tile_list[
-                        self.tile_group] in self.categories["Activators"] and self.current_layer not in self.tilemap.layers["activators"]:
-
-                        self.tilemap.layers["activators"] += [self.current_layer]
-
-                    if "fake" in self.tile_list[self.tile_group] and self.current_layer not in self.tilemap.layers["fake_tiles"]:
-
-                        self.tilemap.layers["fake_tiles"] += [self.current_layer]
-
-                    if self.tile_list[
-                        self.tile_group] == "spawners" and self.tile_variant == 0 and not self.tilemap.extract(
-                            [("spawners", 0)], keep=True):
-                        self.tilemap.layers["player"] = [self.current_layer]
-
-
-                    if self.tile_list[
-                        self.tile_group] == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
-                            [("spawners", 0)], keep=True):
-                        print("Player spawner alredy placed in this map")
-                    else:
-                        t = self.tile_list[self.tile_group]
-                        self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])] = {
-                            'type': self.tile_list[self.tile_group],
-                            'variant': self.tile_variant,
-                            'pos': tile_pos}
-
-                        tile = self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]
-
-
-                        if "spike" in t:
-                            self.tilemap.tilemap[self.current_layer][str(tile_pos[0]) + ";" + str(tile_pos[1])]["rotation"] = self.rotation
-
-
-                        else:
-                            for c in self.infos_per_type_per_category:
-                                if c.lower()[:-1] in t:
-                                    tile_category = self.get_infos_tile_category(tile)
-                                    self.setup_edit_window(tile_category, tile)
-                                    break
-
-                else:
-                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                    if tile_loc in self.tilemap.tilemap[self.current_layer]:
-                        tile = self.tilemap.tilemap[self.current_layer][tile_loc]
-                        tile_category = self.get_infos_tile_category(tile)
-                        self.setup_edit_window(tile_category, tile)
-
-        if self.right_clicking and mpos_in_mainarea:
-            if not self.window_mode:
-                if not self.edit_properties_mode_on:
-                    tile_loc = str(tile_pos[0]) + ";" + str(tile_pos[1])
-                    if tile_loc in self.tilemap.tilemap[self.current_layer]:
-                        del self.tilemap.tilemap[self.current_layer][tile_loc]
-
-                    if self.current_layer in self.tilemap.offgrid_tiles:
-                        for pos in self.tilemap.offgrid_tiles[self.current_layer].copy():
-                            tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
-                            tile_img = self.assets[tile['type']][tile['variant']]
-                            tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
-                                                 tile['pos'][1] - self.scroll[1],
-                                                 tile_img.get_width(),
-                                                 tile_img.get_height())
-                            if tile_r.collidepoint(mpos_scaled) or tile_r.collidepoint(mpos):  # Check both to be safe
-                                del self.tilemap.offgrid_tiles[self.current_layer][pos]
-
-
 
         if not self.edit_properties_mode_on:
             m_pos_txt = self.font.render(str([tile_pos[0]*self.tile_size, tile_pos[1]*self.tile_size]), True, (255, 255, 255))
@@ -1454,5 +1451,6 @@ class Editor:
 
 if __name__ == "__main__":
     editor = Editor()
+    #editor.run()
     ui = UI(editor)
     ui.test_render()
