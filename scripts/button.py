@@ -28,39 +28,59 @@ class EditButton:
 class EditorButton:
 
     def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int],width:int,height:int, bg_color:tuple[int,int,int]):
+        self.rect = pygame.Rect(0,0,width,height)
+        self.default_pos = pos_center
+        self.rect.center = self.default_pos
         self.img = img
-        self.img = pygame.transform.scale(self.img,(width,height))
-        self.rect = self.img.get_rect(center=pos_center)
+        self.img = pygame.transform.scale(self.img, (width * 0.8, height * 0.8))
+        self.img_rect = self.img.get_rect(center=self.rect.center)
         self.bg_color = bg_color
         self.hover = False
         self.label = label
         self.activated = False
 
     def draw(self, screen):
-        pygame.draw.rect(screen,self.bg_color, self.rect)
-        if self.hover:
-            overlay = pygame.Surface(self.rect.size)
-            overlay.fill((0,0,0, 100))
-
-            self.img.blit(overlay, (0, 0))
-        screen.blit(self.img, self.rect)
-
-    def is_selected(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            if self.rect.collidepoint(event.pos):
-                return True
-        return False
-
-    def is_clicked(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 0 and self.rect.collidepoint(event.pos):
-                return True
-        return False
-
-    def handle_event(self,event):
+        # Draw 3D effect
         if self.activated:
-            self.hover = self.is_selected(event)
-            return self.is_clicked(event)
+            pygame.draw.line(screen, (40, 40, 40), (self.rect.x, self.rect.y), (self.rect.x, self.rect.bottom), 2)
+            pygame.draw.line(screen, (40, 40, 40,), (self.rect.x, self.rect.y), (self.rect.right, self.rect.top), 2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.y), (self.rect.right, self.rect.bottom),2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.bottom),(self.rect.left, self.rect.bottom), 2)
+            self.img_rect.center = (self.default_pos[0]+1, self.default_pos[1]+1)
+
+
+        else:
+            pygame.draw.line(screen,(96,96,96),(self.rect.x,self.rect.y),(self.rect.x,self.rect.bottom),2)
+            pygame.draw.line(screen,(96,96,96),(self.rect.x,self.rect.y),(self.rect.right,self.rect.top),2)
+            pygame.draw.line(screen,(40,40,40),(self.rect.right,self.rect.y),(self.rect.right,self.rect.bottom),2)
+            pygame.draw.line(screen,(40,40,40),(self.rect.right,self.rect.bottom),(self.rect.left,self.rect.bottom),2)
+            self.img_rect.center = self.default_pos
+
+        screen.blit(self.img, self.img_rect)
+
+    def is_selected(self, event,offset=None):
+        if event.type == pygame.MOUSEMOTION:
+            if offset is None:
+                if self.rect.collidepoint(event.pos):
+                    return True
+            else:
+                if self.rect.move(offset).collidepoint(event.pos):
+                    return True
+        return False
+
+    def is_clicked(self, event,offset=None):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if offset is None:
+                if event.button == 1 and self.rect.collidepoint(event.pos):
+                    return True
+            else:
+                if event.button == 1 and self.rect.move(offset).collidepoint(event.pos):
+                    return True
+        return False
+
+    def handle_event(self,event,offset=None):
+        self.hover = self.is_selected(event,offset)
+        return self.is_clicked(event,offset)
 
 
 class MenuButton:
@@ -73,7 +93,7 @@ class MenuButton:
         self.text_color = text_color
         self.hover = False
 
-        self.hover_image = load_image("ui/Opera_senza_titolo.png",size=(font.get_height()*1.3,font.get_height()*1.3))
+        self.hover_image = load_image("ui/Opera_senza_titolo.png",size=(font.get_height()*4,font.get_height()*4))
         self.hover2_image = pygame.transform.flip(self.hover_image, True, False)
 
 
@@ -625,6 +645,10 @@ class SaveSlotUI:
         else:
             self.delete_hover = False
             return None
+
+    def update_delete_hover(self):
+        if not self.hover:
+            self.delete_hover = False
 
     def start_hover_effect(self):
         self.hover = True

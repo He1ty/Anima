@@ -12,7 +12,13 @@ def load_image(path, size=None):#Takes a path and load the coresponding image. C
         img = pygame.transform.scale(img, size)  # Resize image if size is provided
     return img
 
-def load_images(path, tile_size=None):#Sort in alpha order every images of a given file. Will be used for animations or image variants
+def load_images(path, tile_size=None):
+    """
+    Sort in alpha order every image of a given file. Will be used for animations or image variants
+    :param path:
+    :param tile_size:
+    :return:
+    """
     images = []
     if type(tile_size) is not tuple and tile_size:
         tile_size = (tile_size, tile_size)

@@ -1,13 +1,9 @@
 import pygame
-import sys
-import json
-import os
 from scripts.button import MenuButton
 from scripts.text import load_game_font
-from scripts.utils import load_image, draw_rect_alpha,key_name,build_items
+from scripts.utils import load_image,key_name,build_items
 
 pygame.init()
-# ─── CLASSE PRINCIPALE ────────────────────────────────────────────────────────
 
 class ControlsMenu:
     """
@@ -203,10 +199,14 @@ class ControlsMenu:
         """
         sw, sh = self.screen.get_size()
 
-        if self.game.previous_state == self.game.TITLE_STATE:
-            self.game.menu.draw_title_screen_background_animation()
+        if self.menu.previous_state == self.menu.TITLE_STATE:
+            self.menu.draw_title_screen_background_animation()
         else:
-            self.screen.fill(self.game.menu.COLORS["black"])
+            if self.menu.original_background is not None:
+                scaled_bg = pygame.transform.scale(self.menu.original_background, (sw,sh))
+                self.screen.blit(scaled_bg, (0, 0))
+            else:
+                self.screen.fill(self.menu.COLORS["black"])
 
         self.update_scroll()
 
