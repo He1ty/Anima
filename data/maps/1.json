@@ -10571,7 +10571,7 @@
     "x_limits": "176;528"
    },
    "33;90": {
-    "type": "green_cave_lever",
+    "type": "leafy_lever",
     "variant": 0,
     "pos": [
      33,

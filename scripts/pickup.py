@@ -81,6 +81,7 @@ class Pickup:
                     self.state = "appearing"
                     self.animation = self.game.assets[self.type + "/" + self.state].copy()
             else:
+                print("A")
                 self.game.pickups.remove(self)
 
         elif self.state == "appearing":
@@ -91,6 +92,10 @@ class Pickup:
                 self.state = "idle"
                 self.animation = self.game.assets[self.type + "/" + self.state].copy()
 
+        if self.state == "idle":
+            self.animation.loop = True
+        else:
+            self.animation.loop = False
         self.animation.update()
 
     def rect(self):

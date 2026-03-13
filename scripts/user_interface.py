@@ -176,7 +176,8 @@ class Menu:
         self.init_buttons()
 
         # --- Souls Animation --- #
-        self.souls_animation = Animation(load_images('pickups/soul/idle'),5,True)
+        self.souls_animation = Animation(load_images(f'environments/{self.game.get_environment(self.game.level)}'
+                                                     f'/images/tiles/pickups/soul/idle'),5,True)
         self.souls_pos = []
         self.souls_end_pos = [self.SH/12, self.SH/12]
         self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
@@ -853,7 +854,6 @@ class Menu:
                 self.controls_menu.scroll_y = 0
                 self.controls_menu.target_scroll = 0
                 self.menu_state = self.OPTION_STATE
-        self.controls_menu.draw_controls_menu()
 
     def draw_pause_menu(self):
         current_screen_size = self.screen.get_size()

@@ -7,12 +7,11 @@ import os
 import shutil
 import copy
 
-from unicodedata import category
-
 # Assuming these exist in your project structure
 from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators, load_pickups
 from scripts.tilemap import Tilemap
 from scripts.button import EditButton, EditorButton
+from editor_ui import UI
 
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200
@@ -181,100 +180,6 @@ class LevelManager:
 
         print("Full Save Complete: Maps reordered and deleted files removed.")
 
-class UI:
-    TOOLBAR_COLOR = (64,64,64)
-    PADDING = 5
-
-    def __init__(self, editor):
-        self.editor = editor
-        self.screen = editor.screen
-        self.screen_width, self.screen_height = self.screen.get_size()
-
-        self.tools_buttons = []
-        self.tools_buttons_labels = ["Brush", "Eraser", "Selection"]
-        self.tools_buttons_images = {"Brush": load_image("ui/skull.png"),
-                                     "Eraser": load_image("ui/skull.png"),
-                                     "Selection": load_image("ui/skull.png")}
-
-        self.toolbar_width = self.screen_width * 5/116
-        self.toolbar_default_width = self.screen_width * 5/116
-        self.toolbar_buttons_width =  self.toolbar_width*(3/5)
-        self.toolbar_buttons_height = self.toolbar_width*(3/5)
-
-        self.init_buttons()
-        self.closing = False
-
-    def init_buttons(self):
-        self.tools_buttons = []
-
-        button_x, button_y = self.toolbar_width/2, self.toolbar_width/2
-        for label in self.tools_buttons_labels:
-            button = EditorButton(label, self.tools_buttons_images[label] ,(button_x, button_y), self.toolbar_buttons_width,self.toolbar_buttons_height,(64,64,64))
-            button_y += self.toolbar_buttons_height + self.PADDING
-            self.tools_buttons.append(button)
-
-    def render_toolbar(self):
-        self.screen.fill((0,0,0))
-
-        overlay = pygame.Surface((self.toolbar_width, self.screen_height))
-        overlay.fill(self.TOOLBAR_COLOR)
-        pygame.draw.rect(overlay, (30, 30, 30),
-                         (self.screen_width-self.toolbar_width, 0, self.toolbar_width, self.screen_height))
-
-        for button in self.tools_buttons:
-            button.draw(overlay)
-            if button.label == self.editor.current_tool:
-                button.activated = True
-            else:
-                button.activated = False
-
-        self.close_toolbar()
-        self.open_toolbar()
-
-        for event in pygame.event.get():
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_TAB:
-                    self.closing = not self.closing
-            for button in self.tools_buttons:
-                if button.handle_event(event,offset=(self.screen_width-self.toolbar_width, 0)):
-                    self.editor.current_tool = button.label
-                    print(button.label)
-
-        self.screen.blit(overlay, (self.screen_width - self.toolbar_width, 0))
-
-    def close_toolbar(self):
-        if self.closing:
-            if self.toolbar_width > 0:
-                self.toolbar_width -= 5
-            else:
-                self.toolbar_width = 0
-
-    def open_toolbar(self):
-        if not self.closing:
-            if self.toolbar_width < self.toolbar_default_width:
-                self.toolbar_width += 5
-            else:
-                self.toolbar_width = self.toolbar_default_width
-
-
-
-    def reload(self):
-        self.screen_width, self.screen_height = self.editor.screen.get_size()
-        self.toolbar_width = self.screen_width * 5/116
-        self.init_buttons()
-
-
-    def test_render(self):
-        while True:
-            self.render_toolbar()
-            for event in pygame.event.get():
-                if event.type == pygame.VIDEORESIZE:
-                    self.reload()
-            self.editor.clock.tick(60)
-            pygame.display.update()
-
-
 class Editor:
 
     def __init__(self):
@@ -282,9 +187,9 @@ class Editor:
 
         pygame.display.set_caption("Editor")
         self.screen_width = 960 + SIDEBAR_WIDTH
-        self.screen_height = 576
+        self.screen_height = 600
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
-        self.display = pygame.Surface((480, 288))
+        self.display = pygame.Surface((self.screen_width/2, self.screen_height/2))
         self.clock = pygame.time.Clock()
 
         self.underbar = pygame.Surface((self.screen.get_size()[0] - SIDEBAR_WIDTH, UNDERBAR_HEIGHT))
@@ -1487,6 +1392,4 @@ class Editor:
 
 if __name__ == "__main__":
     editor = Editor()
-    #editor.run()
-    ui = UI(editor)
-    ui.test_render()
+    editor.run()

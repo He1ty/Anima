@@ -310,6 +310,8 @@ class Tilemap:
 
                             surf.blit(img, (
                                 tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
+                        else:
+                            print(f"{tile["type"]} not in assets")
 
             if layer in self.offgrid_tiles:
                 for pos in self.offgrid_tiles.copy()[layer]:

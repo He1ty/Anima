@@ -3,7 +3,8 @@ import os
 
 
 
-BASE_IMG_PATH = "assets/images/"
+BASE_IMG_PATH = "assets/"
+ANIMATED_CATEGORIES = {"doors", "pickups", "checkpoint", "animated_blocks"}
 
 def load_image(path, size=None):#Takes a path and load the coresponding image. Can resize the image if size given
     img = pygame.image.load(BASE_IMG_PATH + path).convert_alpha()
@@ -63,86 +64,46 @@ def load_tileset(image_path, tile_width, tile_height, spiral_order=False, size=N
 def round_up(x):#pretty basic
     return int(x) + 1 if x % 1 != 0 and x > 0 else int(x)
 
-def load_tiles(env=None):#load every tiles (graphic components) coresponding to a given environement
+def load_tiles(environment):
     tiles = {}
-    for environment in sorted(os.listdir(BASE_IMG_PATH + 'tiles')) if env is None else [env]:
-        for tile in sorted(os.listdir(BASE_IMG_PATH + 'tiles/' + environment)):
-            images = load_images('tiles/' + environment + '/' + tile)
-            if "tileset.png" in os.listdir(f'{BASE_IMG_PATH}/tiles/{environment}/{tile}'):
-                tiles[tile] = load_tileset(image_path=f'{BASE_IMG_PATH}/tiles/{environment}/{tile}/tileset.png', tile_width=16, tile_height=16, spiral_order=True)
+    path = f"{BASE_IMG_PATH}environments/{environment}/images/tiles"
+    for category in sorted(os.listdir(path)):
+        for tile in sorted(os.listdir(f"{path}/{category}")):
+            if category in ANIMATED_CATEGORIES:
+                for animation in sorted(os.listdir(f"{path}/{category}/{tile}")):
+                    tiles[tile + '/' + animation] = Animation(
+                        load_images(f"environments/{environment}/images/tiles/{category}/{tile}/{animation}"))
             else:
-                tiles[tile] = images
-    return tiles
-
-def load_entities(e_info):#load every info on every entities
-    tiles = {}
-    for ent in sorted(os.listdir(BASE_IMG_PATH + 'entities/')):
-        if ent != "player":
-            for tile in sorted(os.listdir(BASE_IMG_PATH + 'entities/' + ent)):
-                for animation in sorted(os.listdir(BASE_IMG_PATH + 'entities/' + ent + '/' + tile)):
-                    if animation in e_info[tile]["left/right"]:
-                        for direction in sorted(os.listdir(BASE_IMG_PATH + 'entities/' + ent + '/' + tile + '/' + animation)):
-                            tiles[tile + '/' + animation + '/' + direction] = Animation(load_images('entities/' + ent + '/' +
-                                                                                                    tile + '/' +
-                                                                                                    animation + '/' +
-                                                                                                    direction, e_info[tile]["size"]),
-                                                                                        img_dur=e_info[tile]["img_dur"][animation],
-                                                                                        loop=e_info[tile]["loop"][animation])
-                    else:
-                        tiles[tile+'/'+animation] = Animation(load_images('entities/' + ent + '/' + tile + '/' + animation, e_info[tile]["size"]),
-                                                              img_dur=e_info[tile]["img_dur"][animation],
-                                                              loop=e_info[tile]["loop"][animation])
+                images = load_images(f"environments/{environment}/images/tiles/{category}/{tile}")
+                if "tileset.png" in os.listdir(f'{path}/{category}/{tile}'):
+                    tiles[tile] = load_tileset(image_path=f"{path}/{category}/{tile}/tileset.png",
+                                               tile_width=16, tile_height=16, spiral_order=True)
+                else:
+                    tiles[tile] = images
     return tiles
 
 def load_player():
-    return {'player/idle': Animation(load_images('entities/player/idle', (16,16)), img_dur=12)}
+    return {'player/idle': Animation(load_images(f'player/idle', (16,16)), img_dur=12)}
 
-def load_doors(d_info, env=None):
+def load_particles(environment):
     tiles = {}
-    for environment in sorted(os.listdir(BASE_IMG_PATH + 'doors/')) if env is None else [env]:
-        for door in sorted(os.listdir(BASE_IMG_PATH + 'doors/' + environment)):
-            if d_info == 'editor':
-                tiles[door] = load_images('doors/' + environment + '/' + door + "/closed")
-            else:
-                for animation in sorted(os.listdir(BASE_IMG_PATH + 'doors/' + environment + '/' + door)):
-                    tiles[door + '/' + animation] = Animation(
-                        load_images('doors/' + environment + '/' + door + '/' + animation,
-                                    d_info[door]["size"]),
-                        img_dur=d_info[door]["img_dur"] if animation in ("closing","opening") else 1,
-                        loop=False)
+    if "particles" in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{environment}/images/")):
+        for particle in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{environment}/images/particles")):
+            tiles[f"particle/{particle}"] = Animation(load_images(f'environments/{environment}/images/particles/leaf'), loop=5)
+
     return tiles
 
-def load_activators(env=None):
+
+def load_backgrounds(b_info, environment):
     tiles = {}
-    for activator in sorted(os.listdir(BASE_IMG_PATH + 'activators/')):
-        for environment in sorted(os.listdir(BASE_IMG_PATH + 'activators/' + activator)) if env is None else [env]:
-            try:
-                tiles[environment + "_" + activator[:-1]] = load_images('activators/' + activator + '/' + environment)
-            except FileNotFoundError:
-                pass
+    path = f"{BASE_IMG_PATH}environments/{environment}/images/backgrounds"
+    if b_info[environment]["animated"]:
+        tiles[environment] = Animation(load_images(f"environments/{environment}/images/backgrounds"), img_dur=b_info[environment]["img_dur"], loop=b_info[environment]["loop"])
+        return tiles
+    for bg in sorted(os.listdir(path)):
+            tiles[environment + "/" + bg[:-4]] = load_image(f"environments/{environment}/images/backgrounds/{bg}",
+                                                       (480, 300))
     return tiles
-
-def load_pickups(one_image=False):
-    pickups = {}
-    for pickup in sorted(os.listdir(BASE_IMG_PATH + 'pickups')):
-        if not one_image:
-            for animation in sorted(os.listdir(BASE_IMG_PATH + 'pickups/' + pickup)):
-                pickups[f"{pickup}/{animation}"] = Animation(load_images(f'pickups/{pickup}/{animation}'), loop = animation in ("idle", "taken"))
-        else:
-            pickups[pickup] = load_images(f'pickups/{pickup}/idle')
-    return pickups
-
-def load_backgrounds(b_info):
-    tiles = {}
-    for environment in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/')):
-        if b_info[environment]["animated"]:
-            tiles[environment] = Animation(load_images('backgrounds/' + environment), img_dur=b_info[environment]["img_dur"], loop=b_info[environment]["loop"])
-            continue
-        for bg in sorted(os.listdir(BASE_IMG_PATH + 'backgrounds/' + environment)):
-            tiles[environment + "/" + bg[:-4]] = load_image('backgrounds/' + environment + "/" + bg,
-                                                       (480, 288))
-    return tiles
-
 
 def draw_rect_alpha(surface, color, rect, alpha):
     """

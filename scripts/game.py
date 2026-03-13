@@ -45,6 +45,15 @@ class Game:
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
 
+        self.level = 0
+        path = 'data/environments.json'
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                # Convert lists back to specific types if needed, json loads arrays as lists
+                self.environments = json.load(f)
+
+        self.environment = self.get_environment(self.level)
+
         if full_setup:
             # --- Debug Mode ---
             self.debug_mode = False
@@ -53,16 +62,16 @@ class Game:
 
             # --- Sound manager System ---
             self.master_volume = 1
-            base_path = "assets/sounds/"
-            music_path = {'title_screen': base_path + 'Title-screen-ambient-music.wav',
-                          'level_0': base_path + 'map_0.wav'}
+            player_path = "assets/player/sounds/"
+            music_path = {'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
+                          'level_0': f"assets/environments/{self.environment}/sounds/map_0.wav"}
             self.music_sound_manager = Sound(self, music_path, is_music=True, master_volume=self.master_volume,volume=1)
             sound_effect_path = {
-                "dash": base_path + 'player/dash.wav',
-                'jump': base_path + 'player/jump.wav',
-                'run': base_path + 'player/run.wav',
-                'wall_jump': base_path + 'player/wall_jump.wav',
-                'land': base_path + 'player/land.wav',
+                "dash": player_path + 'dash.wav',
+                'jump': player_path + 'jump.wav',
+                'run': player_path + 'run.wav',
+                'wall_jump': player_path + 'wall_jump.wav',
+                'land': player_path + 'land.wav',
                 'walk': None,
                 'stun': None
             }
@@ -104,7 +113,7 @@ class Game:
 
         # --- Icon Setup ---
         try:
-            icon_img = pygame.image.load("assets/images/logo.png").convert_alpha()
+            icon_img = pygame.image.load("assets/images/ui/logo.png").convert_alpha()
             icon_img = pygame.transform.smoothscale(icon_img, (16, 16))
             pygame.display.set_icon(icon_img)
         except FileNotFoundError:
@@ -144,11 +153,6 @@ class Game:
         self.b_info = {"white_space": {"animated":True, "img_dur": 6, "loop": True},
                         "green_cave": {"animated":False},
                         "blue_cave": {"animated":False}}
-        path = 'data/environments.json'
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                # Convert lists back to specific types if needed, json loads arrays as lists
-                self.environments = json.load(f)
         self.spawners = {}
 
         # --- Camera Constraints ---
@@ -163,24 +167,13 @@ class Game:
         self.camera_center = None
 
         # --- Asset Loading ---
-        self.assets = {
-            'particle/leaf': Animation(load_images('particles/leaf'), loop=5),
-            'particle/crystal': Animation(load_images('particles/crystal'), loop=1000),
-            'particle/crystal_fragment': Animation(load_images('particles/crystal_fragment'), loop=1),
-            'glorbo_projectile': load_image('projectiles/glorbo_projectile.png', (16, 16)),
-            'missile': load_image('projectiles/missile.png', (16, 16)),
-            'checkpoint/1': Animation(load_images('checkpoint/activated'), img_dur=10),
-            'checkpoint/0': load_images('checkpoint/deactivated')
-        }
+        self.assets = {}
 
         # Dynamically load assets from folders using helper functions
-        self.assets.update(load_activators())
-        self.assets.update(load_doors(self.d_info))
-        self.assets.update(load_tiles())
-        self.assets.update(load_entities(self.e_info))
+        self.assets.update(load_tiles(self.environment))
         self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info))
-        self.assets.update(load_pickups())
+        self.assets.update(load_backgrounds(self.b_info, self.environment))
+        self.assets.update(load_particles(self.environment))
 
         # --- Map Object Caching ---
         # Pre-loads and pairs interactive objects for efficient lookup during level loading
@@ -189,12 +182,12 @@ class Game:
         self.buttons_id_pairs = []
         self.tp_id_pairs = []
 
-        for env in self.environments:
+        '''for env in self.environments:
             self.doors_id_pairs += [(door, 0) for door in load_doors('editor', env)]
             self.levers_id_pairs += [(lever, 0) for lever in load_activators(env) if "lever" in lever]
             self.buttons_id_pairs += [(button, 0) for button in load_activators(env) if "button" in button]
             self.tp_id_pairs += [(tp, 0) for tp in load_activators(env) if "teleporter" in tp]
-
+'''
 
         try:
             if not pygame.mixer.get_init():
@@ -209,7 +202,7 @@ class Game:
                         "key_jump": 0, "key_dash": 0, "key_noclip": 0}
 
         self.tilemap = Tilemap(self, self.tile_size)
-        self.level = 0
+
         #Start level
         self.default_level = self.level
 
@@ -315,7 +308,7 @@ class Game:
         for environment in self.environments:
             if level in self.environments[environment]:
                 return environment
-        return "green_cave"
+        return "white_space"
 
     def set_keymap(self,bindings: dict):
         for cat in bindings:
@@ -337,6 +330,13 @@ class Game:
             :param map_id:
             :param transition_effect:
         """
+        self.environment = self.get_environment(map_id)
+        self.assets = {}
+        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_player())
+        self.assets.update(load_backgrounds(self.b_info, self.environment))
+        self.assets.update(load_particles(self.environment))
+
         self.tilemap.load("data/maps/" + str(map_id) + ".json")
         self.tilemap.tile_size = self.tile_size
         mult=0.5
@@ -349,7 +349,7 @@ class Game:
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
 
         self.pickups = []
-        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(BASE_IMG_PATH + 'pickups'))]):
+        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/pickups"))]):
             if pickup["pos"] not in self.collected_souls:
                 self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
 
@@ -419,7 +419,7 @@ class Game:
             self.camera_setup.append(CameraSetup(self, camera))
 
         fake_tiles_id_pairs = []
-        for tile in sorted(os.listdir(f"{BASE_IMG_PATH}tiles/{str(self.get_environment(self.level))}")):
+        for tile in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/blocks")):
             if "fake" in tile:
                 for variant in range(len(self.assets[tile])):
                     fake_tiles_id_pairs.append((tile, variant))
@@ -505,7 +505,7 @@ class Game:
 
                 # 1. Only create the animation object if we haven't already!
                 if self.active_checkpoint_anim is None:
-                    self.active_checkpoint_anim = self.assets['checkpoint/1'].copy()
+                    self.active_checkpoint_anim = self.assets['simple_campfire/activated'].copy()
                     # Restore the frame from data if it exists (for loading saves)
                     if "frame" in checkpoint:
                         self.active_checkpoint_anim.frame = checkpoint["frame"]
@@ -522,7 +522,7 @@ class Game:
                 continue
 
             checkpoint["state"] = 0
-            img = self.assets['checkpoint/0'].copy()[0]
+            img = self.assets['simple_campfire/deactivated'].img()
             self.display.blit(img, (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
             if ((pos[0] <= self.player.pos[0] <= pos[0] + self.tile_size or pos[0] <= self.player.pos[0] + 16 <= pos[0] + self.tile_size) and
                     pos[1] >= self.player.pos[1] >= pos[1] - 16 and

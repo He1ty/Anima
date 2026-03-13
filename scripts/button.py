@@ -58,7 +58,7 @@ class EditorButton:
 
         screen.blit(self.img, self.img_rect)
 
-    def is_selected(self, event,offset=None):
+    def is_selected(self, event, offset=None):
         if event.type == pygame.MOUSEMOTION:
             if offset is None:
                 if self.rect.collidepoint(event.pos):
@@ -68,7 +68,7 @@ class EditorButton:
                     return True
         return False
 
-    def is_clicked(self, event,offset=None):
+    def is_clicked(self, event, offset=None):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if offset is None:
                 if event.button == 1 and self.rect.collidepoint(event.pos):
@@ -78,7 +78,7 @@ class EditorButton:
                     return True
         return False
 
-    def handle_event(self,event,offset=None):
+    def handle_event(self,event, offset=None):
         self.hover = self.is_selected(event,offset)
         return self.is_clicked(event,offset)
 
