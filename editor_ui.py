@@ -31,7 +31,9 @@ class EditorSimulation:
         self.current_environment = "white_space"
 
         self.categories = load_editor_tiles(self.current_environment)
-        self.assets = load_tiles(self.current_environment)
+        self.assets = {}
+        for tile in self.categories.values():
+            self.assets.update(tile)
         self.assets.update({"spawners": load_images("player/spawner")})
 
         self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
