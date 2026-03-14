@@ -1,38 +1,20 @@
 import pygame
 import datetime
 
+from pygame.display import get_surface
+
 from scripts.utils import load_image
-
-
-class EditButton:
-
-    def __init__(self, left, top, width, height, clicking,text=None,hover=False,):
-        self.x = left
-        self.y = top
-        self.width = width
-        self.height = height
-        self.rect = pygame.Rect(self.x, self.y, self.width, self.height)
-        self.clicking = clicking
-        self.activated = True
-
-    def pressed(self, mpos):
-        if self.clicking and self.rect.collidepoint(mpos):
-            return True
-        return False
-
-    def draw(self, surf, color, mpos):
-        if self.rect.collidepoint(mpos) and not self.pressed(mpos) and self.activated:
-            color = (0, 0, 0)
-        pygame.draw.rect(surf, color, self.rect)
-
 class EditorButton:
 
-    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int],width:int,height:int, bg_color:tuple[int,int,int]):
+    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int],width:int,height:int, bg_color:tuple[int,int,int], img_ratio:int):
         self.rect = pygame.Rect(0,0,width,height)
         self.default_pos = pos_center
         self.rect.center = self.default_pos
         self.img = img
-        self.img = pygame.transform.scale(self.img, (width * 0.8, height * 0.8))
+        if self.img.get_width() != self.img.get_height():
+            self.img = pygame.transform.scale(self.img, (width*0.8, height*0.8))
+        else:
+            self.img = pygame.transform.scale_by(self.img, img_ratio)
         self.img_rect = self.img.get_rect(center=self.rect.center)
         self.bg_color = bg_color
         self.hover = False
@@ -81,7 +63,6 @@ class EditorButton:
     def handle_event(self,event, offset=None):
         self.hover = self.is_selected(event,offset)
         return self.is_clicked(event,offset)
-
 
 class MenuButton:
     def __init__(self,menu, text:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int]):

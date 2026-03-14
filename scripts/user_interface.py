@@ -9,7 +9,7 @@ import cv2
 from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
 from scripts.display import  check_screen
 from scripts.keybind_menu import ControlsMenu
-from scripts.utils import load_images, load_image, Animation
+from scripts.utils import load_images, load_image, Animation, load_editor_tiles
 from scripts.text import load_game_font
 
 class Menu:

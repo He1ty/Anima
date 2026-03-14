@@ -124,32 +124,6 @@ class Game:
 
         self.death_counter = 0
 
-        # --- Entity Configuration ---
-        # Defines animation durations, sizes, and looping behavior for every entity type
-        self.e_info = {
-            "picko": {"left/right": ["run"], "size": (16, 16),
-                      "img_dur": {"idle": 12, "run": 8, "attack": 3, "death": 3, "hit": 5},
-                      "loop": {"idle": True, "run": True, "attack": False, "death": False, "hit": False}},
-            "glorbo": {"left/right": [], "size": (16, 16),
-                       "img_dur": {"idle": 12, "run": 8, "attack": 3, "death": 3, "hit": 5},
-                       "loop": {"idle": True, "run": True, "attack": False, "death": False, "hit": False}},
-            "vine": {"left/right": [], "size": (16, 48),
-                     "img_dur": {"warning": 12, "attack": 1, "retreat": 3},
-                     "loop": {"warning": True, "attack": False, "retreat": False}},
-            "blue_rock": {"left/right": [], "size": (16, 16),
-                          "img_dur": {"intact": 1, "breaking": 2},
-                          "loop": {"intact": False, "breaking": False}},
-        }
-
-        # --- Door Configuration ---
-        self.d_info = {
-            "vines_door_h": {"size": (64, 16), "img_dur": 5},
-            "vines_door_v": {"size": (16, 64), "img_dur": 5},
-            "breakable_stalactite": {"size": (16, 48), "img_dur": 1},
-            "blue_vine_door_v": {"size": (16, 64), "img_dur": 5},
-            "blue_vine_door_h": {"size": (64, 16), "img_dur": 5}
-        }
-
         self.b_info = {"white_space": {"animated":True, "img_dur": 6, "loop": True},
                         "green_cave": {"animated":False},
                         "blue_cave": {"animated":False}}

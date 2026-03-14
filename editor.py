@@ -588,17 +588,6 @@ class Editor:
         self.render_map_selection_menu(map_col_width, mpos)
         self.render_tiles_bar(avail_width, mpos)
 
-    def render_tools_bar(self):
-        mpos = (pygame.mouse.get_pos()[0] - (self.screen.get_size()[0] - SIDEBAR_WIDTH), pygame.mouse.get_pos()[1])
-
-        # SIDEBAR BACKGROUND
-        self.tools_bar = pygame.Surface((SIDEBAR_WIDTH, self.screen_height))
-        self.tools_bar.fill((40, 40, 40))
-
-        # --- MAP NAVIGATION COLUMN (Right side of sidebar) ---
-        pygame.draw.rect(self.tools_bar, (30, 30, 30),
-                         (0, 0, TOOLBAR_WIDTH, self.screen_height))
-
     def move_visual_to(self, pos):
         scale_x = 960 / (self.screen.get_size()[0] - SIDEBAR_WIDTH)
         scale_y = 576 / (self.screen.get_size()[1])

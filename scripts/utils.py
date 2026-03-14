@@ -82,6 +82,28 @@ def load_tiles(environment):
                     tiles[tile] = images
     return tiles
 
+def load_editor_tiles(environment):
+    categories = {}
+    path = f"{BASE_IMG_PATH}environments/{environment}/images/tiles"
+    for category in sorted(os.listdir(path)):
+        category_name = category.capitalize()
+        category_tiles = {category_name:{}}
+        for tile in sorted(os.listdir(f"{path}/{category}")):
+            if category in ANIMATED_CATEGORIES:
+                for animation in sorted(os.listdir(f"{path}/{category}/{tile}")):
+                    category_tiles[category_name][tile] = [load_images(f"environments/{environment}/images/tiles/{category}/{tile}/{animation}")[0]]
+                    break
+            else:
+                images = load_images(f"environments/{environment}/images/tiles/{category}/{tile}")
+                if "tileset.png" in os.listdir(f'{path}/{category}/{tile}'):
+                    category_tiles[category_name][tile] = load_tileset(image_path=f"{path}/{category}/{tile}/tileset.png",
+                                               tile_width=16, tile_height=16, spiral_order=True)
+                else:
+                    category_tiles[category_name][tile] = images
+        categories.update(category_tiles)
+
+    return categories
+
 def load_player():
     return {'player/idle': Animation(load_images(f'player/idle', (16,16)), img_dur=12)}
 
