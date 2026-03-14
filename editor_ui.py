@@ -24,8 +24,16 @@ class EditorSimulation:
 
         self.current_environment = "white_space"
 
-        self.categories = {category : [t for t in list(load_images(f"{self.current_environment}/{category}"))]
-                           for category in sorted(os.listdir(f"assets/{self.current_environment}/images"))}
+
+
+        self.categories = {}
+
+        for category in sorted(os.listdir(f"assets/environments/{self.current_environment}/images/tiles")):
+            self.categories[category] = []
+            for t in sorted(os.listdir(f"assets/environments/{self.current_environment}/images/tiles/{category}")):
+                self.categories[category] += [t]
+
+
 
         self.ui = UI(self)
 
@@ -94,7 +102,7 @@ class UI:
         overlay = pygame.Surface((self.assets_section_width, self.assets_section_height))
         overlay.fill(self.ASSETS_SECTION_COLOR)
 
-        category_text = self.title_font.render(self.editor.categories, True, (255, 255, 255))
+        category_text = self.title_font.render(list(self.editor.categories.keys())[0], True, (255, 255, 255))
         category_x = (self.assets_section_width - category_text.get_width())/2
         category_y = (self.PADDING / self.editor.SH) * self.screen_height
         overlay.blit(category_text, (category_x, category_y))
@@ -118,6 +126,8 @@ class UI:
         self.toolbar_default_width = self.screen_width * 5/96
         self.toolbar_buttons_width = self.toolbar_width * (3 / 5)
         self.toolbar_buttons_height = self.toolbar_width * (3 / 5)
+        self.assets_section_width = self.assets_section_default_width = self.screen_width * 20 / 96
+        self.assets_section_height = self.screen_width * 25 / 96
         self.init_buttons()
 
     def draw(self):
