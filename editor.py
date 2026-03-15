@@ -8,10 +8,8 @@ import shutil
 import copy
 
 # Assuming these exist in your project structure
-from scripts.utils import load_image, load_images, load_tiles, load_doors, load_activators, load_pickups
+from scripts.utils import load_image, load_images, load_tiles
 from scripts.tilemap import Tilemap
-from scripts.button import EditButton, EditorButton
-from editor_ui import UI
 
 RENDER_SCALE = 2.0
 SIDEBAR_WIDTH = 200

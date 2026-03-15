@@ -138,6 +138,7 @@ def draw_rect_alpha(surface, color, rect, alpha):
     shape_surf = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
     shape_surf.fill((color[0], color[1], color[2], alpha))
     surface.blit(shape_surf, (rect[0], rect[1]))
+    return shape_surf
 
 def key_name(keycode: int) -> str:
     if keycode is None:

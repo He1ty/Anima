@@ -1,8 +1,10 @@
-from pygame import MOUSEBUTTONDOWN
-from unicodedata import category
+import os
+import copy
 
-from scripts.utils import load_image
-from scripts.button import EditorButton
+
+from editor import LevelManager
+from scripts.utils import load_image, draw_rect_alpha
+from scripts.button import EditorButton, LevelCarousel
 from scripts.text import load_game_font
 from scripts.utils import load_editor_tiles, load_tiles, load_images
 from scripts.tilemap import Tilemap
@@ -26,9 +28,24 @@ class EditorSimulation:
         self.movement = [0, 0, 0, 0]
 
         self.current_tool = "Brush"
-
         self.level = 0
         self.current_environment = "white_space"
+        self.selecting_environment_mode = False
+
+        # Undo/Redo
+        self.history = []
+        self.history_index = -1
+        self.max_history = 50
+
+        # LevelManager — doit être créé AVANT d'utiliser active_maps/environments
+        self.level_manager = LevelManager(self)
+        self.environments = self.level_manager.load_environments()
+        self.active_maps = list(range(
+            sum(1 for f in os.listdir('data/maps/') if f.endswith('.json'))
+        ))
+
+        self.tile_group = 0
+        self.tile_variant = 0
 
         self.categories = load_editor_tiles(self.current_environment)
         self.assets = {}
@@ -37,10 +54,10 @@ class EditorSimulation:
         self.assets.update({"spawners": load_images("player/spawner")})
 
         self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
-        self.tile_variant = 0
 
         self.showing_all_layers = False
         self.current_layer = "0"
+        self.current_category = 0
 
         self.tilemap = Tilemap(self)
 
@@ -49,7 +66,38 @@ class EditorSimulation:
         except FileNotFoundError:
             pass
 
+        self.save_action()
+
         self.ui = UI(self)
+
+    def get_environment(self, level):
+        file_id = self.level_manager.get_file_id(level)
+        for environment in self.environments:
+            if file_id in self.environments[environment]:
+                return environment
+        if len(self.environments) > 0:
+            return list(self.environments.keys())[0]
+        return "white_space"
+
+    def get_categories(self):
+        self.categories = load_editor_tiles(self.get_environment(self.level))
+        self.assets = {}
+        for tile in self.categories.values():
+            self.assets.update(tile)
+        self.current_category = 0
+
+    def save_action(self):
+        snapshot = {'tilemap': copy.deepcopy(self.tilemap.tilemap)}
+        if self.history_index < len(self.history) - 1:
+            self.history = self.history[:self.history_index + 1]
+        self.history.append(snapshot)
+        self.history_index += 1
+        if len(self.history) > self.max_history:
+            self.history.pop(0)
+            self.history_index -= 1
+
+    def sizeofmaps(self):
+        return len(self.active_maps)
 
     def main_editor_logic(self):
         self.display.fill((0, 0, 0))
@@ -94,8 +142,11 @@ class UI:
 
     def __init__(self, editor):
         self.editor = editor
+        self.editor_previous_tool = None
         self.screen = editor.screen
         self.screen_width, self.screen_height = self.screen.get_size()
+
+        self.level_carousel = LevelCarousel(self.screen_width/2,self.screen_height/2,[None,None,None])
 
         self.title_font = load_game_font(24)
         self.buttons_font = load_game_font(18)
@@ -105,9 +156,12 @@ class UI:
         self.toolbar_buttons_width = self.toolbar_width * (3 / 5)
         self.toolbar_buttons_height = self.toolbar_width * (3 / 5)
         self.tools_buttons = []
-        self.tools_buttons_labels = ["Brush", "Eraser", "Selection"]
-        self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
-        #self.tools_buttons_images = {"Brush": load_image("ui/skull.png"),"Eraser": load_image("ui/skull.png"),"Selection": load_image("ui/skull.png")}
+        self.tools_buttons_labels = ["Brush", "Eraser", "Selection","LevelSelector"]
+        #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
+        self.tools_buttons_images = {"Brush": load_image("ui/brush.png"),
+                                     "Eraser": load_image("ui/eraser.png"),
+                                     "Selection": load_image("ui/selection.png"),
+                                     "LevelSelector": load_image("ui/skull.png")}
 
         self.assets_section_width = self.assets_section_default_width = self.screen_width * 20/96
         self.assets_section_height = self.screen_width * 25/96
@@ -133,7 +187,11 @@ class UI:
         button_x, button_y = self.toolbar_width/2, self.toolbar_width/2
         for label in self.tools_buttons_labels:
             button = EditorButton(label, self.tools_buttons_images[label] ,(button_x, button_y), self.toolbar_buttons_width,self.toolbar_buttons_height,(64,64,64), self.screen_width/self.editor.SW)
-            button_y += self.toolbar_buttons_height + (self.PADDING/self.editor.SH)*self.screen_height
+
+            if label == self.tools_buttons_labels[-2]:
+                button_y = self.screen_height - 1*self.toolbar_buttons_height
+            else:
+                button_y += self.toolbar_buttons_height + (self.PADDING/self.editor.SH)*self.screen_height
             self.tools_buttons.append(button)
 
         button_x, button_y = (30/self.editor.SW)*self.screen_width, (20/self.editor.SH)*self.screen_height
@@ -204,6 +262,11 @@ class UI:
         self.screen.blit(overlay, (self.screen_width - self.toolbar_width - self.assets_section_width,
                                    self.screen_height - self.assets_section_height))
 
+    def render_level_selector(self):
+        overlay = draw_rect_alpha(self.screen,(0,0,0),(0,0,self.screen_width,self.screen_height),100)
+        self.level_carousel.draw(self.screen)
+        self.level_carousel.update()
+
     def check_closed(self):
         if self.closing:
             self.toolbar_width = max(0, self.toolbar_width - 5)
@@ -233,38 +296,71 @@ class UI:
 
     def draw(self):
         for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_TAB:
-                    self.closing = not self.closing
-            if event.type == pygame.VIDEORESIZE:
-                self.reload()
-            for button in self.tools_buttons:
-                if button.handle_event(event,offset=(self.screen_width-self.toolbar_width, 0)):
-                    self.editor.current_tool = button.label
-            for button in self.assets_section_buttons:
-                if button.handle_event(event, offset=(self.screen_width-self.toolbar_width-self.assets_section_width, self.screen_height-self.assets_section_height)):
-                    if button.label == "Next":
-                        self.current_category = (self.current_category + 1) % len(self.editor.categories)
-                    elif button.label == "Previous":
-                        self.current_category = (self.current_category - 1) % len(self.editor.categories)
-                    button.activated = True
-                    self.current_category_name = list(self.editor.categories.keys())[self.current_category]
-                    self.init_assets_buttons()
-                elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(event,
-                                                                                 offset=(self.screen_width-self.toolbar_width-self.assets_section_width,
-                                                                                         self.screen_height-self.assets_section_height)):
-                    button.activated = False
-            for button in self.assets_buttons:
-                if button.handle_event(event,offset=(self.screen_width-self.toolbar_width-self.assets_section_width,
-                                                     self.screen_height-self.assets_section_height)):
-                    self.editor.tile_type = button.label
-                    self.editor.tile_variant = 0
+            self.handle_ui_event(event)
 
         self.check_closed()
         self.render_toolbar()
         match self.editor.current_tool:
             case "Brush":
                 self.render_assets_section()
+            case "LevelSelector":
+                self.render_level_selector()
+
+    def handle_ui_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_TAB:
+                self.closing = not self.closing
+        if event.type == pygame.VIDEORESIZE:
+            self.reload()
+        if event.type == pygame.QUIT:
+            pygame.quit()
+        self.handle_toolbar_event(event)
+        match self.editor.current_tool:
+            case "Brush":
+                self.handle_assets_section_event(event)
+            case "LevelSelector":
+                self.handle_level_selector_event(event)
+                pass
+
+
+
+
+    def handle_toolbar_event(self, event):
+        for button in self.tools_buttons:
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_width, 0)):
+                self.editor_previous_tool = self.editor.current_tool
+                self.editor.current_tool = button.label
+
+    def handle_assets_section_event(self, event):
+        for button in self.assets_section_buttons:
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_width - self.assets_section_width,
+                                                  self.screen_height - self.assets_section_height)):
+                if button.label == "Next":
+                    self.current_category = (self.current_category + 1) % len(self.editor.categories)
+                elif button.label == "Previous":
+                    self.current_category = (self.current_category - 1) % len(self.editor.categories)
+                button.activated = True
+                self.current_category_name = list(self.editor.categories.keys())[self.current_category]
+                self.init_assets_buttons()
+            elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(
+                    event,
+                    offset=(self.screen_width - self.toolbar_width - self.assets_section_width,
+                            self.screen_height - self.assets_section_height)):
+                button.activated = False
+        for button in self.assets_buttons:
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_width - self.assets_section_width,
+                                                  self.screen_height - self.assets_section_height)):
+                self.editor.tile_type = button.label
+                self.editor.tile_variant = 0
+
+    def handle_level_selector_event(self,event):
+        self.level_carousel.handle_event(event)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.editor.current_tool = self.editor_previous_tool
+
+
+
 
 if __name__ == "__main__":
     editor = EditorSimulation()

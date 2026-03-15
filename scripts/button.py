@@ -64,6 +64,176 @@ class EditorButton:
         self.hover = self.is_selected(event,offset)
         return self.is_clicked(event,offset)
 
+
+class LevelCarousel:
+
+    def __init__(self, x, y, levels):
+
+        self.center_rect = None
+        self.left_rect = None
+        self.right_rect = None
+        self.x = x
+        self.y = y
+
+        self.levels = levels
+        self.selected = 0
+
+        self.big_size = (300, 180)
+        self.small_size = (200, 120)
+
+        self.spacing = 260
+
+        self.delete_button = pygame.Rect(x - 70, y + 150, 140, 50)
+        self.delete_button_selected = False
+
+        self.offset = 0
+        self.target_offset = 0
+        self.anim_speed = 0.2
+        self.animating = False
+
+    # -------------------------
+    def draw_level(self, screen, img, rect, selected=False):
+
+        pygame.draw.rect(screen, (40,40,40), rect)
+
+        if img:
+            img = pygame.transform.scale(img, rect.size)
+            screen.blit(img, rect)
+
+        else:
+            # Empty slot
+            font = pygame.font.SysFont(None, 80)
+            txt = font.render("+", True, (200,200,200))
+            screen.blit(txt, txt.get_rect(center=rect.center))
+
+        if selected:
+            pygame.draw.rect(screen, (255,255,255), rect, 3)
+
+    # -------------------------
+    def draw(self, screen):
+
+        center_rect = pygame.Rect(0,0,*self.big_size)
+        center_x = self.x - self.offset * self.spacing
+        center_rect.center = (center_x, self.y)
+
+        # LEFT
+        if self.selected > 0:
+
+            left_rect = pygame.Rect(0,0,*self.small_size)
+            left_rect.center = (center_x - self.spacing, self.y)
+
+            self.draw_level(screen,
+                            self.levels[self.selected-1],
+                            left_rect)
+
+            self.left_rect = left_rect
+
+        else:
+            self.left_rect = None
+
+        # CENTER
+        self.draw_level(screen,
+                        self.levels[self.selected],
+                        center_rect,
+                        True)
+
+        self.center_rect = center_rect
+
+        # RIGHT
+        if self.selected < len(self.levels)-1:
+
+            right_rect = pygame.Rect(0,0,*self.small_size)
+            right_rect.center = (center_x + self.spacing, self.y)
+
+            self.draw_level(screen,
+                            self.levels[self.selected+1],
+                            right_rect)
+
+            self.right_rect = right_rect
+
+        else:
+            self.right_rect = None
+
+        # DELETE BUTTON
+        pygame.draw.rect(screen, (220,40,40), self.delete_button, border_radius=10)
+
+        font = pygame.font.SysFont(None,30)
+        txt = font.render("DELETE",True,(255,255,255))
+        screen.blit(txt, txt.get_rect(center=self.delete_button.center))
+        if self.delete_button_selected:
+            pygame.draw.rect(screen, (255, 255, 255), self.delete_button, 3,border_radius=10)
+
+    # -------------------------
+    def handle_event(self,event):
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+
+            if self.left_rect and self.left_rect.collidepoint(event.pos):
+
+                if not self.animating:
+                    self.target_offset = -1
+                    self.animating = True
+
+            elif self.right_rect and self.right_rect.collidepoint(event.pos):
+
+                if not self.animating:
+                    self.target_offset = 1
+                    self.animating = True
+
+            elif self.center_rect and self.center_rect.collidepoint(event.pos):
+
+                # ADD LEVEL if empty
+                if self.levels[self.selected] is None:
+                    self.levels.insert(self.selected, None)
+                else:
+                    print("Level chosen")
+
+            elif self.delete_button.collidepoint(event.pos):
+
+                if len(self.levels) > 1:
+                    self.levels.pop(self.selected)
+                    self.selected = max(0,self.selected-1)
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_DOWN:
+                self.delete_button_selected = True
+            if event.key == pygame.K_UP:
+                self.delete_button_selected = False
+
+            if not self.delete_button_selected:
+                if event.key == pygame.K_RIGHT and self.selected < len(self.levels)-1:
+                    if not self.animating:
+                        self.target_offset = 1
+                        self.animating = True
+                if event.key == pygame.K_LEFT and self.selected > 0:
+                    if not self.animating:
+                        self.target_offset = -1
+                        self.animating = True
+            if event.key == pygame.K_RETURN:
+                if self.delete_button_selected:
+                    if len(self.levels) > 1:
+                        self.levels.pop(self.selected)
+                        self.selected = max(0, self.selected - 1)
+
+                elif self.levels[self.selected] is None:
+                    self.levels.insert(self.selected, None)
+                else:
+                    print("Level chosen")
+
+    # -------------------------
+    def update(self):
+
+        if self.animating:
+
+            self.offset += (self.target_offset - self.offset) * self.anim_speed
+
+            if abs(self.target_offset - self.offset) < 0.01:
+                self.selected += int(self.target_offset)
+
+                self.offset = 0
+                self.target_offset = 0
+                self.animating = False
+
 class MenuButton:
     def __init__(self,menu, text:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int]):
         self.menu=menu
