@@ -177,7 +177,7 @@ class UI:
         self.tools_buttons_images = {"Brush": load_image("ui/brush.png"),
                                      "Eraser": load_image("ui/eraser.png"),
                                      "Selection": load_image("ui/selection.png"),
-                                     "LevelSelector": load_image("ui/skull.png")}
+                                     "LevelSelector": load_image("ui/level_selector.png")}
 
         self.assets_section_width = self.assets_section_default_width = self.screen_width * 20/96
         self.assets_section_height = self.screen_width * 25/96
@@ -339,6 +339,8 @@ class UI:
                 button.activated = False
 
         self.screen.blit(overlay, (0, 0))
+        
+
 
     def check_closed(self):
         if self.closing:

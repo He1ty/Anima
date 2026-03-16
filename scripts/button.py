@@ -161,6 +161,10 @@ class LevelCarousel:
         self.anim_speed = 0.2
         self.animating = False
 
+        self.delete_window_on = False
+        self.yes_button = None
+        self.no_button = None
+
 
 
     # -------------------------
@@ -241,41 +245,79 @@ class LevelCarousel:
             screen.blit(txt, txt.get_rect(center=self.delete_button.center))
             if self.delete_button_selected:
                 pygame.draw.rect(screen, (255, 255, 255), self.delete_button, 3,border_radius=10)
+        if self.delete_window_on:
+            self.yes_button,self.no_button = self.draw_delete_popup(screen,self.selected,"DELETE THE LEVEL ")
+    #--------------------------
+    def draw_delete_popup(self,screen,confirm_delete_id,text):
+        """Draws the delete confirmation popup. Returns (yes_btn_rect, no_btn_rect)."""
+        text_font = pygame.font.SysFont(None, 30)
+        SW,SH = screen.get_size()
+
+        center_x = SW // 2
+
+        popup_rect = pygame.Rect(center_x - int(SW / 5), SH // 2 - SH // 6, SW * 0.4, SH // 3)
+        pygame.draw.rect(screen, (20, 20, 20), popup_rect)
+        pygame.draw.rect(screen, (255,255,255), popup_rect, 2)
+
+        msg = text_font.render(f"{text} {confirm_delete_id}?", True, (255,255,255))
+        screen.blit(msg, (center_x - msg.get_width() // 2, popup_rect.top + 40))
+
+        yes_btn = pygame.Rect(center_x - SW * 0.12, popup_rect.bottom - SH / 10, SW / 10, SH / 15)
+        no_btn = pygame.Rect(center_x + SW * 0.02, popup_rect.bottom - SH / 10, SW / 10, SH / 15)
+
+        yes_color = (150, 0, 0) #if self.delete_command_nb == 1 else (100, 0, 0)
+        no_color = (100, 100, 100) #if self.delete_command_nb == 0 else (50, 50, 50)
+
+        pygame.draw.rect(screen, yes_color, yes_btn)
+        pygame.draw.rect(screen, no_color, no_btn)
+
+        yes_txt = text_font.render("YES", True, (255, 255, 255))
+        no_txt = text_font.render("NO", True, (255, 255, 255))
+        screen.blit(yes_txt, (yes_btn.centerx - yes_txt.get_width() // 2, yes_btn.centery - SH / 40))
+        screen.blit(no_txt, (no_btn.centerx - no_txt.get_width() // 2, no_btn.centery - SH / 40))
+
+        return yes_btn, no_btn
 
     # -------------------------
     def handle_event(self,event):
 
         if event.type == pygame.MOUSEBUTTONDOWN:
+            if not self.delete_window_on:
+                if self.left_rect and self.left_rect.collidepoint(event.pos):
 
-            if self.left_rect and self.left_rect.collidepoint(event.pos):
+                    if not self.animating:
+                        self.target_offset = -1
+                        self.animating = True
 
-                if not self.animating:
-                    self.target_offset = -1
-                    self.animating = True
+                elif self.right_rect and self.right_rect.collidepoint(event.pos):
 
-            elif self.right_rect and self.right_rect.collidepoint(event.pos):
+                    if not self.animating:
+                        self.target_offset = 1
+                        self.animating = True
 
-                if not self.animating:
-                    self.target_offset = 1
-                    self.animating = True
+                elif self.center_rect and self.center_rect.collidepoint(event.pos):
 
-            elif self.center_rect and self.center_rect.collidepoint(event.pos):
-
-                # ADD LEVEL if empty
-                if self.levels[self.selected] is None:
-                    self.levels[self.selected] = self.selected
-                    self.levels.append(None)
-                    return "AddLevel"
-                else:
-                    return "LoadLevel"
+                    # ADD LEVEL if empty
+                    if self.levels[self.selected] is None:
+                        self.levels[self.selected] = self.selected
+                        self.levels.append(None)
+                        return "AddLevel"
+                    else:
+                        return "LoadLevel"
 
 
-            elif self.delete_button.collidepoint(event.pos):
+                elif self.delete_button.collidepoint(event.pos):
+                    self.delete_window_on = True
+            elif self.delete_window_on:
+                if self.no_button and self.no_button.collidepoint(event.pos):
+                    self.delete_window_on = False
+                if self.yes_button and self.yes_button.collidepoint(event.pos):
+                    if len(self.levels) > 1 and self.levels[self.selected] is not None:
+                        self.levels.pop(self.selected)
+                        self.selected = max(0, self.selected - 1)
+                        self.delete_window_on = False
+                        return "DeleteLevel"
 
-                if len(self.levels) > 1 and self.levels[self.selected] is not None:
-                    self.levels.pop(self.selected)
-                    self.selected = max(0, self.selected - 1)
-                    return "DeleteLevel"
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_DOWN:
