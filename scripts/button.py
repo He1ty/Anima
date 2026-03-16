@@ -298,7 +298,10 @@ class LevelCarousel:
     # -------------------------
     def handle_event(self,event):
 
+
         if event.type == pygame.MOUSEBUTTONDOWN:
+            print(f"Mouse pos: {event.pos}")
+            print(f"Delete btn pos:{self.delete_button}")
             if not self.delete_window_on:
                 if self.left_rect and self.left_rect.collidepoint(event.pos):
 
@@ -314,15 +317,15 @@ class LevelCarousel:
 
                 elif self.center_rect and self.center_rect.collidepoint(event.pos):
 
-                # ADD LEVEL if empty
-                if self.levels[self.selected] is None:
-                    return "AddLevel"
-                else:
-                    return "LoadLevel"
+                    # ADD LEVEL if empty
+                    if self.levels[self.selected] is None:
+                        return "AddLevel"
+                    else:
+                        return "LoadLevel"
 
 
-            elif self.delete_button.collidepoint(event.pos):
-                self.delete_window_on = True
+                elif self.delete_button.collidepoint(event.pos):
+                    self.delete_window_on = True
 
             elif self.delete_window_on:
                 if self.no_button and self.no_button.collidepoint(event.pos):
@@ -330,6 +333,7 @@ class LevelCarousel:
                 if self.yes_button and self.yes_button.collidepoint(event.pos):
                     if len(self.levels) > 1 and self.levels[self.selected] is not None:
                         self.levels.pop(self.selected)
+                        self.delete_window_on = False
                         return "DeleteLevel"
 
         if event.type == pygame.KEYDOWN:
@@ -349,10 +353,8 @@ class LevelCarousel:
                         self.animating = True
             if event.key == pygame.K_RETURN:
                 if self.delete_button_selected:
-                    if len(self.levels) > 1 and self.levels[self.selected] is not None:
-                        self.levels.pop(self.selected)
-                        self.delete_button_selected = False
-                        return "DeleteLevel"
+                   self.delete_window_on = True
+
 
                 else:
                     if self.levels[self.selected] is None:
