@@ -3,21 +3,38 @@ import datetime
 
 from scripts.utils import load_image, random_color
 class SimpleButton:
-    def __init__(self, label:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int]):
+    def __init__(self, label:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int], button_color:tuple[int,int,int]):
         self.default_pos = pos_center
         self.hover = False
         self.label = label
         self.text_surf = font.render(label, True, text_color)
-        self.rect = pygame.Rect(0, 0, self.text_surf.get_width()+10, self.text_surf.get_height()+6)
+        self.rect = pygame.Rect(0, 0, self.text_surf.get_width()+20, self.text_surf.get_height()+12)
         self.rect.center = self.default_pos
         self.activated = False
         self.font = font
         self.text_color = text_color
+        self.button_color = button_color
+        self.activated = False
 
     def draw(self, screen):
+        overlay = pygame.Surface(self.rect.size)
+        overlay.fill(self.button_color)
+        if self.activated:
+            pygame.draw.line(screen, (40, 40, 40), (self.rect.x, self.rect.y), (self.rect.x, self.rect.bottom), 2)
+            pygame.draw.line(screen, (40, 40, 40,), (self.rect.x, self.rect.y), (self.rect.right, self.rect.top), 2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.y), (self.rect.right, self.rect.bottom),2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.bottom),(self.rect.left, self.rect.bottom), 2)
+            screen.blit(overlay, (self.rect.x + 1, self.rect.y + 1))
+        else:
+            pygame.draw.line(screen,(96,96,96),(self.rect.x,self.rect.y),(self.rect.x,self.rect.bottom),2)
+            pygame.draw.line(screen,(96,96,96),(self.rect.x,self.rect.y),(self.rect.right,self.rect.top),2)
+            pygame.draw.line(screen,(40,40,40),(self.rect.right,self.rect.y),(self.rect.right,self.rect.bottom),2)
+            pygame.draw.line(screen,(40,40,40),(self.rect.right,self.rect.bottom),(self.rect.left,self.rect.bottom),2)
+            screen.blit(overlay, self.rect)
+
         self.text_surf = self.font.render(self.label, True, self.text_color)
         # Draw the text
-        screen.blit(self.text_surf, self.rect)
+        screen.blit(self.text_surf, (self.rect.x + (self.rect.width - self.text_surf.get_width())/2, self.rect.y + (self.rect.height - self.text_surf.get_height())/2))
 
     def is_selected(self, event, offset=None):
         if event.type == pygame.MOUSEMOTION:
@@ -124,20 +141,20 @@ class EnvironmentButton(EditorButton):
             pygame.draw.line(screen, (40, 40, 40,), (self.rect.x, self.rect.y), (self.rect.right, self.rect.top), 2)
             pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.y), (self.rect.right, self.rect.bottom),2)
             pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.bottom),(self.rect.left, self.rect.bottom), 2)
-            self.img_rect.center = (img_cx+1, img_cy+1)
+            self.img_rect.center = (round(img_cx+1), round(img_cy+1))
 
         else:
             pygame.draw.line(screen,(96,96,96),(self.rect.x,self.rect.y),(self.rect.x,self.rect.bottom),2)
             pygame.draw.line(screen,(96,96,96),(self.rect.x,self.rect.y),(self.rect.right,self.rect.top),2)
             pygame.draw.line(screen,(40,40,40),(self.rect.right,self.rect.y),(self.rect.right,self.rect.bottom),2)
             pygame.draw.line(screen,(40,40,40),(self.rect.right,self.rect.bottom),(self.rect.left,self.rect.bottom),2)
-            self.img_rect.center = (img_cx, img_cy)
+            self.img_rect.center = (round(img_cx), round(img_cy))
 
         screen.blit(self.img, self.img_rect)
 
 class LevelCarousel:
 
-    def __init__(self, x, y, levels):
+    def __init__(self, x, y, size, levels):
 
         self.center_rect = None
         self.left_rect = None
@@ -148,12 +165,12 @@ class LevelCarousel:
         self.levels = levels
         self.selected = 0
 
-        self.big_size = (300, 180)
-        self.small_size = (200, 120)
+        self.big_size = size
+        self.small_size = (size[0]*2/3, size[1]*2/3)
 
-        self.spacing = 260
+        self.spacing = 260 * size[0]/300
 
-        self.delete_button = pygame.Rect(x - 70, y + 150, 140, 50)
+        self.delete_button = pygame.Rect(x - 70 * size[0]/300, y + 150 * size[1]/180, 140 * size[0]/300, 50 * size[1]/180)
         self.delete_button_selected = False
 
         self.offset = 0
@@ -240,7 +257,7 @@ class LevelCarousel:
         if self.levels[self.selected] is not None:
             pygame.draw.rect(screen, (220,40,40), self.delete_button, border_radius=10)
 
-            font = pygame.font.SysFont(None,30)
+            font = pygame.font.SysFont(None, round(30*self.big_size[0]/300))
             txt = font.render("DELETE",True,(255,255,255))
             screen.blit(txt, txt.get_rect(center=self.delete_button.center))
             if self.delete_button_selected:
@@ -297,27 +314,23 @@ class LevelCarousel:
 
                 elif self.center_rect and self.center_rect.collidepoint(event.pos):
 
-                    # ADD LEVEL if empty
-                    if self.levels[self.selected] is None:
-                        self.levels[self.selected] = self.selected
-                        self.levels.append(None)
-                        return "AddLevel"
-                    else:
-                        return "LoadLevel"
+                # ADD LEVEL if empty
+                if self.levels[self.selected] is None:
+                    return "AddLevel"
+                else:
+                    return "LoadLevel"
 
 
-                elif self.delete_button.collidepoint(event.pos):
-                    self.delete_window_on = True
+            elif self.delete_button.collidepoint(event.pos):
+                self.delete_window_on = True
+
             elif self.delete_window_on:
                 if self.no_button and self.no_button.collidepoint(event.pos):
                     self.delete_window_on = False
                 if self.yes_button and self.yes_button.collidepoint(event.pos):
                     if len(self.levels) > 1 and self.levels[self.selected] is not None:
                         self.levels.pop(self.selected)
-                        self.selected = max(0, self.selected - 1)
-                        self.delete_window_on = False
                         return "DeleteLevel"
-
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_DOWN:
@@ -338,14 +351,11 @@ class LevelCarousel:
                 if self.delete_button_selected:
                     if len(self.levels) > 1 and self.levels[self.selected] is not None:
                         self.levels.pop(self.selected)
-                        self.selected = max(0, self.selected - 1)
                         self.delete_button_selected = False
                         return "DeleteLevel"
 
                 else:
                     if self.levels[self.selected] is None:
-                        self.levels[self.selected] = self.selected
-                        self.levels.append(None)
                         return "AddLevel"
                     else:
                         return "LoadLevel"
