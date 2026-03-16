@@ -1,3 +1,5 @@
+import random
+
 import pygame
 import os
 
@@ -127,7 +129,7 @@ def load_backgrounds(b_info, environment):
                                                        (480, 300))
     return tiles
 
-def draw_rect_alpha(surface, color, rect, alpha):
+def create_rect_alpha(color, rect, alpha):
     """
     surface : surface where we draw the rectangle (ex: screen)
     color   : (R, G, B)
@@ -137,7 +139,6 @@ def draw_rect_alpha(surface, color, rect, alpha):
 
     shape_surf = pygame.Surface((rect[2], rect[3]), pygame.SRCALPHA)
     shape_surf.fill((color[0], color[1], color[2], alpha))
-    surface.blit(shape_surf, (rect[0], rect[1]))
     return shape_surf
 
 def key_name(keycode: int) -> str:
@@ -154,6 +155,11 @@ def build_items(bindings: dict) -> list:
         for action in actions:
             items.append(("bind", cat, action))
     return items
+
+def random_color():
+    return (random.randrange(0, 255, 1),
+            random.randrange(0, 255, 1),
+            random.randrange(0, 255, 1))
 
 class Animation:
     def __init__(self, images, img_dur = 5, loop = True):

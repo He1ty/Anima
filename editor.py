@@ -38,29 +38,24 @@ class LevelManager:
             return 0
         return max(all_ids) + 1
 
-    def delete_current_map(self):
-        if not self.editor.active_maps:
-            return
+    def delete_map(self, level):
 
         # 1. Remove the current File ID from our active list
         # We don't touch the file system yet!
-        del self.editor.active_maps[self.editor.level]
+        del self.editor.active_maps[level]
 
         # 2. Determine new level index
         # If we deleted the last map, go to the previous one
-        if self.editor.level >= len(self.editor.active_maps):
-            self.editor.level = max(0, len(self.editor.active_maps) - 1)
+        if self.editor.level == level:
+            if self.editor.level >= len(self.editor.active_maps):
+                self.editor.level = max(0, len(self.editor.active_maps) - 1)
+                self.change_level(self.editor.level)
 
         # 3. If list is empty, create a fresh map 0 immediately
         if len(self.editor.active_maps) == 0:
             self.editor.active_maps.append(0)
             self.editor.level = 0
 
-        # 4. Reload the view
-        # We call change_level but pass the *same* index (or adjusted one),
-        # which now points to a different File ID because the list shifted.
-        # We need to manually trigger the load logic without saving the "deleted" map
-        self.map_data_reset()
 
     def map_data_reset(self):
         # Load new level (using new file ID)
@@ -81,27 +76,8 @@ class LevelManager:
                            'tilesize': 16, 'offgrid': {}}, f)
             self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
 
-        self.editor.scroll = [0, 0]
-
         # Reload assets
-        new_env = self.editor.get_environment(self.editor.level)
-        self.editor.categories = {}
-        self.editor.assets = self.editor.base_assets | load_tiles(new_env)
-        self.editor.assets.update(load_doors('editor', new_env))
-        self.editor.assets.update(load_activators(new_env))
-
-        self.editor.assets.update(load_pickups(one_image=True))
-        self.editor.get_categories()
-
-        # ... (rest of function: update tile_list, ids, etc) ...
-        self.editor.tile_list = list(self.editor.assets)
-        self.editor.tile_group = 0
-        self.editor.tile_variant = 0
-
-
-        self.editor.history = []
-        self.editor.history_index = -1
-        self.editor.save_action()  # Save the initial state (Index 0)
+        self.editor.reload()
 
     def change_level(self, new_level):
         # Save current level (using current file ID)
