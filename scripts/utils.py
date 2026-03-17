@@ -117,7 +117,6 @@ def load_particles(environment):
 
     return tiles
 
-
 def load_backgrounds(b_info, environment):
     tiles = {}
     path = f"{BASE_IMG_PATH}environments/{environment}/images/backgrounds"

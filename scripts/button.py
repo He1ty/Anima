@@ -183,7 +183,6 @@ class LevelCarousel:
         self.no_button = None
 
 
-
     # -------------------------
     def draw_level(self, screen, img, rect, selected=False):
 
@@ -300,8 +299,6 @@ class LevelCarousel:
 
 
         if event.type == pygame.MOUSEBUTTONDOWN:
-            print(f"Mouse pos: {event.pos}")
-            print(f"Delete btn pos:{self.delete_button}")
             if not self.delete_window_on:
                 if self.left_rect and self.left_rect.collidepoint(event.pos):
 
@@ -332,7 +329,6 @@ class LevelCarousel:
                     self.delete_window_on = False
                 if self.yes_button and self.yes_button.collidepoint(event.pos):
                     if len(self.levels) > 1 and self.levels[self.selected] is not None:
-                        self.levels.pop(self.selected)
                         self.delete_window_on = False
                         return "DeleteLevel"
 

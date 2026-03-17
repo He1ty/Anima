@@ -45,14 +45,16 @@ class Game:
         # --- Window Setup ---
         pygame.display.set_caption("Anima")
 
-        self.level = 0
+        self.level_id = 1
         path = 'data/environments.json'
         if os.path.exists(path):
             with open(path, 'r') as f:
                 # Convert lists back to specific types if needed, json loads arrays as lists
                 self.environments = json.load(f)
 
-        self.environment = self.get_environment(self.level)
+        self.environment = self.get_environment_by_id(self.level_id)
+
+        self.level = self.get_file_name(self.environment, self.level_id)
 
         if full_setup:
             # --- Debug Mode ---
@@ -133,10 +135,10 @@ class Game:
         # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
         self.camera = Camera(self)
 
-        self.scroll_limits_per_level = {"0": {"x": (0, 0), "y":(-1230, 1233)},
-                                        "1": {"x": (64, 624), "y": (-176, 144)}}
+        self.scroll_limits_per_level = {"1": {"x": (0, 0), "y":(-1230, 1233)},
+                                        "2": {"x": (64, 624), "y": (-176, 144)}}
 
-        self.scroll_limits = self.scroll_limits_per_level["0"]
+        self.scroll_limits = self.scroll_limits_per_level["1"]
         #"x": (64, 624), "y": (-176, 144)
         self.camera_center = None
 
@@ -269,19 +271,20 @@ class Game:
         self.show_spikes_hitboxes = not self.show_spikes_hitboxes
         #self.tilemap.show_collisions = not self.tilemap.show_collisions
 
-    def get_environment(self, level):
-        """
-        Retrieves the environment string (e.g., 'green_cave') for a given level ID.
+    def get_env_prefix(self, env_name):
+        # Converts "green_cave" to "gc", "white_space" to "ws"
+        return "".join([word[0] for word in env_name.split("_")])
 
-        Args:
-            level (int): The ID of the current level.
+    def get_file_name(self, env_name, map_id):
+        prefix = self.get_env_prefix(env_name)
+        return f"{prefix}{map_id:03d}.json"
 
-        Returns:
-            str: The name of the environment category.
-        """
-        for environment in self.environments:
-            if level in self.environments[environment]:
-                return environment
+    def get_environment_by_id(self, map_id, environments_dict=None):
+        if environments_dict is None:
+            environments_dict = self.environments
+        for env, ids in environments_dict.items():
+            if map_id in ids:
+                return env
         return "white_space"
 
     def set_keymap(self,bindings: dict):
@@ -304,20 +307,21 @@ class Game:
             :param map_id:
             :param transition_effect:
         """
-        self.environment = self.get_environment(map_id)
+        self.environment = self.get_environment_by_id(self.level_id)
+        map_name = self.get_file_name(self.environment, map_id)
         self.assets = {}
         self.assets.update(load_tiles(self.environment))
         self.assets.update(load_player())
         self.assets.update(load_backgrounds(self.b_info, self.environment))
         self.assets.update(load_particles(self.environment))
 
-        self.tilemap.load("data/maps/" + str(map_id) + ".json")
+        self.tilemap.load("data/maps/" + map_name)
         self.tilemap.tile_size = self.tile_size
         mult=0.5
         self.display = pygame.Surface((self.SCREEN_WIDTH*mult, self.SCREEN_HEIGHT*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
-        self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
+        self.activators_actions = load_activators_actions(map_name, self.tilemap.layers["activators"])
 
         # --- Checkpoints & Traps ---
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
@@ -462,10 +466,11 @@ class Game:
         for transition in self.transitions:
             if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
                     self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
-                self.level = int(transition["destination"])
-                self.scroll_limits = self.scroll_limits_per_level[str(self.level)]
+                self.level_id = int(transition["destination"])
+                self.level = self.get_file_name(self.environment, self.level_id)
+                self.scroll_limits = self.scroll_limits_per_level[str(self.level_id)]
                 delattr(self, "fake_tile_groups")
-                self.load_level(self.level, transition_effect=False)
+                self.load_level(self.level_id, transition_effect=False)
                 self.player.pos = [transition["dest_pos"][0] * self.tile_size, transition["dest_pos"][1] * self.tile_size]
 
     def checkpoints_render_and_update(self, render_scroll):
@@ -584,7 +589,7 @@ class Game:
         self.update_camera_setup()
         self.camera.update_camera()
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
-        display_level_bg(self, self.level)
+        display_level_bg(self, self.level_id)
 
         # -- Tilemap Render and Update
         self.tilemap.render(self.display, offset=render_scroll)

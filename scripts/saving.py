@@ -93,6 +93,7 @@ class Save:
             "doors": [],
             "activators":{},
             "level": self.game.level,
+            "level_id": self.game.level_id,
             "timestamp": time.time(),
             "playtime": time.time() - self.game.start_time + self.game.playtime - self.game.menu_time,
         }
@@ -164,8 +165,10 @@ class Save:
                 save_data = json.load(save_file)
 
             # --- Restore Core Game State ---
-            level = save_data.get("level", 0)
+            level = save_data.get("level", "ws001")
+            level_id = save_data.get("level_id", 1)
             self.game.level = level
+            self.game.level_id = level_id
             self.game.current_slot = slot
             # --- Finalize Load ---
 
@@ -194,7 +197,7 @@ class Save:
                self.game.playtime = save_data["playtime"]
 
             #Load level
-            self.game.load_level(level, transition_effect=False)
+            self.game.load_level(level_id, transition_effect=False)
 
             #Update doors and activators state
             if "doors" in save_data:

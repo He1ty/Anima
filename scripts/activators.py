@@ -32,9 +32,9 @@ class Activator:
     def render(self, surface, offset=(0, 0)):#Just display the marvellous lever design of our dear designer
         surface.blit(self.game.assets[self.type][self.state], (self.pos[0] - offset[0], self.pos[1] - offset[1]))
 
-def load_activators_actions(map_id, activators_layers):
+def load_activators_actions(map_name, activators_layers):
     try:
-        with open(f"data/maps/{map_id}.json", "r") as file:
+        with open(f"data/maps/{map_name}", "r") as file:
             actions_data = json.load(file)
             a = {}
             for layer in activators_layers:

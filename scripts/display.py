@@ -138,7 +138,7 @@ class Shader:
             self.generate_fog(self.game.display, color=(28, 50, 73), opacity=90)
 
     def update_light(self):
-        level_info = self.game.light_infos[self.game.level]
+        level_info = self.game.light_infos[self.game.level_id]
         self.game.darkness_level = level_info["darkness_level"]
 
         self.game.player_light["radius"] = level_info["light_radius"]
@@ -192,7 +192,7 @@ def display_bg(surf, img, pos):
         surf.blit(img, (pos[0] + n* img.get_width(), pos[1]))
         
 def display_level_bg(game, map_id):
-    environment = "white_zone"
+    environment = "white_space"
     for env in game.environments:
         if map_id in game.environments[env]:
             environment = env

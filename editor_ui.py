@@ -10,145 +10,160 @@ from scripts.utils import load_editor_tiles, load_tiles, load_images
 from scripts.tilemap import Tilemap
 import pygame
 
-class LevelManager:
+import os
+import copy
+import json
+import shutil
+import re
 
+
+class LevelManager:
     def __init__(self, editor_instance):
         self.editor = editor_instance
 
-    # Helper to get the actual File ID from the UI Level Index
-    def get_file_id(self, ui_level):
-        '''if 0 <= ui_level < len(self.editor.active_maps):
-                    return self.editor.active_maps[ui_level]
-                return 0'''
-        return ui_level
+    def get_env_prefix(self, env_name):
+        # Converts "green_cave" to "gc", "white_space" to "ws"
+        return "".join([word[0] for word in env_name.split("_")])
+
+    def get_file_name(self, env_name, map_id):
+        prefix = self.get_env_prefix(env_name)
+        return f"{prefix}{map_id:03d}.json"
+
+    def get_environment_by_id(self, map_id, environments_dict=None):
+        if environments_dict is None:
+            environments_dict = self.editor.environments
+        for env, ids in environments_dict.items():
+            if map_id in ids:
+                return env
+        return "white_space"
 
     def get_next_file_id(self):
-        # We look at actual files on disk to avoid conflicts
-        existing_files = [int(f.split('.')[0]) for f in os.listdir('data/maps/') if f.endswith('.json')]
-        # Also look at active maps in memory (in case we created one but haven't saved yet)
-        all_ids = set(existing_files + self.editor.active_maps)
-        if not all_ids:
-            return 0
-        return max(all_ids) + 1
+        existing_ids = []
+        # 1. Look at actual files on disk
+        if os.path.exists('data/maps/'):
+            for f in os.listdir('data/maps/'):
+                if f.endswith('.json'):
+                    match = re.search(r'\d+', f)
+                    if match:
+                        existing_ids.append(int(match.group()))
 
-    def delete_map(self, level):
+        # 2. Look at environments in memory (to catch unsaved creations)
+        for ids in self.editor.environments.values():
+            existing_ids.extend(ids)
 
-        # 1. Remove the current File ID from our active list
-        # We don't touch the file system yet!
-        self.editor.environments[self.editor.get_environment(level)].remove(level)
-        del self.editor.active_maps[level]
+        if not existing_ids:
+            return 1
+        return max(existing_ids) + 1
 
-        # 2. Determine new level index
-        # If we deleted the last map, go to the previous one
-        if self.editor.level == level:
-            if self.editor.level >= len(self.editor.active_maps):
-                next_level = max(0, len(self.editor.active_maps) - 1)
-                self.change_level(next_level)
+    def delete_map(self, level_id):
+        # Remove ONLY from active maps. We leave it in editor.environments
+        # so environments.json retains it if the user quits without a full_save.
+        if level_id in self.editor.active_maps:
+            self.editor.active_maps.remove(level_id)
 
-        # 3. If list is empty, create a fresh map 0 immediately
-        if len(self.editor.active_maps) == 0:
-            self.editor.active_maps.append(0)
-            self.editor.level = 0
+        # Re-route the user to an existing level if they deleted the one they are on
+        if self.editor.level == level_id:
+            if self.editor.active_maps:
+                self.change_level(self.editor.active_maps[-1])
+            else:
+                # Fallback if they deleted the very last map
+                new_id = self.get_next_file_id()
+                env = list(self.editor.environments.keys())[0] if self.editor.environments else "white_space"
+                if env not in self.editor.environments:
+                    self.editor.environments[env] = []
+                self.editor.environments[env].append(new_id)
+                self.editor.active_maps.append(new_id)
+                self.change_level(new_id)
 
     def map_data_reset(self):
-        # Load new level (using new file ID)
-        new_file_id = self.get_file_id(self.editor.level)
-        try:
-            self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
-        except FileNotFoundError:
-            # Create the file if it doesn't exist (e.g. new map)
-            with open('data/maps/' + str(new_file_id) + '.json', 'w') as f:
-                json.dump({'tilemap': {"0":{},
-                                            "1":{},
-                                            "2":{},
-                                            "3":{},
-                                            "4":{},
-                                            "5":{},
-                                            "6":{}},
-                           'tilesize': 16, 'offgrid': {}}, f)
-            self.editor.tilemap.load('data/maps/' + str(new_file_id) + '.json')
+        env = self.get_environment_by_id(self.editor.level)
+        file_name = self.get_file_name(env, self.editor.level)
+        filepath = f'data/maps/{file_name}'
 
-        # Reload assets
+        try:
+            self.editor.tilemap.load(filepath)
+        except FileNotFoundError:
+            if not os.path.exists('data/maps/'):
+                os.makedirs('data/maps/')
+            with open(filepath, 'w') as f:
+                json.dump({'tilemap': {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}},
+                           'tilesize': 16, 'offgrid': {}}, f)
+            self.editor.tilemap.load(filepath)
+
         self.editor.reload()
 
-    def change_level(self, new_level):
-        # Save current level (using current file ID)
-        current_file_id = self.get_file_id(self.editor.level)
-        if self.editor.tilemap.tilemap != {"0":{},
-                                            "1":{},
-                                            "2":{},
-                                            "3":{},
-                                            "4":{},
-                                            "5":{},
-                                            "6":{}}:
-            self.editor.tilemap.save('data/maps/' + str(current_file_id) + '.json')
+    def change_level(self, new_level_id):
+        # Save current level before moving to the next
+        if self.editor.level in self.editor.active_maps:
+            env = self.get_environment_by_id(self.editor.level)
+            current_file_name = self.get_file_name(env, self.editor.level)
 
-        self.editor.level = new_level
+            if self.editor.tilemap.tilemap != {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}}:
+                self.editor.tilemap.save(f'data/maps/{current_file_name}')
 
+        self.editor.level = new_level_id
         self.map_data_reset()
 
     def load_environments(self):
         path = 'data/environments.json'
         if os.path.exists(path):
             with open(path, 'r') as f:
-                # Convert lists back to specific types if needed, json loads arrays as lists
                 return json.load(f)
-        else:
-            # Default fallback if file doesn't exist
-            return {"white_space":[0], "green_cave": [1], "blue_cave": []}
+        return {"white_space": [], "green_cave": [], "blue_cave": []}
 
     def save_environments(self):
         with open('data/environments.json', 'w') as f:
             json.dump(self.editor.environments, f, indent=4)
 
     def full_save(self):
-        # 1. Save current map state first
-        current_file_id = self.get_file_id(self.editor.level)
-        self.editor.tilemap.save('data/maps/' + str(current_file_id) + '.json')
+        # 1. Save current map to disk
+        if self.editor.level in self.editor.active_maps:
+            env = self.get_environment_by_id(self.editor.level)
+            current_file_name = self.get_file_name(env, self.editor.level)
+            self.editor.tilemap.save(f'data/maps/{current_file_name}')
 
-        # 2. Create a mapping of Old File ID -> New File ID (0, 1, 2...)
-        id_mapping = {}
-        for index, file_id in enumerate(self.editor.active_maps):
-            id_mapping[file_id] = index
+        # 2. Re-sequence IDs sequentially for surviving active_maps
+        sorted_active = sorted(self.editor.active_maps)
+        id_mapping = {old_id: (index + 1) for index, old_id in enumerate(sorted_active)}
 
-        # 3. Process Files: Move everything to a temp folder first to avoid collisions
-        # (e.g. renaming 2->1 while 1 exists)
         temp_dir = 'data/maps/temp_save'
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
 
-        # Move valid active maps to temp with their NEW names
-        for file_id in self.editor.active_maps:
-            src = f'data/maps/{file_id}.json'
-            dst = f'{temp_dir}/{id_mapping[file_id]}.json'
-            if os.path.exists(src):
-                shutil.copy2(src, dst)  # Copy is safer than move
+        new_environments = {k: [] for k in self.editor.environments.keys()}
 
-        # 4. Clear the main maps folder
+        # 3. Move valid files to temp directory with new names
+        for old_id in sorted_active:
+            env_name = self.get_environment_by_id(old_id)
+            new_id = id_mapping[old_id]
+
+            old_file = self.get_file_name(env_name, old_id)
+            new_file = self.get_file_name(env_name, new_id)
+
+            src = f'data/maps/{old_file}'
+            dst = f'{temp_dir}/{new_file}'
+
+            if os.path.exists(src):
+                shutil.copy2(src, dst)
+
+            new_environments[env_name].append(new_id)
+
+        # 4. Clear old files and replace with temp
         for f in os.listdir('data/maps/'):
             if f.endswith('.json'):
                 os.remove(f'data/maps/{f}')
 
-        # 5. Move files back from temp
         for f in os.listdir(temp_dir):
             shutil.move(f'{temp_dir}/{f}', f'data/maps/{f}')
         os.rmdir(temp_dir)
 
-        # 6. Rebuild Environments with new IDs
-        new_environments = {k: [] for k in self.editor.environments}
-
-        for env_name in self.editor.environments:
-            for old_id in self.editor.environments[env_name]:
-                # Only keep IDs that are in our active list
-                if old_id in id_mapping:
-                    new_id = id_mapping[old_id]
-                    new_environments[env_name].append(new_id)
-
+        # 5. Overwrite the in-memory environments dict with the cleansed version
         self.editor.environments = new_environments
         self.save_environments()
 
-        # 7. Reset active maps to sequential order
-        self.editor.active_maps = list(range(len(self.editor.active_maps)))
+        # 6. Update running active maps
+        self.editor.active_maps = list(id_mapping.values())
+        self.editor.level = id_mapping.get(self.editor.level, 1)
 
         print("Full Save Complete: Maps reordered and deleted files removed.")
 
@@ -182,9 +197,15 @@ class EditorSimulation:
         # LevelManager — doit être créé AVANT d'utiliser active_maps/environments
         self.level_manager = LevelManager(self)
         self.environments = self.level_manager.load_environments()
-        self.active_maps = list(range(
-            sum(1 for f in os.listdir('data/maps/') if f.endswith('.json'))
-        ))
+
+        # Hydrate active_maps from environments.json
+        self.active_maps = []
+        for ids in self.environments.values():
+            self.active_maps.extend(ids)
+        self.active_maps.sort()
+
+
+        self.level = self.active_maps[0] if self.active_maps else 1
 
         self.tile_group = 0
         self.tile_variant = 0
@@ -204,7 +225,9 @@ class EditorSimulation:
         self.tilemap = Tilemap(self)
 
         try:
-            self.tilemap.load('data/maps/' + str(self.level) + '.json')
+            file_name = self.level_manager.get_file_name(self.current_environment, self.level)
+            filepath = f'data/maps/{file_name}'
+            self.tilemap.load(filepath)
         except FileNotFoundError:
             pass
 
@@ -212,18 +235,9 @@ class EditorSimulation:
 
         self.ui = UI(self)
 
-    def get_environment(self, level):
-        file_id = self.level_manager.get_file_id(level)
-        for environment in self.environments:
-            if file_id in self.environments[environment]:
-                return environment
-        if len(self.environments) > 0:
-            return list(self.environments.keys())[0]
-        return "white_space"
-
     def get_categories(self):
         self.categories = {}
-        self.categories = load_editor_tiles(self.get_environment(self.level))
+        self.categories = load_editor_tiles(self.level_manager.get_environment_by_id(self.level))
         self.current_category = 0
 
     def get_assets(self):
@@ -296,10 +310,10 @@ class UI:
     ASSETS_SECTION_COLOR = (32,32,32)
     PADDING = 5
 
-    def __init__(self, editor):
-        self.editor = editor
+    def __init__(self, editor_instance):
+        self.editor = editor_instance
         self.editor_previous_tool = None
-        self.screen = editor.screen
+        self.screen = editor_instance.screen
         self.screen_width, self.screen_height = self.screen.get_size()
 
         self.level_carousel = None
@@ -487,8 +501,6 @@ class UI:
         self.environment_selector_confirmation_button.draw(overlay)
 
         self.screen.blit(overlay, (0, 0))
-        
-
 
     def check_closed(self):
         if self.closing:
@@ -540,11 +552,13 @@ class UI:
                 else:
                     self.render_level_selector()
 
-
     def handle_ui_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_TAB:
                 self.closing = not self.closing
+            elif event.key == pygame.K_s and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                print("Saving to disk...")
+                self.editor.level_manager.full_save()
         if event.type == pygame.VIDEORESIZE:
             self.reload()
         if event.type == pygame.QUIT:
@@ -593,13 +607,24 @@ class UI:
                 self.selected_environment = button.label
 
         if self.environment_selector_confirmation_button.handle_event(event):
-            self.level_carousel.levels[self.level_carousel.selected] = self.level_carousel.selected
-            self.level_carousel.levels.append(None)
+            # Create the map with a globally new ID
+            new_id = self.editor.level_manager.get_next_file_id()
 
-            self.editor.environments[self.selected_environment].append(self.level_carousel.selected)
+            if self.selected_environment not in self.editor.environments:
+                self.editor.environments[self.selected_environment] = []
+
+            self.editor.environments[self.selected_environment].append(new_id)
+            self.editor.active_maps.append(new_id)
+            self.editor.active_maps.sort()
+
+            # Immediately save environment changes so creations persist without full_save
             self.editor.level_manager.save_environments()
-            self.editor.active_maps.append(self.level_carousel.selected)
-            self.editor.level_manager.change_level(self.level_carousel.selected)
+
+            # Refresh carousel mapping
+            self.level_carousel.levels = self.editor.active_maps + [None]
+            self.level_carousel.selected = self.editor.active_maps.index(new_id)
+
+            self.editor.level_manager.change_level(new_id)
 
             self.reload_assets_section()
             self.editor.current_tool = self.editor_previous_tool
@@ -609,16 +634,20 @@ class UI:
             if event.key == pygame.K_ESCAPE:
                 self.environment_selector_state = False
 
-    def handle_level_selector_event(self,event):
+    def handle_level_selector_event(self, event):
         level_selector_state = self.level_carousel.handle_event(event)
         match level_selector_state:
             case "AddLevel":
                 self.environment_selector_state = True
             case "DeleteLevel":
-                self.editor.level_manager.delete_map(self.level_carousel.selected)
+                deleted_id = self.level_carousel.levels[self.level_carousel.selected]
+                self.level_carousel.levels.pop(self.level_carousel.selected)
+                self.editor.level_manager.delete_map(deleted_id)
+                self.level_carousel.levels = self.editor.active_maps + [None]
                 self.level_carousel.selected = max(0, self.level_carousel.selected - 1)
             case "LoadLevel":
-                self.editor.level_manager.change_level(self.level_carousel.selected)
+                loaded_id = self.level_carousel.levels[self.level_carousel.selected]
+                self.editor.level_manager.change_level(loaded_id)
                 self.editor.current_tool = self.editor_previous_tool
                 self.reload_assets_section()
 

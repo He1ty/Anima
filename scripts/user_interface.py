@@ -176,7 +176,7 @@ class Menu:
         self.init_buttons()
 
         # --- Souls Animation --- #
-        self.souls_animation = Animation(load_images(f'environments/{self.game.get_environment(self.game.level)}'
+        self.souls_animation = Animation(load_images(f'environments/{self.game.get_environment_by_id(self.game.level)}'
                                                      f'/images/tiles/pickups/soul/idle'),5,True)
         self.souls_pos = []
         self.souls_end_pos = [self.SH/12, self.SH/12]
@@ -608,8 +608,8 @@ class Menu:
                         # START NEW GAME
                         self.souls_collected_timer = 0
                         self.is_souls_collected = False
-                        self.game.level = 0
-                        self.game.load_level(self.game.default_level, transition_effect=False)
+                        self.game.level_id = 1
+                        self.game.load_level(self.game.level_id, transition_effect=False)
                         # Crucial: Tell the game which slot is currently active for future saves
                         self.game.current_slot = slots.slot_id
                         self.game.state = self.game.PLAYING_STATE
