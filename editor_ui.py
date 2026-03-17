@@ -1,7 +1,4 @@
-import os
-import copy
-import json
-import shutil
+import sys
 
 from scripts.utils import load_image, create_rect_alpha
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton
@@ -214,7 +211,8 @@ class EditorSimulation:
         self.assets = {}
         for tile in self.categories.values():
             self.assets.update(tile)
-        self.assets.update({"spawners": load_images("player/spawner")})
+        self.assets.update({"spawners": load_images("player/spawner"),
+                            "transition": load_images("transition")})
 
         self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
 
@@ -235,26 +233,115 @@ class EditorSimulation:
 
         self.ui = UI(self)
 
+        self.clicking = False
+        self.rotation = 0
+        self.state = "MapEditor"
+
+        self.mpos = pygame.mouse.get_pos()
+        self.main_area_width = self.screen_width
+        self.main_area_height = self.screen_height
+
+        self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
+
+        self.ongrid = True
+
+        self.infos_per_type_per_category = {
+            "Levers": {
+                "visual_and_door": {"id": int, "visual_duration": int, "door_id": int},
+                "test": {"id": int, "info 1": int, "info 2": str}
+            },
+            "Teleporters": {
+                "normal_tp": {"id": int, "dest": str, "time": int},
+                "progressive_tp": {"id": int, "dest": str, "time": int}
+            },
+            "Buttons": {
+                "improve_tp_progress": {"id": int, "amount": int, "tp_id": int},
+            },
+            "Transitions": {
+                "transition": {"destination": int,
+                               "dest_pos": list}
+            },
+            "Cameras": {
+                "non-static": {
+                    "size": list,
+                    "x_limits": list,
+                    "y_limits": list
+                },
+                "static": {"size": list,
+                           "center": list,
+                           "x_limits": list,
+                           "y_limits": list
+                           }
+            },
+            "Doors": {
+                "non_interactable": {
+                    "id": int,
+                    "opening_time": int}}
+
+        }
+        self.types_per_categories = {t: set(self.infos_per_type_per_category[t].keys()) for t in
+                                     self.infos_per_type_per_category}
+
+        self.holding_i = False
+        self.holding_b = False
+        self.holding_y = False
+        self.holding_tab = False
+        
+        
+
+    def create_snapshot(self):
+        # Creates a deep copy of the current map state
+        return {
+            'tilemap': copy.deepcopy(self.tilemap.tilemap)
+        }
+
+    def save_action(self):
+        # 1. Create snapshot
+        snapshot = self.create_snapshot()
+
+        # 2. If we aren't at the end of history (because we undid), cut the future
+        if self.history_index < len(self.history) - 1:
+            self.history = self.history[:self.history_index + 1]
+
+        # 3. Add new state
+        self.history.append(snapshot)
+        self.history_index += 1
+
+        # 4. Limit history size
+        if len(self.history) > self.max_history:
+            self.history.pop(0)
+            self.history_index -= 1
+
+    def restore_snapshot(self, snapshot):
+        # 1. Load data
+        self.tilemap.tilemap = copy.deepcopy(snapshot['tilemap'])
+
+    def undo(self):
+        if self.history_index > 0:
+            self.history_index -= 1
+            self.restore_snapshot(self.history[self.history_index])
+            print(f"Undo: Step {self.history_index}")
+
+    def redo(self):
+        if self.history_index < len(self.history) - 1:
+            self.history_index += 1
+            self.restore_snapshot(self.history[self.history_index])
+            print(f"Redo: Step {self.history_index}")
+            
+            
+
     def get_categories(self):
         self.categories = {}
         self.categories = load_editor_tiles(self.level_manager.get_environment_by_id(self.level))
         self.current_category = 0
+        self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
 
     def get_assets(self):
         self.assets = {}
         for tile in self.categories.values():
             self.assets.update(tile)
-        self.assets.update({"spawners": load_images("player/spawner")})
-
-    def save_action(self):
-        snapshot = {'tilemap': copy.deepcopy(self.tilemap.tilemap)}
-        if self.history_index < len(self.history) - 1:
-            self.history = self.history[:self.history_index + 1]
-        self.history.append(snapshot)
-        self.history_index += 1
-        if len(self.history) > self.max_history:
-            self.history.pop(0)
-            self.history_index -= 1
+        self.assets.update({"spawners": load_images("player/spawner"),
+                            "transition": load_images("transition")})
 
     def sizeofmaps(self):
         return len(self.active_maps)
@@ -268,8 +355,7 @@ class EditorSimulation:
         self.history_index = -1
         self.save_action()  # Save the initial state (Index 0)
 
-
-    def main_editor_logic(self):
+    def render_map(self):
         self.display.fill((0, 0, 0))
 
         self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
@@ -280,12 +366,261 @@ class EditorSimulation:
                             precise_layer=self.current_layer if not self.showing_all_layers else None,
                             with_player=False)
 
+    def map_editor_logic(self, event):
+
+
+
+        if self.mpos_in_mainarea:
+            match self.current_tool:
+                case "Brush":
+                    if self.clicking:
+                        if self.ongrid:
+                            if "Activators" in self.categories:
+                                if self.tile_type in self.categories["Activators"] and self.current_layer not in \
+                                        self.tilemap.layers["activators"]:
+                                    self.tilemap.layers["activators"] += [self.current_layer]
+
+                            if "fake" in self.tile_type and self.current_layer not in \
+                                    self.tilemap.layers["fake_tiles"]:
+                                self.tilemap.layers["fake_tiles"] += [self.current_layer]
+
+                            if self.tile_type == "spawners" and self.tile_variant == 0 and not self.tilemap.extract(
+                                [("spawners", 0)], keep=True):
+                                self.tilemap.layers["player"] = [self.current_layer]
+
+                            if self.tile_type == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
+                                [("spawners", 0)], keep=True):
+                                print("Player spawner alredy placed in this map")
+                            else:
+                                t = self.tile_type
+                                self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
+                                    'type': t,
+                                    'variant': self.tile_variant,
+                                    'pos': self.tile_pos}
+
+                                tile = self.tilemap.tilemap[self.current_layer][
+                                    str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
+
+                                if "spike" in t:
+                                    self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])][
+                                        "rotation"] = self.rotation
+
+                                else:
+                                    for c in self.infos_per_type_per_category:
+                                        if c.lower()[:-1] in t:
+                                            tile_category = self.get_infos_tile_category(tile)
+                                            self.setup_edit_window(tile_category, tile)
+                                            break
+
+                        else:
+                            if self.current_layer not in self.tilemap.offgrid_tiles:
+                                self.tilemap.offgrid_tiles[self.current_layer] = {}
+                            self.tilemap.offgrid_tiles[self.current_layer][
+                                str(self.mpos_scaled[0] + self.scroll[0]) +
+                                ";"
+                                + str(self.mpos_scaled[1] + self.scroll[1])] = \
+                                {'type': self.tile_type,
+                                 'variant': self.tile_variant,
+                                 'pos': (
+                                     self.mpos_scaled[0] + self.scroll[0],
+                                     self.mpos_scaled[1] + self.scroll[1])}
+
+                case "Eraser":
+                    if self.clicking:
+                        tile_loc = str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])
+                        if tile_loc in self.tilemap.tilemap[self.current_layer]:
+                            del self.tilemap.tilemap[self.current_layer][tile_loc]
+
+                        if self.current_layer in self.tilemap.offgrid_tiles:
+                            for pos in self.tilemap.offgrid_tiles[self.current_layer].copy():
+                                tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
+                                tile_img = self.assets[tile['type']][tile['variant']]
+                                tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
+                                                     tile['pos'][1] - self.scroll[1],
+                                                     tile_img.get_width(),
+                                                     tile_img.get_height())
+                                if tile_r.collidepoint(self.mpos_scaled) or tile_r.collidepoint(
+                                        self.mpos):  # Check both to be safe
+                                    del self.tilemap.offgrid_tiles[self.current_layer][pos]
+
+        if event.type == pygame.MOUSEWHEEL:
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_CTRL:
+                self.zoom -= 0.1 * event.y
+                self.zoom = max(0.2, min(self.zoom, 8))
+            else:
+                self.tile_variant = (self.tile_variant + event.y) % len(
+                    self.assets[self.tile_type])
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button in (1, 3):  # Left or Right click
+                self.temp_snapshot = self.create_snapshot()
+
+            if event.button == 1:
+                self.clicking = True
+            if event.button == 3:
+                self.right_clicking = True
+        if event.type == pygame.KEYDOWN:
+            mods = pygame.key.get_mods()
+            if mods & pygame.KMOD_CTRL:
+                if event.key == pygame.K_w:
+                    self.undo()
+                if event.key == pygame.K_y:
+                    self.redo()
+                if event.key == pygame.K_DOWN:
+                    if self.current_layer == "0":
+                        print("Layer 0, can't go down")
+                    else:
+                        self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[
+                            str(int(self.current_layer) - 1)] \
+                            = self.tilemap.tilemap[str(int(self.current_layer) - 1)], \
+                            self.tilemap.tilemap[self.current_layer]
+                        self.current_layer = str(int(self.current_layer) - 1)
+                        print(f"Current layer moved to layer {self.current_layer}")
+                if event.key == pygame.K_UP:
+                    if self.tilemap.tilemap[self.current_layer] == {} and str(
+                            int(self.current_layer) + 1) not in self.tilemap.tilemap:
+                        print("This layer is the last layer, can't go up")
+                    else:
+                        self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[
+                            str(int(self.current_layer) + 1)] \
+                            = self.tilemap.tilemap[str(int(self.current_layer) + 1)], \
+                            self.tilemap.tilemap[self.current_layer]
+                        self.current_layer = str(int(self.current_layer) + 1)
+                        print(f"Current layer moved to layer {self.current_layer}")
+            else:
+                if event.key == pygame.K_i and not self.holding_i:
+                    self.edit_properties_mode_on = not self.edit_properties_mode_on
+                    self.holding_i = True
+                if event.key == pygame.K_q:
+                    self.movement[0] = True
+                if event.key == pygame.K_RIGHT:
+                    self.level_manager.change_level((self.level + 1) % self.sizeofmaps())
+                if event.key == pygame.K_LEFT:
+                    self.level_manager.change_level((self.level - 1) % self.sizeofmaps())
+                if event.key == pygame.K_DOWN:
+                    if self.current_layer == "0":
+                        print("Layer 0, can't make any new layer under this one")
+                    else:
+                        self.current_layer = str(int(self.current_layer) - 1)
+                        print(f"Current layer : {self.current_layer}")
+                    if self.current_layer not in self.tilemap.tilemap:
+                        self.tilemap.tilemap[self.current_layer] = {}
+
+                if event.key == pygame.K_UP:
+                    if int(self.current_layer) + 1 == len(self.tilemap.tilemap.keys()) and \
+                            self.tilemap.tilemap[self.current_layer] == {}:
+                        print("This layer is empty, can't make any new layer")
+                    else:
+                        self.current_layer = str(int(self.current_layer) + 1)
+                        print(f"Current layer : {self.current_layer}")
+
+                    if self.current_layer not in self.tilemap.tilemap:
+                        self.tilemap.tilemap[self.current_layer] = {}
+                if event.key == pygame.K_TAB and not self.holding_tab:
+                    self.showing_all_layers = not self.showing_all_layers
+                    self.holding_tab = True
+                if event.key == pygame.K_LSHIFT:
+                    self.shift = True
+                # Show camera setup zones
+                if event.key == pygame.K_b and not self.holding_b:
+                    self.showing_camera_setup_area = not self.showing_camera_setup_area
+                    self.holding_b = True
+                if event.key == pygame.K_d:
+                    self.movement[1] = True
+                if event.key == pygame.K_z:
+                    self.movement[2] = True
+                if event.key == pygame.K_s:
+                    self.movement[3] = True
+                if event.key == pygame.K_g:
+                    self.ongrid = not self.ongrid
+                if event.key == pygame.K_t:
+                    self.tilemap.autotile()
+                    self.save_action()
+                if event.key == pygame.K_o:
+                    self.level_manager.full_save()
+                if event.key == pygame.K_c:
+                    print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
+                if event.key == pygame.K_r:
+                    self.rotation = (self.rotation + 1) % 4
+                # Unused key
+                if event.key == pygame.K_y and not self.holding_y:
+                    pass
+                # Shortcut for placing camera setup
+                if event.key == pygame.K_k:
+                    self.tilemap.tilemap[self.current_layer][
+                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
+                        'type': "camera_setup",
+                        'pos': self.tile_pos
+                    }
+                    tile = self.tilemap.tilemap[self.current_layer][
+                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
+                    tile_category = self.get_infos_tile_category(tile)
+                    self.setup_edit_window(tile_category, tile)
+                    self.save_action()
+                # Shortcut for placing transitions
+                if event.key == pygame.K_p:
+                    dest = "0"  # Default value
+                    self.tilemap.tilemap[self.current_layer][
+                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
+                        'type': "transition",
+                        'variant': self.tile_variant,
+                        'pos': self.tile_pos,
+                        'destination': dest,
+                        'dest_pos': [0, 0]}
+                    tile = self.tilemap.tilemap[self.current_layer][
+                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
+                    tile_category = self.get_infos_tile_category(tile)
+                    self.setup_edit_window(tile_category, tile)
+                    self.save_action()
+                # Shortcut for placing checkpoints
+                if event.key == pygame.K_j:
+                    self.tilemap.tilemap[self.current_layer][
+                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
+                        'type': "checkpoint",
+                        'variant': 0,
+                        'pos': self.tile_pos,
+                        'state': 0
+                    }
+                    self.save_action()
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_y:
+                self.holding_y = False
+            if event.key == pygame.K_b:
+                self.holding_b = False
+            if event.key == pygame.K_i:
+                self.holding_i = False
+            if event.key == pygame.K_q:
+                self.movement[0] = False
+            if event.key == pygame.K_d:
+                self.movement[1] = False
+            if event.key == pygame.K_z:
+                self.movement[2] = False
+            if event.key == pygame.K_s:
+                self.movement[3] = False
+            if event.key == pygame.K_TAB:
+                self.holding_tab = False
+            if event.key == pygame.K_LSHIFT:
+                self.shift = False
+        
+    def render_map_editor(self):
+        current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
+        current_tile_img.set_alpha(100)
+
+        match self.current_tool:
+            case "Brush":
+                if 'spike' in self.tile_type:
+                    current_tile_img = pygame.transform.rotate(current_tile_img, self.rotation * -90)
+                if self.ongrid:
+                    self.display.blit(current_tile_img, (self.tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
+                                                     self.tile_pos[1] * self.tilemap.tile_size - self.scroll[1]))
+                else:
+                    self.display.blit(current_tile_img, self.mpos_scaled)
 
 
         changing_size = False
+        screenshot = self.screen.copy()
 
         if self.display.get_size() != (int(480 * self.zoom), int(288 * self.zoom)):
-            screenshot = self.screen.copy()
             self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
             changing_size = True
 
@@ -294,14 +629,65 @@ class EditorSimulation:
         self.screen.blit(scaled_display, (0, 0))
 
         if changing_size:
-            # noinspection PyUnboundLocalVariable
             self.screen.blit(screenshot, (0, 0))
-        self.ui.draw()
 
 
     def run(self):
         while True:
-            self.main_editor_logic()
+            self.mpos = pygame.mouse.get_pos()
+            self.main_area_width = self.screen_width
+            self.main_area_height = self.screen_height
+            if self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height:  # Only if mouse is over main area
+                # Scale mouse position to account for display scaling
+                scale_x = 960 / (self.screen.get_size()[0])
+                scale_y = 576 / (self.screen.get_size()[1])
+                self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
+                               (self.mpos[1] / 2) * scale_y * self.zoom)
+                self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
+                            int((self.mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
+            else:
+                # Default values if out of bounds to prevent crash
+                self.tile_pos = (0, 0)
+                self.mpos_scaled = (0, 0)
+
+            self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
+
+            for event in pygame.event.get():
+                self.ui.handle_ui_event(event)
+                match self.state:
+                    case "MapEditor":
+                        self.map_editor_logic(event)
+
+                if event.type == pygame.MOUSEBUTTONUP:
+                    if event.button == 1:
+                        self.clicking = False
+                        self.waiting_for_click_release = False
+                    if event.button == 3:
+                        self.right_clicking = False
+                    if event.button in (1, 3) and self.temp_snapshot:
+                        current_state = self.create_snapshot()
+                        # Simply comparing the dicts detects if anything changed
+                        if current_state != self.temp_snapshot:
+                            self.save_action()
+                if event.type == pygame.KEYUP:
+                    if event.key == pygame.K_LSHIFT:
+                        self.shift = False
+                if event.type == pygame.VIDEORESIZE:
+                    # Update screen dimensions
+                    self.screen_width = max(event.w, 480)  # Minimum width
+                    self.screen_height = max(event.h, 300)  # Minimum height
+                    self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+
+
+            match self.state:
+                case "MapEditor":
+                    self.render_map_editor()
+
+            self.render_map()
+            self.ui.draw()
             self.clock.tick(60)
             pygame.display.update()
 
@@ -536,9 +922,6 @@ class UI:
         self.init_assets_buttons(self.editor.categories)
 
     def draw(self):
-        for event in pygame.event.get():
-            self.handle_ui_event(event)
-
 
         self.check_closed()
         self.render_toolbar()
