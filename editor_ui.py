@@ -1,5 +1,4 @@
 import sys
-
 from scripts.utils import load_image, create_rect_alpha
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton
 from scripts.text import load_game_font
@@ -328,7 +327,6 @@ class EditorSimulation:
             self.restore_snapshot(self.history[self.history_index])
             print(f"Redo: Step {self.history_index}")
             
-            
 
     def get_categories(self):
         self.categories = {}
@@ -369,7 +367,8 @@ class EditorSimulation:
     def map_editor_logic(self, event):
 
 
-
+        if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
+            self.clicking = False
         if self.mpos_in_mainarea:
             match self.current_tool:
                 case "Brush":
@@ -709,10 +708,10 @@ class UI:
 
         self.state = "Editor"
 
-        self.toolbar_width = self.screen_width * 5 / 96
         self.toolbar_default_width = self.screen_width * 5 / 96
-        self.toolbar_buttons_width = self.toolbar_width * (3 / 5)
-        self.toolbar_buttons_height = self.toolbar_width * (3 / 5)
+        self.toolbar_rect = pygame.Rect(self.screen_width - self.toolbar_default_width, 0,self.screen_width * 5 / 96,self.screen_height)
+        self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
+        self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
         self.tools_buttons = []
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "LevelSelector"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
@@ -721,18 +720,24 @@ class UI:
                                      "Selection": load_image("ui/selection.png"),
                                      "LevelSelector": load_image("ui/level_selector.png")}
 
-        self.assets_section_width = self.assets_section_default_width = self.screen_width * 20/96
-        self.assets_section_height = self.screen_width * 25/96
+
+
+        self.assets_section_default_width = self.screen_width * 20/96
+        self.assets_section_rect = pygame.Rect(self.screen_width - self.toolbar_rect.width - self.assets_section_default_width,
+                                               self.screen_height - self.screen_width * 25/96,
+                                               self.screen_width * 20 / 96, self.screen_width * 25 / 96)
+
         self.current_category = 0
         self.current_category_name = list(self.editor.categories.keys())[self.current_category]
-        self.assets_section_buttons_width = self.assets_section_width * (1 / 8)
-        self.assets_section_buttons_height = self.assets_section_width * (1 / 8)
+
+        self.assets_section_buttons_width = self.assets_section_rect.width * (1 / 8)
+        self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
         self.assets_section_buttons = []
         self.assets_section_buttons_labels = ["Previous", "Next"]
         self.assets_section_buttons_images = {"Previous": pygame.transform.flip(load_image("ui/next.png"), True, False),
                                               "Next": load_image("ui/next.png")}
-        self.assets_button_width = self.assets_section_width * (1 / 10)
-        self.assets_button_height = self.assets_section_width * (1 / 10)
+        self.assets_button_width = self.assets_section_rect.width * (1 / 10)
+        self.assets_button_height = self.assets_section_rect.width * (1 / 10)
         self.assets_buttons = []
 
         self.environment_selector_state = False
@@ -755,7 +760,7 @@ class UI:
         self.assets_section_buttons = []
         self.environment_selector_buttons = []
 
-        button_x, button_y = self.toolbar_width/2, self.toolbar_width/2
+        button_x, button_y = self.toolbar_rect.width/2, self.toolbar_rect.width/2
         for label in self.tools_buttons_labels:
             button = EditorButton(label, self.tools_buttons_images[label] ,
                                   (button_x, button_y),
@@ -773,7 +778,7 @@ class UI:
         button_x, button_y = (30/self.editor.SW)*self.screen_width, (20/self.editor.SH)*self.screen_height
         for label in self.assets_section_buttons_labels:
             button = EditorButton(label, self.assets_section_buttons_images[label], (button_x, button_y), self.assets_section_buttons_width, self.assets_section_buttons_height, (24,24,24), self.screen_width/self.editor.SW)
-            button_x = self.assets_section_width - button_x
+            button_x = self.assets_section_rect.width - button_x
             self.assets_section_buttons.append(button)
 
         self.level_carousel = LevelCarousel(self.screen_width / 2, self.screen_height / 2,
@@ -791,7 +796,7 @@ class UI:
                                        self.environment_selector_buttons_height,
                                        (32, 32, 32))
             if (button_x + 10 * self.screen_width / self.editor.SW >
-                    self.screen_width - self.assets_section_width - 10 * self.screen_width / self.editor.SW):
+                    self.screen_width - self.assets_section_rect.width - 10 * self.screen_width / self.editor.SW):
                 button_y = button_y + self.screen_height + 10*self.screen_height/self.editor.SH % self.screen_height
                 button_x = initial_x
             else:
@@ -819,7 +824,7 @@ class UI:
             img = categories[self.current_category_name][tile].copy()[0]
             button = EditorButton(tile, img, (button_x, button_y), self.assets_button_width, self.assets_button_height,
                                   (24, 24, 24), self.screen_width/self.editor.SW)
-            if button_x + self.assets_button_width + self.PADDING > self.assets_section_width - self.assets_button_width:
+            if button_x + self.assets_section_rect.width + self.PADDING > self.assets_section_rect.width - self.assets_button_width:
                 button_y = (button_y + self.assets_button_height + self.PADDING*self.screen_height/self.editor.SH %
                             self.screen_height)
                 button_x = initial_x
@@ -828,14 +833,14 @@ class UI:
                             (self.assets_section_width - self.assets_button_width))
             if button_x < initial_x:
                 button_x = initial_x
-            if button_y + self.assets_button_height/2 > self.assets_section_height:
-                self.assets_section_height += self.assets_button_height + self.PADDING*self.screen_height/self.editor.SH
+            if button_y + self.assets_button_height/2 > self.assets_section_rect.height:
+                self.assets_section_rect.height += self.assets_button_height + self.PADDING*self.screen_height/self.editor.SH
             self.assets_buttons.append(button)
 
 
     def render_toolbar(self):
 
-        overlay = pygame.Surface((self.toolbar_width, self.screen_height))
+        overlay = pygame.Surface((self.toolbar_rect.width, self.toolbar_rect.height))
         overlay.fill(self.TOOLBAR_COLOR)
 
         for button in self.tools_buttons:
@@ -844,15 +849,17 @@ class UI:
                 button.activated = True
             else:
                 button.activated = False
+        self.toolbar_rect.x,self.toolbar_rect.y = (self.screen_width - self.toolbar_rect.width, 0)
 
-        self.screen.blit(overlay, (self.screen_width - self.toolbar_width, 0))
+        self.screen.blit(overlay, (self.toolbar_rect.x,self.toolbar_rect.y))
 
     def render_assets_section(self, x, y):
-        overlay = pygame.Surface((self.assets_section_width, self.assets_section_height))
+        self.assets_section_rect.x,self.assets_section_rect.y = x,y
+        overlay = pygame.Surface((self.assets_section_rect.width, self.assets_section_rect.height))
         overlay.fill(self.ASSETS_SECTION_COLOR)
 
         category_text = self.title_font.render(self.current_category_name, True, (255, 255, 255))
-        category_x = (self.assets_section_width - category_text.get_width())/2
+        category_x = (self.assets_section_rect.width - category_text.get_width())/2
         category_y = (10 / self.editor.SH) * self.screen_height
         overlay.blit(category_text, (category_x, category_y))
 
@@ -866,7 +873,7 @@ class UI:
         for button in self.assets_section_buttons:
             button.draw(overlay)
 
-        self.screen.blit(overlay, (x, y))
+        self.screen.blit(overlay, (self.assets_section_rect.x,self.assets_section_rect.y))
 
     def render_level_selector(self):
         overlay = create_rect_alpha((0, 0, 0), (0, 0, self.screen_width, self.screen_height), 100)
@@ -890,12 +897,11 @@ class UI:
 
     def check_closed(self):
         if self.closing:
-            self.toolbar_width = max(0, self.toolbar_width - 5)
-            self.assets_section_width = max(0, self.assets_section_width - 20)
+            self.toolbar_rect.width = max(0, self.toolbar_rect.width - 5)
+            self.assets_section_rect.width = max(0, self.assets_section_rect.width - 20)
         else:
-            self.toolbar_width = min(self.toolbar_default_width, self.toolbar_width + 5)
-            self.assets_section_width = min(self.assets_section_default_width, self.assets_section_width + 20)
-
+            self.toolbar_rect.width = min(self.toolbar_default_width, self.toolbar_rect.width + 5)
+            self.assets_section_rect.width = min(self.assets_section_default_width, self.assets_section_rect.width + 20)
 
     def reload(self):
         self.screen_width, self.screen_height = self.editor.screen.get_size()
@@ -903,17 +909,22 @@ class UI:
         self.title_font = load_game_font(int((24/self.editor.SH)*self.screen_height))
         self.buttons_font = load_game_font(int((18/self.editor.SH)*self.screen_height))
 
-        self.toolbar_width = self.screen_width * 5/96
+        self.toolbar_default_width = self.screen_width * 5 / 96
+        self.toolbar_rect = pygame.Rect(self.screen_width - self.toolbar_default_width, 0, self.screen_width * 5 / 96,
+                                        self.screen_height)
         self.toolbar_default_width = self.screen_width * 5/96
-        self.toolbar_buttons_width = self.toolbar_width * (3 / 5)
-        self.toolbar_buttons_height = self.toolbar_width * (3 / 5)
+        self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
+        self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
 
-        self.assets_section_width = self.assets_section_default_width = self.screen_width * 20 / 96
-        self.assets_section_height = self.screen_width * 25/96
-        self.assets_section_buttons_width = self.assets_section_width * (1 / 8)
-        self.assets_section_buttons_height = self.assets_section_width * (1 / 8)
-        self.assets_button_width = self.assets_section_width * (1 / 10)
-        self.assets_button_height = self.assets_section_width * (1 / 10)
+        self.assets_section_default_width = self.screen_width * 20 / 96
+        self.assets_section_rect = pygame.Rect(
+            self.screen_width - self.toolbar_rect.width - self.assets_section_default_width,
+            self.screen_height - self.screen_width * 25 / 96,
+            self.screen_width * 20 / 96, self.screen_width * 25 / 96)
+        self.assets_section_buttons_width = self.assets_section_rect.width * (1 / 8)
+        self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
+        self.assets_button_width = self.assets_section_rect.width * (1 / 10)
+        self.assets_button_height = self.assets_section_rect.width * (1 / 10)
         self.init_buttons()
 
     def reload_assets_section(self):
@@ -927,8 +938,8 @@ class UI:
         self.render_toolbar()
         match self.editor.current_tool:
             case "Brush":
-                self.render_assets_section(self.screen_width - self.toolbar_width - self.assets_section_width,
-                                   self.screen_height - self.assets_section_height)
+                self.render_assets_section(self.screen_width - self.toolbar_rect.width  - self.assets_section_rect.width,
+                                   self.screen_height - self.assets_section_rect.height)
             case "LevelSelector":
                 if self.environment_selector_state:
                     self.render_environment_selector()
@@ -958,14 +969,14 @@ class UI:
 
     def handle_toolbar_event(self, event):
         for button in self.tools_buttons:
-            if button.handle_event(event, offset=(self.screen_width - self.toolbar_width, 0)):
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width, 0)):
                 self.editor_previous_tool = self.editor.current_tool
                 self.editor.current_tool = button.label
 
     def handle_assets_section_event(self, event):
         for button in self.assets_section_buttons:
-            if button.handle_event(event, offset=(self.screen_width - self.toolbar_width - self.assets_section_width,
-                                                  self.screen_height - self.assets_section_height)):
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width - self.assets_section_rect.width,
+                                                  self.screen_height - self.assets_section_rect.height)):
                 if button.label == "Next":
                     self.current_category = (self.current_category + 1) % len(self.editor.categories)
                 elif button.label == "Previous":
@@ -975,12 +986,12 @@ class UI:
                 self.init_assets_buttons(self.editor.categories)
             elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(
                     event,
-                    offset=(self.screen_width - self.toolbar_width - self.assets_section_width,
-                            self.screen_height - self.assets_section_height)):
+                    offset=(self.screen_width - self.toolbar_rect.width - self.assets_section_rect.width,
+                            self.screen_height - self.assets_section_rect.height)):
                 button.activated = False
         for button in self.assets_buttons:
-            if button.handle_event(event, offset=(self.screen_width - self.toolbar_width - self.assets_section_width,
-                                                  self.screen_height - self.assets_section_height)):
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width - self.assets_section_rect.width,
+                                                  self.screen_height - self.assets_section_rect.height)):
                 self.editor.tile_type = button.label
                 self.editor.tile_variant = 0
 

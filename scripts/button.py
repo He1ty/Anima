@@ -333,30 +333,33 @@ class LevelCarousel:
                         return "DeleteLevel"
 
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_DOWN:
-                self.delete_button_selected = True
-            if event.key == pygame.K_UP:
-                self.delete_button_selected = False
+            if not self.delete_window_on:
+                if event.key == pygame.K_DOWN:
+                    self.delete_button_selected = True
+                if event.key == pygame.K_UP:
+                    self.delete_button_selected = False
 
-            if not self.delete_button_selected:
-                if event.key == pygame.K_RIGHT and self.selected < len(self.levels)-1:
-                    if not self.animating:
-                        self.target_offset = 1
-                        self.animating = True
-                if event.key == pygame.K_LEFT and self.selected > 0:
-                    if not self.animating:
-                        self.target_offset = -1
-                        self.animating = True
-            if event.key == pygame.K_RETURN:
-                if self.delete_button_selected:
-                   self.delete_window_on = True
+                if not self.delete_button_selected:
+                    if event.key == pygame.K_RIGHT and self.selected < len(self.levels)-1:
+                        if not self.animating:
+                            self.target_offset = 1
+                            self.animating = True
+
+                    if event.key == pygame.K_LEFT and self.selected > 0:
+                        if not self.animating:
+                            self.target_offset = -1
+                            self.animating = True
+
+                if event.key == pygame.K_RETURN:
+                    if self.delete_button_selected:
+                       self.delete_window_on = True
 
 
-                else:
-                    if self.levels[self.selected] is None:
-                        return "AddLevel"
                     else:
-                        return "LoadLevel"
+                        if self.levels[self.selected] is None:
+                            return "AddLevel"
+                        else:
+                            return "LoadLevel"
 
         return None
 
