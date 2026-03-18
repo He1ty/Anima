@@ -1,4 +1,5 @@
 import sys
+
 from scripts.utils import load_image, create_rect_alpha
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton
 from scripts.text import load_game_font
@@ -189,6 +190,7 @@ class EditorSimulation:
         self.history = []
         self.history_index = -1
         self.max_history = 50
+        self.temp_snapshot = None
 
         # LevelManager — doit être créé AVANT d'utiliser active_maps/environments
         self.level_manager = LevelManager(self)
@@ -327,6 +329,7 @@ class EditorSimulation:
             self.restore_snapshot(self.history[self.history_index])
             print(f"Redo: Step {self.history_index}")
             
+            
 
     def get_categories(self):
         self.categories = {}
@@ -364,7 +367,12 @@ class EditorSimulation:
                             precise_layer=self.current_layer if not self.showing_all_layers else None,
                             with_player=False)
 
-    def map_editor_logic(self, event):
+    def get_infos_tile_category(self, tile):
+        for tile_category in self.infos_per_type_per_category:
+            if tile_category.lower()[:-1] in tile["type"]:
+                return tile_category
+
+    def handle_map_editor(self, event):
 
 
         if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
@@ -405,11 +413,12 @@ class EditorSimulation:
                                         "rotation"] = self.rotation
 
                                 else:
+                                    """
                                     for c in self.infos_per_type_per_category:
                                         if c.lower()[:-1] in t:
                                             tile_category = self.get_infos_tile_category(tile)
                                             self.setup_edit_window(tile_category, tile)
-                                            break
+                                            break"""
 
                         else:
                             if self.current_layer not in self.tilemap.offgrid_tiles:
@@ -490,12 +499,6 @@ class EditorSimulation:
                 if event.key == pygame.K_i and not self.holding_i:
                     self.edit_properties_mode_on = not self.edit_properties_mode_on
                     self.holding_i = True
-                if event.key == pygame.K_q:
-                    self.movement[0] = True
-                if event.key == pygame.K_RIGHT:
-                    self.level_manager.change_level((self.level + 1) % self.sizeofmaps())
-                if event.key == pygame.K_LEFT:
-                    self.level_manager.change_level((self.level - 1) % self.sizeofmaps())
                 if event.key == pygame.K_DOWN:
                     if self.current_layer == "0":
                         print("Layer 0, can't make any new layer under this one")
@@ -504,7 +507,6 @@ class EditorSimulation:
                         print(f"Current layer : {self.current_layer}")
                     if self.current_layer not in self.tilemap.tilemap:
                         self.tilemap.tilemap[self.current_layer] = {}
-
                 if event.key == pygame.K_UP:
                     if int(self.current_layer) + 1 == len(self.tilemap.tilemap.keys()) and \
                             self.tilemap.tilemap[self.current_layer] == {}:
@@ -515,6 +517,8 @@ class EditorSimulation:
 
                     if self.current_layer not in self.tilemap.tilemap:
                         self.tilemap.tilemap[self.current_layer] = {}
+
+
                 if event.key == pygame.K_TAB and not self.holding_tab:
                     self.showing_all_layers = not self.showing_all_layers
                     self.holding_tab = True
@@ -522,14 +526,20 @@ class EditorSimulation:
                     self.shift = True
                 # Show camera setup zones
                 if event.key == pygame.K_b and not self.holding_b:
-                    self.showing_camera_setup_area = not self.showing_camera_setup_area
+                    self.current_tool = "Brush"
                     self.holding_b = True
+                if event.key == pygame.K_e:
+                    self.current_tool = "Eraser"
+
+                if event.key == pygame.K_q:
+                    self.movement[0] = True
                 if event.key == pygame.K_d:
                     self.movement[1] = True
                 if event.key == pygame.K_z:
                     self.movement[2] = True
                 if event.key == pygame.K_s:
                     self.movement[3] = True
+
                 if event.key == pygame.K_g:
                     self.ongrid = not self.ongrid
                 if event.key == pygame.K_t:
@@ -537,6 +547,7 @@ class EditorSimulation:
                     self.save_action()
                 if event.key == pygame.K_o:
                     self.level_manager.full_save()
+
                 if event.key == pygame.K_c:
                     print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
                 if event.key == pygame.K_r:
@@ -581,6 +592,7 @@ class EditorSimulation:
                         'state': 0
                     }
                     self.save_action()
+
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_y:
                 self.holding_y = False
@@ -636,14 +648,15 @@ class EditorSimulation:
             self.mpos = pygame.mouse.get_pos()
             self.main_area_width = self.screen_width
             self.main_area_height = self.screen_height
-            if self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height:  # Only if mouse is over main area
+            if self.mpos[0] < self.main_area_width and self.mpos[
+                1] < self.main_area_height:  # Only if mouse is over main area
                 # Scale mouse position to account for display scaling
                 scale_x = 960 / (self.screen.get_size()[0])
                 scale_y = 576 / (self.screen.get_size()[1])
                 self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
-                               (self.mpos[1] / 2) * scale_y * self.zoom)
+                                    (self.mpos[1] / 2) * scale_y * self.zoom)
                 self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
-                            int((self.mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
+                                 int((self.mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
             else:
                 # Default values if out of bounds to prevent crash
                 self.tile_pos = (0, 0)
@@ -652,10 +665,13 @@ class EditorSimulation:
             self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
 
             for event in pygame.event.get():
-                self.ui.handle_ui_event(event)
                 match self.state:
                     case "MapEditor":
-                        self.map_editor_logic(event)
+                        if self.current_tool == "LevelSelector":
+                            pass
+                        else:
+                            self.handle_map_editor(event)
+                self.ui.handle_ui_event(event)
 
                 if event.type == pygame.MOUSEBUTTONUP:
                     if event.button == 1:
@@ -697,7 +713,7 @@ class UI:
 
     def __init__(self, editor_instance):
         self.editor = editor_instance
-        self.editor_previous_tool = None
+        self.editor_previous_tool = self.editor.current_tool
         self.screen = editor_instance.screen
         self.screen_width, self.screen_height = self.screen.get_size()
 
@@ -708,6 +724,7 @@ class UI:
 
         self.state = "Editor"
 
+        self.toolbar_width = self.screen_width * 5 / 96
         self.toolbar_default_width = self.screen_width * 5 / 96
         self.toolbar_rect = pygame.Rect(self.screen_width - self.toolbar_default_width, 0,self.screen_width * 5 / 96,self.screen_height)
         self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
@@ -824,13 +841,13 @@ class UI:
             img = categories[self.current_category_name][tile].copy()[0]
             button = EditorButton(tile, img, (button_x, button_y), self.assets_button_width, self.assets_button_height,
                                   (24, 24, 24), self.screen_width/self.editor.SW)
-            if button_x + self.assets_section_rect.width + self.PADDING > self.assets_section_rect.width - self.assets_button_width:
+            if button_x + self.assets_button_width + self.PADDING*self.screen_width/self.editor.SW > self.assets_section_rect.width - self.assets_button_width:
                 button_y = (button_y + self.assets_button_height + self.PADDING*self.screen_height/self.editor.SH %
                             self.screen_height)
                 button_x = initial_x
             else:
                 button_x = ((button_x + self.assets_button_width + self.PADDING*self.screen_width/self.editor.SW) %
-                            (self.assets_section_width - self.assets_button_width))
+                            (self.assets_section_rect.width - self.assets_button_width))
             if button_x < initial_x:
                 button_x = initial_x
             if button_y + self.assets_button_height/2 > self.assets_section_rect.height:

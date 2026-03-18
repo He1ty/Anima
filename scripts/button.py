@@ -5,7 +5,6 @@ from scripts.utils import load_image, random_color
 class SimpleButton:
     def __init__(self, label:str, font:pygame.font.Font, pos_center:tuple[int,int], text_color:tuple[int,int,int], button_color:tuple[int,int,int]):
         self.default_pos = pos_center
-        self.hover = False
         self.label = label
         self.text_surf = font.render(label, True, text_color)
         self.rect = pygame.Rect(0, 0, self.text_surf.get_width()+20, self.text_surf.get_height()+12)
@@ -57,15 +56,12 @@ class SimpleButton:
         return False
 
     def handle_event(self,event, offset=None):
-        self.hover = self.is_selected(event,offset)
-        return self.is_clicked(event,offset)
-
-
-
+        if event:
+            return self.is_clicked(event,offset)
 
 class EditorButton:
 
-    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int],width:int,height:int, bg_color:tuple[int,int,int], img_ratio:int):
+    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int]|tuple[float,float],width:int|float,height:int|float, bg_color:tuple[int,int,int], img_ratio:int|float):
         self.rect = pygame.Rect(0,0,width,height)
         self.default_pos = pos_center
         self.rect.center = self.default_pos
