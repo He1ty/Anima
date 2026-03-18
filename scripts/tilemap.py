@@ -276,16 +276,15 @@ class Tilemap:
         r = pygame.Rect(tile["pos"][0]*self.tile_size, tile["pos"][1]*self.tile_size, self.tile_size, self.tile_size)
         return self.game.player.rect().colliderect(r)
 
-    def render(self, surf, offset = (0, 0), mask_opacity=255, exception=(), precise_layer = None, with_player = True):
-
-        tiles_opacity = mask_opacity
+    def render(self, surf, offset = (0, 0), mask_opacity=255, exception_types=(), exception_coordinates=(), precise_layer = None, with_player = True):
 
         for layer in self.tilemap:
 
+            tiles_opacity = mask_opacity
             if precise_layer is not None:
                 if layer != precise_layer:
                     tiles_opacity = 80
-                else:
+                elif not exception_coordinates:
                     tiles_opacity = 255
 
             if with_player:
@@ -303,7 +302,7 @@ class Tilemap:
                         tile = self.tilemap[layer][loc]
                         if tile["type"] in self.game.assets:
                             img = self.game.assets[tile['type']][tile['variant']].copy()
-                            img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity), special_flags=BLEND_RGBA_MULT)
+                            img.fill((255, 255, 255, 255 if tile['type'] in exception_types or loc in exception_coordinates else tiles_opacity), special_flags=BLEND_RGBA_MULT)
 
                             if 'rotation' in tile:
                                 img = pygame.transform.rotate(img, tile['rotation'] * -90)
@@ -317,7 +316,7 @@ class Tilemap:
                 for pos in self.offgrid_tiles.copy()[layer]:
                     tile = self.offgrid_tiles[layer][pos]
                     img = self.game.assets[tile['type']][tile['variant']].copy()
-                    img.fill((255, 255, 255, 255 if tile['type'] in exception else tiles_opacity),
+                    img.fill((255, 255, 255, 255 if tile['type'] in exception_types or pos in exception_coordinates else tiles_opacity),
                              special_flags=BLEND_RGBA_MULT)
                     surf.blit(img,
                               (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))

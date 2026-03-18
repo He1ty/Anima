@@ -1,4 +1,5 @@
 import sys
+from sys import exception
 
 from scripts.utils import load_image, create_rect_alpha
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton
@@ -13,6 +14,77 @@ import json
 import shutil
 import re
 
+class Selector:
+    def __init__(self, editor_instance):
+        self.editor = editor_instance
+        self.pos = self.editor.mpos_scaled
+        self.initial_pos = self.pos
+        self.rect = pygame.Rect(self.pos[0], self.pos[1], 0, 0)
+        self.rect_displayed = False
+        self.group = []
+
+    def get_coordinates_in_rect(self, rect):
+        grid = []
+        for x in range(rect.left//self.editor.tile_size, rect.right//self.editor.tile_size + 1):
+            for y in range(rect.top//self.editor.tile_size, rect.bottom//self.editor.tile_size + 1):
+                grid.append(f"{x};{y}")
+
+        return grid
+
+    def get_group_in_rect(self, rect, check_offgrid=True):
+        group = []
+        ongrid = self.get_coordinates_in_rect(rect)
+        for coordinate in ongrid:
+            if coordinate in self.editor.tilemap.tilemap[self.editor.current_layer]:
+                group.append(coordinate)
+
+        if check_offgrid and self.editor.current_layer in self.editor.tilemap.offgrid_tiles:
+            for coordinate in self.editor.tilemap.offgrid_tiles[self.editor.current_layer]:
+                pos = list(coordinate.split(";"))
+                if self.rect.left <= pos[0] <= self.rect.right or self.rect.top <= pos[1] <= self.rect.bottom:
+                    group.append(coordinate)
+
+        return group
+
+    def draw(self, surface):
+        if self.rect_displayed:
+            overlay = pygame.Surface(self.rect.size)
+            overlay.fill((10,10,100))
+            surface.blit(overlay, (self.rect.left - self.editor.scroll[0], self.rect.top - self.editor.scroll[1]))
+
+    def rect_pos_update(self):
+        self.pos = [self.editor.mpos_scaled[0] + self.editor.scroll[0],
+                    self.editor.mpos_scaled[1] + self.editor.scroll[1]]
+        distx = self.pos[0] - self.initial_pos[0]
+        disty = self.pos[1] - self.initial_pos[1]
+        left = self.initial_pos[0]
+        top = self.initial_pos[1]
+        if distx < 0:
+            left = self.pos[0]
+        if disty < 0:
+            top = self.pos[1]
+        self.rect = pygame.Rect(left,
+                                top,
+                                abs(distx),
+                                abs(disty))
+
+    def handle_selection_rect(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1 :
+                if not self.rect_displayed:
+                    self.rect_displayed = True
+                    self.initial_pos = self.pos
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.rect_displayed = False
+                self.group = self.get_group_in_rect(self.rect)
+
+        self.rect_pos_update()
+
+    def handle_event(self, event):
+        if event:
+            self.handle_selection_rect(event)
 
 class LevelManager:
     def __init__(self, editor_instance):
@@ -223,6 +295,8 @@ class EditorSimulation:
 
         self.tilemap = Tilemap(self)
 
+        self.tile_size = self.tilemap.tile_size
+
         try:
             file_name = self.level_manager.get_file_name(self.current_environment, self.level)
             filepath = f'data/maps/{file_name}'
@@ -242,9 +316,16 @@ class EditorSimulation:
         self.main_area_width = self.screen_width
         self.main_area_height = self.screen_height
 
+        scale_x = 960 / (self.screen.get_size()[0])
+        scale_y = 576 / (self.screen.get_size()[1])
+        self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
+                            (self.mpos[1] / 2) * scale_y * self.zoom)
+
         self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
 
         self.ongrid = True
+
+        self.selector = Selector(self)
 
         self.infos_per_type_per_category = {
             "Levers": {
@@ -287,8 +368,6 @@ class EditorSimulation:
         self.holding_b = False
         self.holding_y = False
         self.holding_tab = False
-        
-        
 
     def create_snapshot(self):
         # Creates a deep copy of the current map state
@@ -329,7 +408,10 @@ class EditorSimulation:
             self.restore_snapshot(self.history[self.history_index])
             print(f"Redo: Step {self.history_index}")
             
-            
+    def get_infos_tile_category(self, tile):
+        for tile_category in self.infos_per_type_per_category:
+            if tile_category.lower()[:-1] in tile["type"]:
+                return tile_category
 
     def get_categories(self):
         self.categories = {}
@@ -356,21 +438,25 @@ class EditorSimulation:
         self.history_index = -1
         self.save_action()  # Save the initial state (Index 0)
 
-    def render_map(self):
-        self.display.fill((0, 0, 0))
+    def mpos_update(self):
+        self.mpos = pygame.mouse.get_pos()
+        self.main_area_width = self.screen_width
+        self.main_area_height = self.screen_height
+        if self.mpos[0] < self.main_area_width and self.mpos[
+            1] < self.main_area_height:  # Only if mouse is over main area
+            # Scale mouse position to account for display scaling
+            scale_x = 960 / (self.screen.get_size()[0])
+            scale_y = 576 / (self.screen.get_size()[1])
+            self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
+                                (self.mpos[1] / 2) * scale_y * self.zoom)
+            self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
+                             int((self.mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
+        else:
+            # Default values if out of bounds to prevent crash
+            self.tile_pos = (0, 0)
+            self.mpos_scaled = (0, 0)
 
-        self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
-        self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
-        render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
-
-        self.tilemap.render(self.display, offset=render_scroll,
-                            precise_layer=self.current_layer if not self.showing_all_layers else None,
-                            with_player=False)
-
-    def get_infos_tile_category(self, tile):
-        for tile_category in self.infos_per_type_per_category:
-            if tile_category.lower()[:-1] in tile["type"]:
-                return tile_category
+        self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
 
     def handle_map_editor(self, event):
 
@@ -451,6 +537,9 @@ class EditorSimulation:
                                         self.mpos):  # Check both to be safe
                                     del self.tilemap.offgrid_tiles[self.current_layer][pos]
 
+                case "Selection":
+                    self.selector.handle_event(event)
+
         if event.type == pygame.MOUSEWHEEL:
             mods = pygame.key.get_mods()
             if mods & pygame.KMOD_CTRL:
@@ -504,15 +593,18 @@ class EditorSimulation:
                         print("Layer 0, can't make any new layer under this one")
                     else:
                         self.current_layer = str(int(self.current_layer) - 1)
+                        self.selector.group = []
                         print(f"Current layer : {self.current_layer}")
                     if self.current_layer not in self.tilemap.tilemap:
                         self.tilemap.tilemap[self.current_layer] = {}
+
                 if event.key == pygame.K_UP:
                     if int(self.current_layer) + 1 == len(self.tilemap.tilemap.keys()) and \
                             self.tilemap.tilemap[self.current_layer] == {}:
                         print("This layer is empty, can't make any new layer")
                     else:
                         self.current_layer = str(int(self.current_layer) + 1)
+                        self.selector.group = []
                         print(f"Current layer : {self.current_layer}")
 
                     if self.current_layer not in self.tilemap.tilemap:
@@ -612,6 +704,19 @@ class EditorSimulation:
                 self.holding_tab = False
             if event.key == pygame.K_LSHIFT:
                 self.shift = False
+
+    def render_map(self):
+        self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
+        self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
+        render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
+
+        mask_opacity = 120 if self.selector.group else 255
+
+        self.tilemap.render(self.display, offset=render_scroll,
+                            precise_layer=self.current_layer if not self.showing_all_layers else None,
+                            with_player=False,
+                            mask_opacity=mask_opacity,
+                            exception_coordinates = tuple(self.selector.group))
         
     def render_map_editor(self):
         current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
@@ -627,7 +732,10 @@ class EditorSimulation:
                 else:
                     self.display.blit(current_tile_img, self.mpos_scaled)
 
+            case "Selection":
+                self.selector.draw(self.display)
 
+    def render_display(self):
         changing_size = False
         screenshot = self.screen.copy()
 
@@ -642,28 +750,9 @@ class EditorSimulation:
         if changing_size:
             self.screen.blit(screenshot, (0, 0))
 
-
     def run(self):
         while True:
-            self.mpos = pygame.mouse.get_pos()
-            self.main_area_width = self.screen_width
-            self.main_area_height = self.screen_height
-            if self.mpos[0] < self.main_area_width and self.mpos[
-                1] < self.main_area_height:  # Only if mouse is over main area
-                # Scale mouse position to account for display scaling
-                scale_x = 960 / (self.screen.get_size()[0])
-                scale_y = 576 / (self.screen.get_size()[1])
-                self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
-                                    (self.mpos[1] / 2) * scale_y * self.zoom)
-                self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
-                                 int((self.mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
-            else:
-                # Default values if out of bounds to prevent crash
-                self.tile_pos = (0, 0)
-                self.mpos_scaled = (0, 0)
-
-            self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
-
+            self.mpos_update()
             for event in pygame.event.get():
                 match self.state:
                     case "MapEditor":
@@ -696,12 +785,13 @@ class EditorSimulation:
                     pygame.quit()
                     sys.exit()
 
-
+            self.display.fill((0, 0, 0))
             match self.state:
                 case "MapEditor":
                     self.render_map_editor()
 
             self.render_map()
+            self.render_display()
             self.ui.draw()
             self.clock.tick(60)
             pygame.display.update()
