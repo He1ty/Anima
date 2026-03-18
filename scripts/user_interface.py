@@ -602,7 +602,7 @@ class Menu:
                             self.is_souls_collected = False
                             self.game.state = self.game.PLAYING_STATE
                             self.profile_command_nb = 0
-                            self.game.play_music(f"level_{self.game.level}")
+                            self.game.play_music(f"level_{self.game.level_id}")
                             pygame.mouse.set_visible(False)
                     case "START":
                         # START NEW GAME
@@ -613,7 +613,7 @@ class Menu:
                         # Crucial: Tell the game which slot is currently active for future saves
                         self.game.current_slot = slots.slot_id
                         self.game.state = self.game.PLAYING_STATE
-                        self.game.play_music(f"level_{self.game.level}")
+                        self.game.play_music(f"level_{self.game.level_id}")
                         pygame.mouse.set_visible(False)
                     case "DELETE":
                         self.delete_slot_id = slots.slot_id

@@ -821,11 +821,22 @@ class UI:
         self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
         self.tools_buttons = []
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "LevelSelector"]
+        self.check_buttons = []
+        self.check_buttons_labels = ["On grid"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
-        self.tools_buttons_images = {"Brush": load_image("ui/brush.png"),
-                                     "Eraser": load_image("ui/eraser.png"),
-                                     "Selection": load_image("ui/selection.png"),
-                                     "LevelSelector": load_image("ui/level_selector.png")}
+        self.buttons_images = {"Brush": load_image("ui/brush.png"),
+                               "Eraser": load_image("ui/eraser.png"),
+                               "Selection": load_image("ui/selection.png"),
+                               "LevelSelector": load_image("ui/level_selector.png"),
+                               "On grid": load_image("ui/ongrid.png")}
+
+        self.spectial_buttons_labels = {"Brush": [],
+                                        "Eraser": [],
+                                        "Selection": []}
+
+        self.selection_rect = pygame.Rect(0,0,0,0)
+        self.selecting = False
+        self.selection_pos = None
 
 
 
@@ -866,15 +877,16 @@ class UI:
         self.tools_buttons = []
         self.assets_section_buttons = []
         self.environment_selector_buttons = []
+        self.check_buttons = []
 
         button_x, button_y = self.toolbar_rect.width/2, self.toolbar_rect.width/2
         for label in self.tools_buttons_labels:
-            button = EditorButton(label, self.tools_buttons_images[label] ,
+            button = EditorButton(label, self.buttons_images[label],
                                   (button_x, button_y),
                                   self.toolbar_buttons_width,
                                   self.toolbar_buttons_height,
                                   (64,64,64),
-                                  self.screen_width/self.editor.SW)
+                                  self.screen_width / self.editor.SW)
 
             if label == self.tools_buttons_labels[-2]:
                 button_y = self.screen_height - 1*self.toolbar_buttons_height
@@ -921,6 +933,20 @@ class UI:
 
         self.init_assets_buttons(self.editor.categories)
 
+        button_x,button_y = self.toolbar_rect.width/2, self.toolbar_rect.height-3*self.toolbar_buttons_height
+        for label in self.check_buttons_labels:
+            button = EditorButton(label, self.buttons_images[label],
+                                  (button_x, button_y),
+                                  0.7*self.toolbar_buttons_width,
+                                  0.7*self.toolbar_buttons_height,
+                                  (64, 64, 64),
+
+                                  resize=0.8)
+            button_y -= 0.7*self.toolbar_buttons_height - (self.PADDING/self.editor.SH)*self.screen_height
+            self.check_buttons.append(button)
+
+
+
     def init_assets_buttons(self, categories):
         self.assets_buttons = []
 
@@ -930,7 +956,7 @@ class UI:
         for tile in categories[self.current_category_name]:
             img = categories[self.current_category_name][tile].copy()[0]
             button = EditorButton(tile, img, (button_x, button_y), self.assets_button_width, self.assets_button_height,
-                                  (24, 24, 24), self.screen_width/self.editor.SW)
+                                  (24, 24, 24),resize=0.9)
             if button_x + self.assets_button_width + self.PADDING*self.screen_width/self.editor.SW > self.assets_section_rect.width - self.assets_button_width:
                 button_y = (button_y + self.assets_button_height + self.PADDING*self.screen_height/self.editor.SH %
                             self.screen_height)
@@ -953,6 +979,12 @@ class UI:
         for button in self.tools_buttons:
             button.draw(overlay)
             if button.label == self.editor.current_tool:
+                button.activated = True
+            else:
+                button.activated = False
+        for button in self.check_buttons:
+            button.draw(overlay)
+            if button.label == "On grid" and self.editor.ongrid:
                 button.activated = True
             else:
                 button.activated = False
@@ -1079,6 +1111,12 @@ class UI:
             if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width, 0)):
                 self.editor_previous_tool = self.editor.current_tool
                 self.editor.current_tool = button.label
+        for button in self.check_buttons:
+            if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width, 0)):
+                match button.label:
+                    case "On grid":
+                        self.editor.ongrid = not self.editor.ongrid
+
 
     def handle_assets_section_event(self, event):
         for button in self.assets_section_buttons:

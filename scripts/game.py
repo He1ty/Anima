@@ -66,7 +66,8 @@ class Game:
             self.master_volume = 1
             player_path = "assets/player/sounds/"
             music_path = {'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-                          'level_0': f"assets/environments/{self.environment}/sounds/map_0.wav"}
+                          'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
+                          'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",}
             self.music_sound_manager = Sound(self, music_path, is_music=True, master_volume=self.master_volume,volume=1)
             sound_effect_path = {
                 "dash": player_path + 'dash.wav',

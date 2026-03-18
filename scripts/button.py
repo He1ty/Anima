@@ -61,16 +61,15 @@ class SimpleButton:
 
 class EditorButton:
 
-    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int]|tuple[float,float],width:int|float,height:int|float, bg_color:tuple[int,int,int], img_ratio:int|float):
+    def __init__(self, label:str, img:pygame.Surface, pos_center:tuple[int,int]|tuple[float,float],width:int|float,height:int|float, bg_color:tuple[int,int,int], img_ratio:int|float=None,resize=None):
         self.rect = pygame.Rect(0,0,width,height)
         self.default_pos = pos_center
         self.rect.center = self.default_pos
         self.img = img
+        if resize:
+            self.img = pygame.transform.scale(self.img, (width * resize, height * resize))
         if img_ratio:
-            if self.img.get_width() != self.img.get_height():
-                self.img = pygame.transform.scale(self.img, (width*0.8, height*0.8))
-            else:
-                self.img = pygame.transform.scale_by(self.img, img_ratio)
+            self.img = pygame.transform.scale_by(self.img,img_ratio)
         self.img_rect = self.img.get_rect(center=self.rect.center)
         self.bg_color = bg_color
         self.hover = False
