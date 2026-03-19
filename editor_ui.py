@@ -974,7 +974,7 @@ class UI:
         self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
         self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
         self.tools_buttons = []
-        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "LevelSelector"]
+        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move","Properties", "LevelSelector"]
         self.check_buttons = []
         self.check_buttons_labels = ["On grid"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
@@ -983,7 +983,8 @@ class UI:
                                "Selection": load_image("ui/selection.png"),
                                "Move": load_image("ui/move.png"),
                                "LevelSelector": load_image("ui/level_selector.png"),
-                               "On grid": load_image("ui/skull.png")}
+                               "On grid": load_image("ui/ongrid.png"),
+                               "Properties" : load_image("ui/properties.png")}
 
         self.spectial_buttons_labels = {"Brush": [],
                                         "Eraser": [],
@@ -1101,7 +1102,6 @@ class UI:
             self.check_buttons.append(button)
 
 
-
     def init_assets_buttons(self, categories):
         self.assets_buttons = []
 
@@ -1124,7 +1124,6 @@ class UI:
             if button_y + self.assets_button_height/2 > self.assets_section_rect.height:
                 self.assets_section_rect.height += self.assets_button_height + self.PADDING*self.screen_height/self.editor.SH
             self.assets_buttons.append(button)
-
 
     def render_toolbar(self):
 
