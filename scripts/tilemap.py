@@ -44,6 +44,7 @@ class Tilemap:
         self.fake_tile_opacity = 255
         self.fake_tile_groups = []
         self.fake_tile_colliding_group = []
+        self.render_filters = {}
 
     def extract(self, id_pairs, keep=False, layers=()):
         """dict, bool -> list
@@ -276,16 +277,26 @@ class Tilemap:
         r = pygame.Rect(tile["pos"][0]*self.tile_size, tile["pos"][1]*self.tile_size, self.tile_size, self.tile_size)
         return self.game.player.rect().colliderect(r)
 
-    def render(self, surf, offset = (0, 0), mask_opacity=255, exception_types=(), exception_coordinates=(), precise_layer = None, with_player = True):
+    def set_render_filter(self, tiles, filter_instance : int|tuple[int, int, int]|tuple[int, int, int, int]):
+        for tile in tiles:
+            if tile not in self.render_filters:
+                if type(filter_instance) is int:
+                    self.render_filters[tile] = {"opacity": filter_instance}
+                elif type(filter_instance) is tuple:
+                    self.render_filters[tile] = {"color": filter_instance}
+
+
+    def render(self, surf, offset = (0, 0), precise_layer = None, with_player = True):
 
         for layer in self.tilemap:
 
-            tiles_opacity = mask_opacity
             if precise_layer is not None:
                 if layer != precise_layer:
                     tiles_opacity = 80
-                elif not exception_coordinates:
+                else:
                     tiles_opacity = 255
+            else:
+                tiles_opacity = 255
 
             if with_player:
                 if layer in self.layers["player"]:
@@ -302,7 +313,22 @@ class Tilemap:
                         tile = self.tilemap[layer][loc]
                         if tile["type"] in self.game.assets:
                             img = self.game.assets[tile['type']][tile['variant']].copy()
-                            img.fill((255, 255, 255, 255 if tile['type'] in exception_types or loc in exception_coordinates else tiles_opacity), special_flags=BLEND_RGBA_MULT)
+                            mask = (255, 255, 255, tiles_opacity)
+                            if loc in self.render_filters:
+                                if list(self.render_filters[loc].keys())[0] == "opacity":
+                                    mask = (255, 255, 255, self.render_filters[loc]["opacity"])
+                                    img.fill(mask, special_flags=BLEND_RGBA_MULT)
+                                elif list(self.render_filters[loc].keys())[0] == "color":
+                                    mask = self.render_filters[loc]["color"]
+                                    img = pygame.transform.grayscale(img)
+                                    highlight = pygame.Surface(img.get_size(), pygame.SRCALPHA)
+                                    highlight.fill(mask)
+
+                                    # Blit it onto your image
+                                    img.blit(highlight, (0, 0))
+
+                            else:
+                                img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
                             if 'rotation' in tile:
                                 img = pygame.transform.rotate(img, tile['rotation'] * -90)
@@ -310,14 +336,30 @@ class Tilemap:
                             surf.blit(img, (
                                 tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
                         else:
-                            print(f"{tile["type"]} not in assets")
+                            pass
+                            #print(f"{tile["type"]} not in assets")
 
             if layer in self.offgrid_tiles:
                 for pos in self.offgrid_tiles.copy()[layer]:
                     tile = self.offgrid_tiles[layer][pos]
                     img = self.game.assets[tile['type']][tile['variant']].copy()
-                    img.fill((255, 255, 255, 255 if tile['type'] in exception_types or pos in exception_coordinates else tiles_opacity),
-                             special_flags=BLEND_RGBA_MULT)
+                    mask = (255, 255, 255, tiles_opacity)
+                    if pos in self.render_filters:
+                        if list(self.render_filters[pos].keys())[0] == "opacity":
+                            mask = (255, 255, 255, self.render_filters[pos]["opacity"])
+                            img.fill(mask, special_flags=BLEND_RGBA_MULT)
+
+                        elif list(self.render_filters[pos].keys())[0] == "color":
+                            mask = self.render_filters[pos]["color"]
+                            img = pygame.transform.grayscale(img)
+                            highlight = pygame.Surface(img.get_size(), pygame.SRCALPHA)
+                            highlight.fill(mask)
+
+                            # Blit it onto your image
+                            img.blit(highlight, (0, 0))
+                    else:
+                        img.fill(mask, special_flags=BLEND_RGBA_MULT)
+
                     surf.blit(img,
                               (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
 
