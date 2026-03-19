@@ -119,6 +119,81 @@ class EditorButton:
         self.hover = self.is_selected(event,offset)
         return self.is_clicked(event,offset)
 
+
+class Picklist:
+    def __init__(self, labels: list[str], font: pygame.font.Font, pos_center: tuple[int, int],
+                 text_color: tuple[int, int, int], button_color: tuple[int, int, int]):
+        self.default_pos = pos_center
+        self.labels = labels
+        self.selected_label = self.labels[0]
+        self.font = font
+        self.text_color = text_color
+        self.button_color = button_color
+        self.activated = False
+
+        # Calculate width based on the longest label so nothing gets cut off
+        max_width = max([font.size(label)[0] for label in labels])
+        height = font.get_height() + 12
+
+        self.rect = pygame.Rect(0, 0, max_width + 20, height)
+        self.rect.center = self.default_pos
+
+    def get_option_rects(self):
+        """Helper method to calculate the position of the dropdown choices."""
+        option_rects = []
+        # Exclude the currently selected label
+        available_labels = [label for label in self.labels if label != self.selected_label]
+
+        for i, label in enumerate(available_labels):
+            # Place each option directly below the previous one
+            opt_rect = pygame.Rect(self.rect.x, self.rect.y + (i + 1) * self.rect.height, self.rect.width,
+                                   self.rect.height)
+            option_rects.append((opt_rect, label))
+
+        return option_rects
+
+    def handle_event(self, event):
+        """Handles mouse clicks and returns the selected label if changed."""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left click
+            if not self.activated:
+                # If closed, check if the main button was clicked to open it
+                if self.rect.collidepoint(event.pos):
+                    self.activated = True
+            else:
+
+                # If open, check if an option was clicked
+                for opt_rect, label in self.get_option_rects():
+                    if opt_rect.collidepoint(event.pos):
+                        self.selected_label = label
+                        self.activated = False
+                        return self.selected_label
+
+                # If they clicked anywhere else (or on the main button again), close the menu
+                self.activated = False
+
+        return "All"
+
+    def draw(self, screen):
+        # 1. Always draw the main button
+        pygame.draw.rect(screen, self.button_color, self.rect)
+        pygame.draw.rect(screen, (0, 0, 0), self.rect, 2)  # Black outline
+
+        text_surf = self.font.render(self.selected_label, True, self.text_color)
+        screen.blit(text_surf, (self.rect.x + (self.rect.width - text_surf.get_width()) / 2,
+                                self.rect.y + (self.rect.height - text_surf.get_height()) / 2))
+
+        # 2. Draw the dropdown options if activated
+        if self.activated:
+            for opt_rect, label in self.get_option_rects():
+                # Draw background and outline for each option
+                pygame.draw.rect(screen, self.button_color, opt_rect)
+                pygame.draw.rect(screen, (0, 0, 0), opt_rect, 1)  # Thin outline to separate choices
+
+                # Draw text for each option
+                opt_text = self.font.render(label, True, self.text_color)
+                screen.blit(opt_text, (opt_rect.x + (opt_rect.width - opt_text.get_width()) / 2,
+                                       opt_rect.y + (opt_rect.height - opt_text.get_height()) / 2))
+
 class EnvironmentButton(EditorButton):
 
     def __init__(self, label: str, img: pygame.Surface, pos_center: tuple[int, int], width: int, height: int,
