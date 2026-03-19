@@ -40,8 +40,9 @@ class Selector:
 
         if check_offgrid and self.editor.current_layer in self.editor.tilemap.offgrid_tiles:
             for coordinate in self.editor.tilemap.offgrid_tiles[self.editor.current_layer]:
-                pos = list(coordinate.split(";"))
-                if self.rect.left <= pos[0] <= self.rect.right or self.rect.top <= pos[1] <= self.rect.bottom:
+                pos = [float(val) for val in coordinate.split(";")]
+                if (rect.left <= pos[0] <= rect.right and
+                        rect.top <= pos[1] <= rect.bottom):
                     group.append(coordinate)
 
         return group
@@ -321,6 +322,8 @@ class EditorSimulation:
         self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
                             (self.mpos[1] / 2) * scale_y * self.zoom)
 
+        self.mpos_scaled_onclick = self.mpos_scaled
+
         self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
 
         self.ongrid = True
@@ -368,6 +371,8 @@ class EditorSimulation:
         self.holding_b = False
         self.holding_y = False
         self.holding_tab = False
+
+        self.moved_group = {"ongrid": {}, "offgrid": {}}
 
     def create_snapshot(self):
         # Creates a deep copy of the current map state
@@ -436,6 +441,7 @@ class EditorSimulation:
 
         self.history = []
         self.history_index = -1
+        self.selector.group = []
         self.save_action()  # Save the initial state (Index 0)
 
     def mpos_update(self):
@@ -456,13 +462,18 @@ class EditorSimulation:
             self.tile_pos = (0, 0)
             self.mpos_scaled = (0, 0)
 
+        self.tile_pos_onclick = (int((self.mpos_scaled_onclick[0] + self.scroll[0]) // self.tilemap.tile_size),
+                             int((self.mpos_scaled_onclick[1] + self.scroll[1]) // self.tilemap.tile_size))
         self.mpos_in_mainarea = self.mpos[0] < self.main_area_width and self.mpos[1] < self.main_area_height
 
     def handle_map_editor(self, event):
 
 
-        if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
+        if self.ui.toolbar_rect.collidepoint(self.mpos):
             self.clicking = False
+        if self.ui.assets_section_rect.collidepoint(self.mpos) and self.current_tool == "Brush":
+            self.clicking = False
+
         if self.mpos_in_mainarea:
             match self.current_tool:
                 case "Brush":
@@ -540,6 +551,30 @@ class EditorSimulation:
                 case "Selection":
                     self.selector.handle_event(event)
 
+                case "Move":
+                    if self.clicking and event.type == pygame.MOUSEBUTTONUP:
+                        if event.button == 1:
+                            can_place_check = True
+                            if self.moved_group["ongrid"]:
+                                for tile_loc in self.selector.group:
+                                    if self.moved_group["ongrid"][tile_loc] in self.tilemap.tilemap[self.current_layer]:
+                                        can_place_check = False
+                                        break
+
+                                if can_place_check:
+                                    for tile_loc in self.selector.group:
+                                        new_loc = self.moved_group["ongrid"][tile_loc]
+                                        tmp = self.tilemap.tilemap[self.current_layer][tile_loc]
+                                        tmp["pos"] = [int(val) for val in new_loc.split(";")]
+                                        del self.tilemap.tilemap[self.current_layer][tile_loc]
+                                        self.tilemap.tilemap[self.current_layer][new_loc] = tmp
+
+                                    self.selector.group = list(self.moved_group["ongrid"].values())
+
+                            self.moved_group = {"ongrid": {}, "offgrid": {}}
+
+
+
         if event.type == pygame.MOUSEWHEEL:
             mods = pygame.key.get_mods()
             if mods & pygame.KMOD_CTRL:
@@ -554,6 +589,7 @@ class EditorSimulation:
 
             if event.button == 1:
                 self.clicking = True
+                self.mpos_scaled_onclick = (self.mpos_scaled[0] + self.scroll[0], self.mpos_scaled[1] + self.scroll[1])
             if event.button == 3:
                 self.right_clicking = True
         if event.type == pygame.KEYDOWN:
@@ -710,13 +746,14 @@ class EditorSimulation:
         self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
-        mask_opacity = 120 if self.selector.group else 255
+        #fix selection mask + selection bug when map changed
+        self.tilemap.set_render_filter(self.selector.group, (152, 242, 255, 50))
 
         self.tilemap.render(self.display, offset=render_scroll,
                             precise_layer=self.current_layer if not self.showing_all_layers else None,
-                            with_player=False,
-                            mask_opacity=mask_opacity,
-                            exception_coordinates = tuple(self.selector.group))
+                            with_player=False)
+
+        self.tilemap.render_filters = {}
         
     def render_map_editor(self):
         current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
@@ -734,6 +771,50 @@ class EditorSimulation:
 
             case "Selection":
                 self.selector.draw(self.display)
+
+            case "Move":
+                if self.clicking:
+                    self.tilemap.set_render_filter(self.selector.group, 0)
+
+                    tilepos_onclick = (int((self.mpos_scaled_onclick[0]) // self.tilemap.tile_size),
+                             int((self.mpos_scaled_onclick[1]) // self.tilemap.tile_size))
+                    mpos_scaled_onclick = (self.mpos_scaled_onclick[0] - self.scroll[0], self.mpos_scaled_onclick[1] - self.scroll[1])
+                    for pos in self.selector.group:
+                        offgrid_tile = False
+                        if pos in self.tilemap.tilemap[self.current_layer]:
+                            tile = self.tilemap.tilemap[self.current_layer][pos]
+                        else:
+                            tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
+                            offgrid_tile = True
+                        tile_img = self.assets[tile["type"]][tile["variant"]].copy()
+
+                        if offgrid_tile:
+                            if self.ongrid:
+                                self.moved_group["offgrid"] = {}
+                                x, y = ((tile["pos"][0]//self.tilemap.tile_size + self.tile_pos[0] - tilepos_onclick[0]),
+                                       (tile["pos"][1]//self.tilemap.tile_size + self.tile_pos[1] - tilepos_onclick[1]) )
+
+                                self.display.blit(tile_img, (x * self.tilemap.tile_size - self.scroll[0], y* self.tilemap.tile_size - self.scroll[1]))
+                                self.moved_group["ongrid"][pos] = f"{x};{y}"
+                            else:
+                                self.moved_group["ongrid"] = {}
+                                x,y = (tile["pos"][0] + self.mpos_scaled[0] - mpos_scaled_onclick[0], tile["pos"][1] + self.mpos_scaled[1] - mpos_scaled_onclick[1])
+                                self.display.blit(tile_img, (x - self.scroll[0], y -self.scroll[1]))
+                                self.moved_group["offgrid"][pos] = f"{x};{y}"
+                        else:
+                            if self.ongrid:
+                                self.moved_group["offgrid"] = {}
+                                x,y = ((tile["pos"][0] + self.tile_pos[0] - tilepos_onclick[0])  ,
+                                (tile["pos"][1] + self.tile_pos[1] - tilepos_onclick[1]) )
+                                self.display.blit(tile_img, (x * self.tilemap.tile_size - self.scroll[0], y * self.tilemap.tile_size - self.scroll[1] ))
+                                self.moved_group["ongrid"][pos] = f"{x};{y}"
+                            else:
+                                self.moved_group["ongrid"] = {}
+                                x,y = ((tile["pos"][0]*self.tile_size + self.mpos_scaled[0] - mpos_scaled_onclick[0]),
+                                       (tile["pos"][1]*self.tile_size + self.mpos_scaled[1] - mpos_scaled_onclick[1]))
+                                self.display.blit(tile_img, (x - self.scroll[0], y - self.scroll[1]))
+                                self.moved_group["offgrid"][pos] = f"{x};{y}"
+
 
     def render_display(self):
         changing_size = False
@@ -820,15 +901,16 @@ class UI:
         self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
         self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
         self.tools_buttons = []
-        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "LevelSelector"]
+        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "LevelSelector"]
         self.check_buttons = []
         self.check_buttons_labels = ["On grid"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
         self.buttons_images = {"Brush": load_image("ui/brush.png"),
                                "Eraser": load_image("ui/eraser.png"),
                                "Selection": load_image("ui/selection.png"),
+                               "Move": load_image("ui/move.png"),
                                "LevelSelector": load_image("ui/level_selector.png"),
-                               "On grid": load_image("ui/ongrid.png")}
+                               "On grid": load_image("ui/skull.png")}
 
         self.spectial_buttons_labels = {"Brush": [],
                                         "Eraser": [],
