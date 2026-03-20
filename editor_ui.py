@@ -2,7 +2,7 @@ import sys
 from sys import exception
 
 from scripts.utils import load_image, create_rect_alpha
-from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Picklist
+from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown
 from scripts.text import load_game_font
 from scripts.utils import load_editor_tiles, load_tiles, load_images
 from scripts.tilemap import Tilemap
@@ -326,6 +326,13 @@ class EditorSimulation:
 
         self.selector = Selector(self)
 
+        self.holding_i = False
+        self.holding_b = False
+        self.holding_y = False
+        self.holding_tab = False
+
+        self.moved_group = {"ongrid": {}, "offgrid": {}}
+
         self.infos_per_type_per_category = {
             "Levers": {
                 "visual_and_door": {"id": int, "visual_duration": int, "door_id": int},
@@ -362,15 +369,6 @@ class EditorSimulation:
         }
         self.types_per_categories = {t: set(self.infos_per_type_per_category[t].keys()) for t in
                                      self.infos_per_type_per_category}
-
-        self.holding_i = False
-        self.holding_b = False
-        self.holding_y = False
-        self.holding_tab = False
-
-        self.moved_group = {"ongrid": {}, "offgrid": {}}
-
-        self.info_tiles = {}
 
         self.ui = UI(self)
 
@@ -489,6 +487,7 @@ class EditorSimulation:
                 2 * int(2 * self.zoom))
         self.scroll[1] = pos[1] * 16 - self.screen_height * scale_y // (2 * int(2 * self.zoom))
 
+        
 
     def handle_brush_tool(self):
         if self.clicking:
@@ -643,9 +642,7 @@ class EditorSimulation:
     def handle_map_editor(self, event):
 
 
-        if self.ui.toolbar_rect.collidepoint(self.mpos):
-            self.clicking = False
-        if self.ui.assets_section_rect.collidepoint(self.mpos) and self.current_tool == "Brush":
+        if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
             self.clicking = False
 
         if self.mpos_in_mainarea:
@@ -822,6 +819,7 @@ class EditorSimulation:
                 self.holding_tab = False
             if event.key == pygame.K_LSHIFT:
                 self.shift = False
+
 
 
     def render_brush_tool(self):
@@ -1051,7 +1049,14 @@ class UI:
         self.properties_section_buttons_width = self.properties_section_rect.width * (1 / 8)
         self.properties_section_buttons_height = self.properties_section_rect.width * (1 / 8)
         self.properties_section_buttons = []
-        self.properties_categories = ["All"] + list(self.editor.info_tiles.keys())
+
+        self.infos_tiles = []
+        for tile_pos in self.editor.tilemap.tilemap[self.editor.current_layer]:
+            tile = self.editor.tilemap.tilemap[self.editor.current_layer][tile_pos]
+            if "infos_type" in tile:
+                self.infos_tiles.append(tile)
+
+        self.properties_categories = ["All"] + list(self.infos_tiles.keys())
         self.properties_category = "All"
         self.properties_category_button = None
 
@@ -1132,11 +1137,12 @@ class UI:
             self.check_buttons.append(button)
 
         button_x, button_y = (60/self.editor.SW)*self.screen_width, (20/self.editor.SH)*self.screen_height
-        self.properties_category_button = Picklist(self.properties_categories, self.buttons_font, (button_x, button_y), (255,255,255), (24,24,24))
+        self.properties_category_button = Dropdown(button_x, button_y,self.buttons_font, self.properties_categories)
 
         initial_x = (20 / self.editor.SW) * self.screen_width
         button_x, button_y = initial_x, (60 / self.editor.SH) * self.screen_height
-        for tile_pos in self.editor.info_tiles[self.properties_category] if self.properties_category != "All" else self.editor.info_tiles.values():
+
+        ''' # creation de chaque bouton pr chaque info tile
             button = SimpleButton(tile_pos, self.buttons_font, (button_x, button_y), (255, 255, 255), (32,32,32))
             if button_x + self.properties_section_buttons_width + self.PADDING*self.screen_width/self.editor.SW > self.properties_section_rect.width - self.properties_section_buttons_width:
                 button_y = (button_y + self.properties_section_buttons_width + self.PADDING*self.screen_height/self.editor.SH %
@@ -1150,9 +1156,7 @@ class UI:
             if button_y + self.properties_section_buttons_height/2 > self.properties_section_rect.height:
                 self.properties_section_rect.height += self.properties_section_buttons_height + self.PADDING*self.screen_height/self.editor.SH
             self.properties_section_buttons.append(button)
-
-
-
+            '''
     def init_assets_buttons(self, categories):
         self.assets_buttons = []
 
@@ -1198,6 +1202,8 @@ class UI:
         self.screen.blit(overlay, (self.toolbar_rect.x,self.toolbar_rect.y))
 
     def render_assets_section(self, x, y):
+        if self.assets_section_rect.width == 0 and not self.closing:
+            self.reload_assets_section_rect()
         self.assets_section_rect.x,self.assets_section_rect.y = x,y
         overlay = pygame.Surface((self.assets_section_rect.width, self.assets_section_rect.height))
         overlay.fill(self.ASSETS_SECTION_COLOR)
@@ -1253,10 +1259,14 @@ class UI:
     def check_closed(self):
         if self.closing:
             self.toolbar_rect.width = max(0, self.toolbar_rect.width - 5)
-            self.assets_section_rect.width = max(0, self.assets_section_rect.width - 20)
+            match self.editor.current_tool:
+                case "Brush":
+                    self.assets_section_rect.width = max(0, self.assets_section_rect.width - 20)
         else:
             self.toolbar_rect.width = min(self.toolbar_default_width, self.toolbar_rect.width + 5)
-            self.assets_section_rect.width = min(self.assets_section_default_width, self.assets_section_rect.width + 20)
+            match self.editor.current_tool:
+                case "Brush":
+                    self.assets_section_rect.width = min(self.assets_section_default_width, self.assets_section_rect.width + 20)
 
     def reload(self):
         self.screen_width, self.screen_height = self.editor.screen.get_size()
@@ -1272,23 +1282,34 @@ class UI:
         self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
 
         self.assets_section_default_width = self.screen_width * 20 / 96
-        self.assets_section_rect = pygame.Rect(
-            self.screen_width - self.toolbar_rect.width - self.assets_section_default_width,
-            self.screen_height - self.screen_width * 25 / 96,
-            self.screen_width * 20 / 96, self.screen_width * 25 / 96)
         self.assets_section_buttons_width = self.assets_section_rect.width * (1 / 8)
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
         self.assets_button_width = self.assets_section_rect.width * (1 / 10)
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
+        self.init_assets_buttons(self.editor.categories)
+
         self.init_buttons()
+
+    def reload_assets_section_rect(self):
+        self.assets_section_rect = pygame.Rect(
+            self.screen_width - self.toolbar_rect.width - self.assets_section_default_width,
+            self.screen_height - self.screen_width * 25 / 96,
+            self.screen_width * 20 / 96, self.screen_width * 25 / 96)
 
     def reload_assets_section(self):
         self.current_category = 0
         self.current_category_name = list(self.editor.categories.keys())[self.current_category]
         self.init_assets_buttons(self.editor.categories)
 
+    def clear_sections_rect(self):
+        if self.editor.current_tool != "Brush":
+            if self.assets_section_rect.width:
+                self.assets_section_rect.width = 0
+
+
     def draw(self):
 
+        self.clear_sections_rect()
         self.check_closed()
         self.render_toolbar()
         match self.editor.current_tool:
@@ -1303,6 +1324,8 @@ class UI:
             case "Properties":
                 self.render_properties_section()
 
+
+
     def handle_ui_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_TAB:
@@ -1312,6 +1335,9 @@ class UI:
                 self.editor.level_manager.full_save()
         if event.type == pygame.VIDEORESIZE:
             self.reload()
+            match self.editor.current_tool:
+                case "Brush":
+                    self.reload_assets_section_rect()
         if event.type == pygame.QUIT:
             pygame.quit()
         self.handle_toolbar_event(event)
