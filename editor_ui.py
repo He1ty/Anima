@@ -1,5 +1,6 @@
 import sys
 from sys import exception
+from tabnanny import check
 
 from scripts.utils import load_image, create_rect_alpha
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown
@@ -36,8 +37,10 @@ class Selector:
         ongrid = self.get_coordinates_in_rect(rect)
         for coordinate in ongrid:
             if coordinate in self.editor.tilemap.tilemap[self.editor.current_layer]:
-                if "group" in self.editor.tilemap.tilemap[self.editor.current_layer][coordinate]:
-                    group = self.editor.tilemap.groups[self.editor.current_layer][self.editor.tilemap.tilemap[self.editor.current_layer][coordinate]["group"]]
+                tile = self.editor.tilemap.tilemap[self.editor.current_layer][coordinate]
+                if "group" in tile:
+                    if not set(self.editor.tilemap.groups[self.editor.current_layer][tile["group"]]).issubset(set(group)):
+                        group += self.editor.tilemap.groups[self.editor.current_layer][tile["group"]]
                 else:
                     group.append(coordinate)
 
@@ -387,6 +390,7 @@ class EditorSimulation:
         return {
             'tilemap': copy.deepcopy(self.tilemap.tilemap),
             'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles),
+            'groups': copy.deepcopy(self.tilemap.groups),
             'layers': copy.deepcopy(self.tilemap.layers),
             'selected_group': copy.deepcopy(self.selector.group)
         }
@@ -412,6 +416,7 @@ class EditorSimulation:
         # 1. Load data
         self.tilemap.tilemap = copy.deepcopy(snapshot['tilemap'])
         self.tilemap.offgrid_tiles = copy.deepcopy(snapshot['offgrid'])
+        self.tilemap.groups = copy.deepcopy(snapshot['groups'])
         self.tilemap.layers = copy.deepcopy(snapshot['layers'])
         self.selector.group = copy.deepcopy(snapshot['selected_group'])
 
@@ -504,6 +509,17 @@ class EditorSimulation:
                 return "offgrid"
         return None
 
+    def ungroup_group(self, group_id):
+        for tile_pos in self.tilemap.groups[self.current_layer][group_id]:
+            space = self.check_tile_space(tile_pos)
+            if space == "tilemap":
+                del self.tilemap.tilemap[self.current_layer][tile_pos]["group"]
+            elif space == "offgrid":
+                del self.tilemap.tilemap[self.current_layer][tile_pos]["group"]
+        del self.tilemap.groups[self.current_layer][group_id]
+        if self.tilemap.groups[self.current_layer] == {}:
+            del self.tilemap.groups[self.current_layer]
+
 
     def handle_brush_tool(self):
         self.selector.group = []
@@ -575,8 +591,7 @@ class EditorSimulation:
                                          tile['pos'][1] - self.scroll[1],
                                          tile_img.get_width(),
                                          tile_img.get_height())
-                    if tile_r.collidepoint(self.mpos_scaled) or tile_r.collidepoint(
-                            self.mpos):  # Check both to be safe
+                    if tile_r.collidepoint(self.mpos_scaled):  # Check both to be safe
                         del self.tilemap.offgrid_tiles[self.current_layer][pos]
 
     def handle_move_tool(self, event):
@@ -676,6 +691,26 @@ class EditorSimulation:
 
                 self.moved_group = {"ongrid": {}, "offgrid": {}}
 
+    def handle_group_locker(self, event):
+        if event.key == pygame.K_l:
+            if self.current_tool == "Selection" and self.selector.group:
+                print("group locked")
+                for tile_pos in self.selector.group:
+                    space = self.check_tile_space(tile_pos)
+                    if space == "tilemap":
+                        self.tilemap.tilemap[self.current_layer][tile_pos]["group"] = self.next_available_group_id
+                    elif space == "offgrid":
+                        self.tilemap.offgrid_tiles[self.current_layer][tile_pos][
+                            "group"] = self.next_available_group_id
+
+                if self.current_layer in self.tilemap.groups:
+                    for group in self.tilemap.groups[self.current_layer]:
+                        if set(group).issubset(set(self.selector.group)):
+                            self.ungroup_group(group)
+                else:
+                    self.tilemap.groups[self.current_layer] = {}
+                self.tilemap.groups[self.current_layer][self.next_available_group_id] = self.selector.group.copy()
+
     def handle_map_editor(self, event):
 
 
@@ -713,6 +748,12 @@ class EditorSimulation:
         if event.type == pygame.KEYDOWN:
             mods = pygame.key.get_mods()
             if mods & pygame.KMOD_CTRL:
+                if event.key == pygame.K_l:
+                    for group in self.tilemap.groups[self.current_layer]:
+                        if self.tilemap.groups[self.current_layer][group] == self.selector.group:
+                            self.ungroup_group(group)
+                            break
+
                 if event.key == pygame.K_w:
                     self.undo()
                 if event.key == pygame.K_y:
@@ -741,21 +782,7 @@ class EditorSimulation:
                 if event.key == pygame.K_d:
                     self.selector.group = []
             else:
-                if event.key == pygame.K_l:
-                    if self.current_tool == "Selection" and self.selector.group:
-                        print("group locked")
-                        for tile_pos in self.selector.group:
-                            space = self.check_tile_space(tile_pos)
-                            if space == "tilemap":
-                                self.tilemap.tilemap[self.current_layer][tile_pos]["group"] = self.next_available_group_id
-                            elif space == "offgrid":
-                                self.tilemap.offgrid_tiles[self.current_layer][tile_pos][
-                                    "group"] = self.next_available_group_id
-                        if self.current_layer not in self.tilemap.groups:
-                            self.tilemap.groups[self.current_layer] = {}
-                        self.tilemap.groups[self.current_layer][self.next_available_group_id] = self.selector.group.copy()
-
-
+                self.handle_group_locker(event)
 
                 if event.key == pygame.K_i and not self.holding_i:
                     self.holding_i = True
@@ -1310,7 +1337,9 @@ class UI:
         self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
         self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
 
+
         self.assets_section_default_width = self.screen_width * 20 / 96
+        self.reload_assets_section_rect()
         self.assets_section_buttons_width = self.assets_section_rect.width * (1 / 8)
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
         self.assets_button_width = self.assets_section_rect.width * (1 / 10)
