@@ -40,10 +40,8 @@ class Tilemap:
         self.layers = {"player":["0"],
                        "activators":[],
                        "fake_tiles":[]}
+        self.groups = {}
         self.show_collisions = False
-        self.fake_tile_opacity = 255
-        self.fake_tile_groups = []
-        self.fake_tile_colliding_group = []
         self.render_filters = {}
 
     def extract(self, id_pairs, keep=False, layers=()):
@@ -149,7 +147,8 @@ class Tilemap:
         f = open(path, 'w')
 
         json.dump({'tilemap': self.tilemap,
-                        'offgrid':self.offgrid_tiles,
+                        'offgrid': self.offgrid_tiles,
+                   'groups': self.groups,
                    'layers': self.layers,
                    'tilesize': self.tile_size},
                   f, indent=1)
@@ -162,8 +161,9 @@ class Tilemap:
 
         self.tilemap = map_data['tilemap']
         self.offgrid_tiles = map_data['offgrid']
-        if "layers" in map_data:
-            self.layers = map_data["layers"]
+        if "groups" in map_data:
+            self.groups = map_data['groups']
+        self.layers = map_data["layers"]
         self.tile_size = map_data['tilesize']
 
     def autotile(self):

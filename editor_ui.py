@@ -36,14 +36,20 @@ class Selector:
         ongrid = self.get_coordinates_in_rect(rect)
         for coordinate in ongrid:
             if coordinate in self.editor.tilemap.tilemap[self.editor.current_layer]:
-                group.append(coordinate)
+                if "group" in self.editor.tilemap.tilemap[self.editor.current_layer][coordinate]:
+                    group = self.editor.tilemap.groups[self.editor.current_layer][self.editor.tilemap.tilemap[self.editor.current_layer][coordinate]["group"]]
+                else:
+                    group.append(coordinate)
 
         if check_offgrid and self.editor.current_layer in self.editor.tilemap.offgrid_tiles:
             for coordinate in self.editor.tilemap.offgrid_tiles[self.editor.current_layer]:
                 pos = [float(val) for val in coordinate.split(";")]
                 if (rect.left <= pos[0] <= rect.right and
                         rect.top <= pos[1] <= rect.bottom):
-                    group.append(coordinate)
+                    if "group" in self.editor.tilemap.offgrid_tiles[self.editor.current_layer][coordinate]:
+                        group = self.editor.tilemap.groups[self.editor.current_layer][self.editor.tilemap.offgrid_tiles[self.editor.current_layer][coordinate]["group"]]
+                    else:
+                        group.append(coordinate)
 
         return group
 
@@ -370,6 +376,8 @@ class EditorSimulation:
         self.types_per_categories = {t: set(self.infos_per_type_per_category[t].keys()) for t in
                                      self.infos_per_type_per_category}
 
+        self.next_available_group_id = "0"
+
         self.ui = UI(self)
 
         self.save_action()
@@ -487,9 +495,18 @@ class EditorSimulation:
                 2 * int(2 * self.zoom))
         self.scroll[1] = pos[1] * 16 - self.screen_height * scale_y // (2 * int(2 * self.zoom))
 
-        
+    def check_tile_space(self, tile_pos):
+        if self.current_layer in self.tilemap.tilemap:
+            if tile_pos in self.tilemap.tilemap[self.current_layer]:
+                return "tilemap"
+        if self.current_layer in self.tilemap.offgrid_tiles:
+            if tile_pos in self.tilemap.offgrid_tiles[self.current_layer]:
+                return "offgrid"
+        return None
+
 
     def handle_brush_tool(self):
+        self.selector.group = []
         if self.clicking:
             if self.ongrid:
                 if "Activators" in self.categories:
@@ -544,6 +561,7 @@ class EditorSimulation:
                          self.mpos_scaled[1] + self.scroll[1])}
 
     def handle_eraser_tool(self):
+        self.selector.group = []
         if self.clicking:
             tile_loc = str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])
             if tile_loc in self.tilemap.tilemap[self.current_layer]:
@@ -580,14 +598,21 @@ class EditorSimulation:
                     if can_place_check:
                         tilemap_tmp = {}
                         offgrid_tmp = {}
-
+                        group_id = None
                         for tile_loc in self.selector.group:
                             if tile_loc in self.tilemap.tilemap[self.current_layer]:
                                 tilemap_tmp[tile_loc] = self.tilemap.tilemap[self.current_layer][tile_loc]
                                 del self.tilemap.tilemap[self.current_layer][tile_loc]
+                                if group_id is None:
+                                    if "group" in tilemap_tmp[tile_loc]:
+                                        group_id = tilemap_tmp[tile_loc]["group"]
                             else:
                                 offgrid_tmp[tile_loc] = self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
                                 del self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
+                                if group_id is None:
+                                    if "group" in offgrid_tmp[tile_loc]:
+                                        group_id = offgrid_tmp[tile_loc]["group"]
+
 
                         for tile_loc in self.selector.group:
                             new_loc = self.moved_group["ongrid"][tile_loc]
@@ -603,7 +628,10 @@ class EditorSimulation:
                                 self.tilemap.tilemap[self.current_layer] = {}
                             self.tilemap.tilemap[self.current_layer][new_loc] = tmp
 
+
                         self.selector.group = list(self.moved_group["ongrid"].values())
+                        if group_id is not None:
+                            self.tilemap.groups[self.current_layer][group_id] = self.selector.group.copy()
 
                 elif self.moved_group["offgrid"]:
                     for tile_loc in self.selector.group:
@@ -615,13 +643,20 @@ class EditorSimulation:
                     if can_place_check:
                         tilemap_tmp = {}
                         offgrid_tmp = {}
+                        group_id = None
                         for tile_loc in self.selector.group:
                             if tile_loc in self.tilemap.tilemap[self.current_layer]:
                                 tilemap_tmp[tile_loc] = self.tilemap.tilemap[self.current_layer][tile_loc]
                                 del self.tilemap.tilemap[self.current_layer][tile_loc]
+                                if group_id is None:
+                                    if "group" in tilemap_tmp[tile_loc]:
+                                        group_id = tilemap_tmp[tile_loc]["group"]
                             else:
                                 offgrid_tmp[tile_loc] = self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
                                 del self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
+                                if group_id is None:
+                                    if "group" in offgrid_tmp[tile_loc]:
+                                        group_id = offgrid_tmp[tile_loc]["group"]
 
                         for tile_loc in self.selector.group:
                             new_loc = self.moved_group["offgrid"][tile_loc]
@@ -636,6 +671,8 @@ class EditorSimulation:
                             self.tilemap.offgrid_tiles[self.current_layer][new_loc] = tmp
 
                         self.selector.group = list(self.moved_group["offgrid"].values())
+                        if group_id is not None:
+                            self.tilemap.groups[self.current_layer][group_id] = self.selector.group.copy()
 
                 self.moved_group = {"ongrid": {}, "offgrid": {}}
 
@@ -704,6 +741,22 @@ class EditorSimulation:
                 if event.key == pygame.K_d:
                     self.selector.group = []
             else:
+                if event.key == pygame.K_l:
+                    if self.current_tool == "Selection" and self.selector.group:
+                        print("group locked")
+                        for tile_pos in self.selector.group:
+                            space = self.check_tile_space(tile_pos)
+                            if space == "tilemap":
+                                self.tilemap.tilemap[self.current_layer][tile_pos]["group"] = self.next_available_group_id
+                            elif space == "offgrid":
+                                self.tilemap.offgrid_tiles[self.current_layer][tile_pos][
+                                    "group"] = self.next_available_group_id
+                        if self.current_layer not in self.tilemap.groups:
+                            self.tilemap.groups[self.current_layer] = {}
+                        self.tilemap.groups[self.current_layer][self.next_available_group_id] = self.selector.group.copy()
+
+
+
                 if event.key == pygame.K_i and not self.holding_i:
                     self.holding_i = True
                 if event.key == pygame.K_DOWN:
