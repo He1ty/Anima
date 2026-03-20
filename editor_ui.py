@@ -1056,10 +1056,6 @@ class UI:
             if "infos_type" in tile:
                 self.infos_tiles.append(tile)
 
-        self.properties_categories = ["All"] + list(self.infos_tiles.keys())
-        self.properties_category = "All"
-        self.properties_category_button = None
-
 
         self.init_buttons()
         self.closing = False
@@ -1122,8 +1118,6 @@ class UI:
         button_x, button_y = (self.screen_width - 100*self.screen_width/self.editor.SW, self.screen_height - 100*self.screen_height/self.editor.SH)
         self.environment_selector_confirmation_button = SimpleButton("Confirm", self.title_font, (button_x, button_y), (0, 0, 0), (64, 64, 64))
 
-        self.init_assets_buttons(self.editor.categories)
-
         button_x,button_y = self.toolbar_rect.width/2, self.toolbar_rect.height-3*self.toolbar_buttons_height
         for label in self.check_buttons_labels:
             button = EditorButton(label, self.buttons_images[label],
@@ -1136,27 +1130,9 @@ class UI:
             button_y -= 0.7*self.toolbar_buttons_height - (self.PADDING/self.editor.SH)*self.screen_height
             self.check_buttons.append(button)
 
-        button_x, button_y = (60/self.editor.SW)*self.screen_width, (20/self.editor.SH)*self.screen_height
-        self.properties_category_button = Dropdown(button_x, button_y,self.buttons_font, self.properties_categories)
+        self.init_assets_buttons(self.editor.categories)
 
-        initial_x = (20 / self.editor.SW) * self.screen_width
-        button_x, button_y = initial_x, (60 / self.editor.SH) * self.screen_height
 
-        ''' # creation de chaque bouton pr chaque info tile
-            button = SimpleButton(tile_pos, self.buttons_font, (button_x, button_y), (255, 255, 255), (32,32,32))
-            if button_x + self.properties_section_buttons_width + self.PADDING*self.screen_width/self.editor.SW > self.properties_section_rect.width - self.properties_section_buttons_width:
-                button_y = (button_y + self.properties_section_buttons_width + self.PADDING*self.screen_height/self.editor.SH %
-                            self.screen_height)
-                button_x = initial_x
-            else:
-                button_x = ((button_x + self.properties_section_buttons_width + self.PADDING*self.screen_width/self.editor.SW) %
-                            (self.properties_section_rect.width - self.properties_section_buttons_width))
-            if button_x < initial_x:
-                button_x = initial_x
-            if button_y + self.properties_section_buttons_height/2 > self.properties_section_rect.height:
-                self.properties_section_rect.height += self.properties_section_buttons_height + self.PADDING*self.screen_height/self.editor.SH
-            self.properties_section_buttons.append(button)
-            '''
     def init_assets_buttons(self, categories):
         self.assets_buttons = []
 
@@ -1364,10 +1340,7 @@ class UI:
                         self.editor.ongrid = not self.editor.ongrid
 
     def handle_properties_section_event(self, event):
-        self.properties_category = self.properties_category_button.handle_event(event)
-        for button in self.properties_section_buttons:
-            if button.handle_event(event):
-                self.editor.move_visual_to(button.label)
+        pass
 
     def handle_assets_section_event(self, event):
         for button in self.assets_section_buttons:
