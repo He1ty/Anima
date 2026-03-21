@@ -40,7 +40,8 @@ class Tilemap:
         self.layers = {"player":["0"],
                        "activators":[],
                        "fake_tiles":[]}
-        self.groups = {}
+        self.selection_groups = {}
+        self.tag_groups = {}
         self.show_collisions = False
         self.render_filters = {}
 
@@ -148,7 +149,8 @@ class Tilemap:
 
         json.dump({'tilemap': self.tilemap,
                         'offgrid': self.offgrid_tiles,
-                   'groups': self.groups,
+                   'tag_groups': self.tag_groups,
+                   'selection_groups': self.selection_groups,
                    'layers': self.layers,
                    'tilesize': self.tile_size},
                   f, indent=1)
@@ -161,8 +163,10 @@ class Tilemap:
 
         self.tilemap = map_data['tilemap']
         self.offgrid_tiles = map_data['offgrid']
-        if "groups" in map_data:
-            self.groups = map_data['groups']
+        if "tag_groups" in map_data:
+            self.tag_groups = map_data["tag_groups"]
+        if "selection_groups" in map_data:
+            self.selection_groups = map_data['selection_groups']
         self.layers = map_data["layers"]
         self.tile_size = map_data['tilesize']
 

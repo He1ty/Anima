@@ -39,8 +39,8 @@ class Selector:
             if coordinate in self.editor.tilemap.tilemap[self.editor.current_layer]:
                 tile = self.editor.tilemap.tilemap[self.editor.current_layer][coordinate]
                 if "group" in tile:
-                    if not set(self.editor.tilemap.groups[self.editor.current_layer][tile["group"]]).issubset(set(group)):
-                        group += self.editor.tilemap.groups[self.editor.current_layer][tile["group"]]
+                    if not set(self.editor.tilemap.selection_groups[self.editor.current_layer][tile["group"]]).issubset(set(group)):
+                        group += self.editor.tilemap.selection_groups[self.editor.current_layer][tile["group"]]
                 else:
                     group.append(coordinate)
 
@@ -50,7 +50,7 @@ class Selector:
                 if (rect.left <= pos[0] <= rect.right and
                         rect.top <= pos[1] <= rect.bottom):
                     if "group" in self.editor.tilemap.offgrid_tiles[self.editor.current_layer][coordinate]:
-                        group = self.editor.tilemap.groups[self.editor.current_layer][self.editor.tilemap.offgrid_tiles[self.editor.current_layer][coordinate]["group"]]
+                        group = self.editor.tilemap.selection_groups[self.editor.current_layer][self.editor.tilemap.offgrid_tiles[self.editor.current_layer][coordinate]["group"]]
                     else:
                         group.append(coordinate)
 
@@ -88,7 +88,11 @@ class Selector:
         if event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
                 self.rect_displayed = False
-                self.group = self.get_group_in_rect(self.rect)
+                group = self.get_group_in_rect(self.rect)
+                if group == []:
+                    self.group = []
+                else:
+                  self.group = list(set(self.group)|(set(group)))
 
         self.rect_pos_update()
 
@@ -254,8 +258,8 @@ class EditorSimulation:
         pygame.init()
 
         pygame.display.set_caption("Editor")
-        self.screen_width = 960
-        self.screen_height = 600
+        self.screen_width = self.SW
+        self.screen_height = self.SH
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
         self.display = pygame.Surface((self.screen_width / 2, self.screen_height / 2))
         self.clock = pygame.time.Clock()
@@ -390,7 +394,7 @@ class EditorSimulation:
         return {
             'tilemap': copy.deepcopy(self.tilemap.tilemap),
             'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles),
-            'groups': copy.deepcopy(self.tilemap.groups),
+            'selection_groups': copy.deepcopy(self.tilemap.selection_groups),
             'layers': copy.deepcopy(self.tilemap.layers),
             'selected_group': copy.deepcopy(self.selector.group)
         }
@@ -416,7 +420,7 @@ class EditorSimulation:
         # 1. Load data
         self.tilemap.tilemap = copy.deepcopy(snapshot['tilemap'])
         self.tilemap.offgrid_tiles = copy.deepcopy(snapshot['offgrid'])
-        self.tilemap.groups = copy.deepcopy(snapshot['groups'])
+        self.tilemap.selection_groups = copy.deepcopy(snapshot['selection_groups'])
         self.tilemap.layers = copy.deepcopy(snapshot['layers'])
         self.selector.group = copy.deepcopy(snapshot['selected_group'])
 
@@ -471,7 +475,7 @@ class EditorSimulation:
             1] < self.main_area_height:  # Only if mouse is over main area
             # Scale mouse position to account for display scaling
             scale_x = 960 / (self.screen.get_size()[0])
-            scale_y = 600 / (self.screen.get_size()[1])
+            scale_y = 576 / (self.screen.get_size()[1])
             self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
                                 (self.mpos[1] / 2) * scale_y * self.zoom)
             self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
@@ -510,15 +514,15 @@ class EditorSimulation:
         return None
 
     def ungroup_group(self, group_id):
-        for tile_pos in self.tilemap.groups[self.current_layer][group_id]:
+        for tile_pos in self.tilemap.selection_groups[self.current_layer][group_id]:
             space = self.check_tile_space(tile_pos)
             if space == "tilemap":
                 del self.tilemap.tilemap[self.current_layer][tile_pos]["group"]
             elif space == "offgrid":
                 del self.tilemap.tilemap[self.current_layer][tile_pos]["group"]
-        del self.tilemap.groups[self.current_layer][group_id]
-        if self.tilemap.groups[self.current_layer] == {}:
-            del self.tilemap.groups[self.current_layer]
+        del self.tilemap.selection_groups[self.current_layer][group_id]
+        if self.tilemap.selection_groups[self.current_layer] == {}:
+            del self.tilemap.selection_groups[self.current_layer]
 
 
     def handle_brush_tool(self):
@@ -646,7 +650,7 @@ class EditorSimulation:
 
                         self.selector.group = list(self.moved_group["ongrid"].values())
                         if group_id is not None:
-                            self.tilemap.groups[self.current_layer][group_id] = self.selector.group.copy()
+                            self.tilemap.selection_groups[self.current_layer][group_id] = self.selector.group.copy()
 
                 elif self.moved_group["offgrid"]:
                     for tile_loc in self.selector.group:
@@ -687,9 +691,13 @@ class EditorSimulation:
 
                         self.selector.group = list(self.moved_group["offgrid"].values())
                         if group_id is not None:
-                            self.tilemap.groups[self.current_layer][group_id] = self.selector.group.copy()
+                            self.tilemap.selection_groups[self.current_layer][group_id] = self.selector.group.copy()
 
                 self.moved_group = {"ongrid": {}, "offgrid": {}}
+
+    def handle_selection_tool(self, event):
+        self.selector.handle_event(event)
+
 
     def handle_group_locker(self, event):
         if event.key == pygame.K_l:
@@ -703,13 +711,13 @@ class EditorSimulation:
                         self.tilemap.offgrid_tiles[self.current_layer][tile_pos][
                             "group"] = self.next_available_group_id
 
-                if self.current_layer in self.tilemap.groups:
-                    for group in self.tilemap.groups[self.current_layer]:
+                if self.current_layer in self.tilemap.selection_groups:
+                    for group in self.tilemap.selection_groups[self.current_layer]:
                         if set(group).issubset(set(self.selector.group)):
                             self.ungroup_group(group)
                 else:
-                    self.tilemap.groups[self.current_layer] = {}
-                self.tilemap.groups[self.current_layer][self.next_available_group_id] = self.selector.group.copy()
+                    self.tilemap.selection_groups[self.current_layer] = {}
+                self.tilemap.selection_groups[self.current_layer][self.next_available_group_id] = self.selector.group.copy()
 
     def handle_map_editor(self, event):
 
@@ -724,7 +732,7 @@ class EditorSimulation:
                 case "Eraser":
                     self.handle_eraser_tool()
                 case "Selection":
-                    self.selector.handle_event(event)
+                    self.handle_selection_tool(event)
                 case "Move":
                     self.handle_move_tool(event)
 
@@ -749,8 +757,8 @@ class EditorSimulation:
             mods = pygame.key.get_mods()
             if mods & pygame.KMOD_CTRL:
                 if event.key == pygame.K_l:
-                    for group in self.tilemap.groups[self.current_layer]:
-                        if self.tilemap.groups[self.current_layer][group] == self.selector.group:
+                    for group in self.tilemap.selection_groups[self.current_layer]:
+                        if self.tilemap.selection_groups[self.current_layer][group] == self.selector.group:
                             self.ungroup_group(group)
                             break
 
@@ -960,13 +968,16 @@ class EditorSimulation:
                                 (tile["pos"][1] * self.tile_size + self.mpos_scaled[1] - mpos_scaled_onclick[1]))
                         self.display.blit(tile_img, (x - self.scroll[0], y - self.scroll[1]))
                         self.moved_group["offgrid"][pos] = f"{x};{y}"
+
+    def render_selection_tool(self):
+        self.selector.draw(self.display)
         
     def render_map_editor(self):
         match self.current_tool:
             case "Brush":
                 self.render_brush_tool()
             case "Selection":
-                self.selector.draw(self.display)
+                self.render_selection_tool()
             case "Move":
                 self.render_move_tool()
 
