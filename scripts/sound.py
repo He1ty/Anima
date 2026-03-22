@@ -32,7 +32,7 @@ class Sound:
                 pygame.mixer.music.load(self.music_paths[name])
                 pygame.mixer.music.set_volume(self.volume*self.master_volume)
                 pygame.mixer.music.play(loops)
-            except KeyError:
+            except :
                 pass
         else:
             self.sounds[name].play()

@@ -910,7 +910,7 @@ class Menu:
                             self.game.save_system.update_playtime(self.game.current_slot)
                             self.game.save_game( self.game.current_slot)
                             settings_categories = self.save_current_button_states()
-                            self.game.__init__(full_setup=False)
+                            self.game.reload()
                             self.settings_categories = settings_categories
                             self.init_buttons()
                             self.menu_state = self.TITLE_STATE
@@ -956,8 +956,6 @@ class Menu:
     def draw_player_souls(self):
         if not self.is_souls_collected:
             return
-
-
 
         self.souls_animation.update()
 

@@ -35,153 +35,235 @@ class Game:
     SCREEN_WIDTH = 960
     SCREEN_HEIGHT = 600
 
-    def __init__(self, full_setup=True):
+    def __init__(self):
         """
-        Initializes the Pygame context, display settings, and global game variables.
-        Loads all base assets and prepares the internal state for the first level.
+        Initializes all engine systems in dependency order:
+        display → sound → settings → world → player → vfx → ui.
         """
+
         pygame.init()
 
-        # --- Window Setup ---
+        # ── 1. Window & display ────────────────────────────────────────────────
         pygame.display.set_caption("Anima")
-
-        self.level_id = 1
-        path = 'data/environments.json'
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                # Convert lists back to specific types if needed, json loads arrays as lists
-                self.environments = json.load(f)
-
-        self.environment = self.get_environment_by_id(self.level_id)
-
-        self.level = self.get_file_name(self.environment, self.level_id)
-
-        if full_setup:
-            # --- Debug Mode ---
-            self.debug_mode = False
-            # The actual window size
-            self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
-
-            # --- Sound manager System ---
-            self.master_volume = 1
-            player_path = "assets/player/sounds/"
-            music_path = {'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-                          'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
-                          'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",}
-            self.music_sound_manager = Sound(self, music_path, is_music=True, master_volume=self.master_volume,volume=1)
-            sound_effect_path = {
-                "dash": player_path + 'dash.wav',
-                'jump': player_path + 'jump.wav',
-                'run': player_path + 'run.wav',
-                'wall_jump': player_path + 'wall_jump.wav',
-                'land': player_path + 'land.wav',
-                'walk': None,
-                'stun': None
-            }
-            self.sound_effect_manager = Sound(self, sound_effect_path, is_music=False,master_volume=self.master_volume, volume=0.5)
-
-            # --- System Configuration ---
-            self.save_system = Save(self)
-            self.current_slot = None  # Tracking the active save slot
-
-            # --- Menu & System Configuration ---
-            self.languages = ["Français", "English", "Español"]
-            self.selected_language = self.languages[1]
-            self.fullscreen = False
-            self.vsync_on = False
-            self.brightness = 0.5
-            self.keyboard_layout = "AZERTY"
-            self.key_map = {"key_up" : pygame.K_z,
-                            "key_down" : pygame.K_s,
-                            "key_left" : pygame.K_q,
-                            "key_right" : pygame.K_d,
-                            "key_jump" : pygame.K_SPACE,
-                            "key_dash" : pygame.K_g,
-                            "key_interact" : pygame.K_e,
-                            "key_noclip" : pygame.K_n,
-                            "key_hitbox" : pygame.K_h,
-                            "key_select" : pygame.K_RETURN}
-
-            self.menu = Menu(self)
-
-        # The internal rendering surface (half size for a pixel-art aesthetic)
-        self.display = pygame.Surface((self.SCREEN_WIDTH/2, self.SCREEN_HEIGHT/2))
+        self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
+        self.display = pygame.Surface((self.SCREEN_WIDTH / 2, self.SCREEN_HEIGHT / 2))
         self.clock = pygame.time.Clock()
+        self.debug_mode = False
 
-
-
-        self.previous_state = None
-        self.state = self.MENU_STATE
-        self.game_initialized = False
-
-        # --- Icon Setup ---
         try:
-            icon_img = pygame.image.load("assets/images/ui/logo.png").convert_alpha()
-            icon_img = pygame.transform.smoothscale(icon_img, (16, 16))
-            pygame.display.set_icon(icon_img)
+            icon = pygame.image.load("assets/images/ui/logo.png").convert_alpha()
+            pygame.display.set_icon(pygame.transform.smoothscale(icon, (16, 16)))
         except FileNotFoundError:
             pass
 
+        # ── 5. Level & map data ────────────────────────────────────────────────
+        self.level_id = 1
+
+        path = 'data/environments.json'
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                self.environments = json.load(f)
+
+        self.environment = self.get_environment_by_id(self.level_id)
+        self.level = self.get_file_name(self.environment, self.level_id)
+        self.default_level = self.level
 
         self.tile_size = 16
-
-        self.death_counter = 0
-
-        self.b_info = {"white_space": {"animated":True, "img_dur": 6, "loop": True},
-                        "green_cave": {"animated":False},
-                        "blue_cave": {"animated":False}}
+        self.b_info = {
+            "white_space": {"animated": True, "img_dur": 6, "loop": True},
+            "green_cave": {"animated": False},
+            "blue_cave": {"animated": False},
+        }
         self.spawners = {}
+        self.spawner_pos = {}
 
-        # --- Camera Constraints ---
-        # Defines min/max X and Y coordinates the camera can scroll to on very first spawn
-        self.camera = Camera(self)
-
-        self.scroll_limits_per_level = {"1": {"x": (0, 0), "y":(-1230, 1233)},
-                                        "2": {"x": (64, 624), "y": (-176, 144)}}
-
-        self.scroll_limits = self.scroll_limits_per_level["1"]
-        #"x": (64, 624), "y": (-176, 144)
-        self.camera_center = None
-
-        # --- Asset Loading ---
-        self.assets = {}
-
-        # Dynamically load assets from folders using helper functions
-        self.assets.update(load_tiles(self.environment))
-        self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.environment))
-        self.assets.update(load_particles(self.environment))
-
-        # --- Map Object Caching ---
-        # Pre-loads and pairs interactive objects for efficient lookup during level loading
-        self.doors_id_pairs = []
-        self.levers_id_pairs = []
-        self.buttons_id_pairs = []
-        self.tp_id_pairs = []
-
-        '''for env in self.environments:
-            self.doors_id_pairs += [(door, 0) for door in load_doors('editor', env)]
-            self.levers_id_pairs += [(lever, 0) for lever in load_activators(env) if "lever" in lever]
-            self.buttons_id_pairs += [(button, 0) for button in load_activators(env) if "button" in button]
-            self.tp_id_pairs += [(tp, 0) for tp in load_activators(env) if "teleporter" in tp]
-'''
-
+        # ── 2. Sound ───────────────────────────────────────────────────────────
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=2048)
             self.sound_running = True
         except Exception as e:
             print(f"Error initializing sound: {e}")
+            self.sound_running = False
+
+        self.master_volume = 1
+        player_sfx = "assets/player/sounds/"
+
+        self.music_sound_manager = Sound(self, {
+            'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
+            'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
+            'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",
+        }, is_music=True, master_volume=self.master_volume, volume=1)
+
+        self.sound_effect_manager = Sound(self, {
+            "dash": player_sfx + 'dash.wav',
+            "jump": player_sfx + 'jump.wav',
+            "run": player_sfx + 'run.wav',
+            "wall_jump": player_sfx + 'wall_jump.wav',
+            "land": player_sfx + 'land.wav',
+            "walk": None,
+            "stun": None,
+        }, is_music=False, master_volume=self.master_volume, volume=0.5)
+
+        # ── 3. Save & settings ─────────────────────────────────────────────────
+        self.save_system = Save(self)
+        self.current_slot = None
+
+        self.languages = ["Français", "English", "Español"]
+        self.selected_language = self.languages[1]
+        self.fullscreen = False
+        self.vsync_on = False
+        self.brightness = 0.5
+
+        # ── 4. Keybindings ─────────────────────────────────────────────────────
+        self.keyboard_layout = "AZERTY"
+        self.key_map = {
+            "key_up": pygame.K_z,
+            "key_down": pygame.K_s,
+            "key_left": pygame.K_q,
+            "key_right": pygame.K_d,
+            "key_jump": pygame.K_SPACE,
+            "key_dash": pygame.K_g,
+            "key_interact": pygame.K_e,
+            "key_noclip": pygame.K_n,
+            "key_hitbox": pygame.K_h,
+            "key_select": pygame.K_RETURN,
+        }
+        self.keybindings = {}
+        self.dict_kb = {
+            "key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
+            "key_jump": 0, "key_dash": 0, "key_noclip": 0,
+        }
+
+        # ── 6. Assets ──────────────────────────────────────────────────────────
+        self.assets = {}
+        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_player())
+        self.assets.update(load_backgrounds(self.b_info, self.environment))
+        self.assets.update(load_particles(self.environment))
+
+        self.doors_id_pairs = []
+        self.levers_id_pairs = []
+        self.buttons_id_pairs = []
+        self.tp_id_pairs = []
+
+        # ── 7. Camera ──────────────────────────────────────────────────────────
+        self.camera = Camera(self)
+        self.camera_center = None
+        self.scroll_limits_per_level = {
+            "1": {"x": (0, 0), "y": (-1230, 1233)},
+            "2": {"x": (64, 624), "y": (-176, 144)},
+        }
+        self.scroll_limits = self.scroll_limits_per_level["1"]
+        self.screenshake = 0
+
+        # ── 8. Tilemap ─────────────────────────────────────────────────────────
+        self.tilemap = Tilemap(self, self.tile_size)
+        self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
+        self.doors_rects = []
+        self.show_spikes_hitboxes = False
+
+        # ── 9. Player ──────────────────────────────────────────────────────────
+        self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
+        self.player_dead = False
+        self.death_counter = 0
+
+        self.collected_souls = []
+        self.nb_souls = 0
+
+        self.checkpoints = []
+        self.current_checkpoint = None
+        self.active_checkpoint_anim = None
+        self.sections = {0: (0, 1, 2)}
+
+        # ── 10. Activators & interactables ────────────────────────────────────
+        self.activators = []
+        self.projectiles = []
+        self.teleporting = False
+        self.tp_id = None
+        self.last_teleport_time = 0
+        self.player_grabbing = False
+
+        # ── 11. Game state & flow ─────────────────────────────────────────────
+        self.state = self.MENU_STATE
+        self.previous_state = None
+        self.game_initialized = False
+        self.current_mode = "default"
+
+        self.cutscene = False
+        self.game_texts = load_game_texts()
+        self.bottom_text = None
+
+        self.attacking = False
+        self.holding_attack = False
+
+        # ── 12. Lighting ──────────────────────────────────────────────────────
+        self.darkness_level = 255
+        self.light_radius = 10
+        self.light_soft_edge = 200
+        self.light_emitting_tiles = []
+        self.light_emitting_objects = []
+
+        self.light_properties = {
+            "player": {"radius": 100, "intensity": 250, "edge_softness": 255, "color": (255, 255, 255),
+                       "flicker": False},
+            "torch": {"radius": 80, "intensity": 220, "edge_softness": 30, "color": (255, 180, 100), "flicker": True},
+            "crystal": {"radius": 120, "intensity": 200, "edge_softness": 50, "color": (100, 180, 255),
+                        "flicker": False},
+            "glowing_mushroom": {"radius": 80, "intensity": 80, "edge_softness": 500, "color": (160, 230, 180),
+                                 "flicker": False},
+            "lava": {"radius": 100, "intensity": 210, "edge_softness": 40, "color": (255, 120, 50), "flicker": True},
+        }
+        self.light_infos = {i: {"darkness_level": 180, "light_radius": 200} for i in range(5)}
+        self.player_light = self.light_properties["player"]
+
+        self.shader = Shader(self)
+        self.light_mask = pygame.Surface((self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA)
+        self.shader.create_light_mask(self.light_radius)
+
+        # ── 13. VFX & combat ──────────────────────────────────────────────────
+        self.particles = []
+        self.sparks = []
+        self.moving_visual = False
+
+        self.damage_flash_active = False
+        self.damage_flash_end_time = 0
+        self.damage_flash_duration = 100
+
+        self.fake_tiles_opacity = 255
+        self.fake_tiles_colliding_group = []
+        if hasattr(self, "fake_tile_groups"):
+            delattr(self, "fake_tile_groups")
+
+        # ── 14. UI & menu ─────────────────────────────────────────────────────
+        self.menu = Menu(self)
+
+        # ── 15. Timers & counters ─────────────────────────────────────────────
+        self.playtime = 0
+        self.menu_time = 0
+
+    def reload(self):
+        self.previous_state = None
+        self.state = self.MENU_STATE
+        self.game_initialized = False
+
+        self.death_counter = 0
+
+        self.spawners = {}
+        self.scroll_limits_per_level = {"1": {"x": (0, 0), "y": (-1230, 1233)},
+                                        "2": {"x": (64, 624), "y": (-176, 144)}}
+
+        self.scroll_limits = self.scroll_limits_per_level["1"]
+        # "x": (64, 624), "y": (-176, 144)
+
+        self.camera_center = None
+
+        self.camera = Camera(self)
 
         # --- Input & Level Tracking ---
         self.keybindings = {}
         self.dict_kb = {"key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
                         "key_jump": 0, "key_dash": 0, "key_noclip": 0}
-
-        self.tilemap = Tilemap(self, self.tile_size)
-
-        #Start level
-        self.default_level = self.level
 
         self.active_checkpoint_anim = None
 
@@ -192,14 +274,10 @@ class Game:
 
         self.checkpoints = []
         self.current_checkpoint = None
-        self.sections = {0: (0, 1, 2)}
 
         # --- Player Stats & Combat ---
         self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
         self.player_dead = False
-
-        self.collected_souls = []
-        self.nb_souls = 0
 
         self.holding_attack = False
         self.attacking = False
@@ -209,7 +287,6 @@ class Game:
         self.last_teleport_time = 0
         self.screenshake = 0
         self.cutscene = False
-        self.game_texts = load_game_texts()
         self.bottom_text = None
         self.doors_rects = []
 
@@ -226,18 +303,6 @@ class Game:
 
         self.shader = Shader(self)
 
-        # Define light behaviors for different game objects
-        self.light_properties = {
-            "player": {"radius": 100, "intensity": 250, "edge_softness": 255, "color": (255, 255, 255),
-                       "flicker": False},
-            "torch": {"radius": 80, "intensity": 220, "edge_softness": 30, "color": (255, 180, 100), "flicker": True},
-            "crystal": {"radius": 120, "intensity": 200, "edge_softness": 50, "color": (100, 180, 255),
-                        "flicker": False},
-            "glowing_mushroom": {"radius": 80, "intensity": 80, "edge_softness": 500, "color": (160, 230, 180),
-                                 "flicker": False},
-            "lava": {"radius": 100, "intensity": 210, "edge_softness": 40, "color": (255, 120, 50), "flicker": True}
-        }
-
         self.light_infos = {i: {"darkness_level": 180, "light_radius": 200} for i in range(5)}
         self.light_mask = pygame.Surface((self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA)
         self.shader.create_light_mask(self.light_radius)
@@ -251,9 +316,6 @@ class Game:
         self.damage_flash_duration = 100
         self.particles = []
         self.sparks = []
-
-
-
 
         # --- Modes configuration ---
         self.current_mode = "default"
@@ -297,7 +359,6 @@ class Game:
                     self.key_map["key_noclip"] = bindings[cat][bind]
                 else:
                     self.key_map[f"key_{bind.lower()}"] = bindings[cat][bind]
-
 
     def load_level(self, map_id, transition_effect=True):
         """
@@ -386,12 +447,12 @@ class Game:
             self.activators.append(a)
 
         self.doors = []
-        for door in self.tilemap.extract(self.doors_id_pairs):
+        '''for door in self.tilemap.extract(self.doors_id_pairs):
             door_type = door["type"]
             speed = int(door["opening_time"])
             door_id = door["id"]
             self.doors.append(
-                Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))
+                Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))'''
 
         self.camera_setup = []
         for camera in self.tilemap.extract(["camera_setup"]):

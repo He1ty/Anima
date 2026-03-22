@@ -1,11 +1,20 @@
 import sys
-from sys import exception
-from tabnanny import check
 
-from scripts.utils import load_image, create_rect_alpha
+from scripts.activators import Activator
+from scripts.camera import Camera, CameraSetup
+from scripts.display import Shader
+from scripts.doors import Door
+from scripts.entities import DamageBlock, Throwable, Enemy, DistanceEnemy
+from scripts.game import Game
+from scripts.physics import PhysicsPlayer
+from scripts.pickup import Pickup
+from scripts.saving import Save
+from scripts.sound import Sound
+from scripts.user_interface import Menu
+from scripts.utils import load_image, create_rect_alpha, load_tiles
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown
 from scripts.text import load_game_font
-from scripts.utils import load_editor_tiles, load_tiles, load_images
+from scripts.utils import *
 from scripts.tilemap import Tilemap
 import pygame
 
@@ -145,7 +154,7 @@ class LevelManager:
             self.editor.active_maps.remove(level_id)
 
         # Re-route the user to an existing level if they deleted the one they are on
-        if self.editor.level == level_id:
+        if self.editor.level_id == level_id:
             if self.editor.active_maps:
                 self.change_level(self.editor.active_maps[-1])
             else:
@@ -159,8 +168,8 @@ class LevelManager:
                 self.change_level(new_id)
 
     def map_data_reset(self):
-        env = self.get_environment_by_id(self.editor.level)
-        file_name = self.get_file_name(env, self.editor.level)
+        env = self.get_environment_by_id(self.editor.level_id)
+        file_name = self.get_file_name(env, self.editor.level_id)
         filepath = f'data/maps/{file_name}'
 
         try:
@@ -177,14 +186,14 @@ class LevelManager:
 
     def change_level(self, new_level_id):
         # Save current level before moving to the next
-        if self.editor.level in self.editor.active_maps:
-            env = self.get_environment_by_id(self.editor.level)
-            current_file_name = self.get_file_name(env, self.editor.level)
+        if self.editor.level_id in self.editor.active_maps:
+            env = self.get_environment_by_id(self.editor.level_id)
+            current_file_name = self.get_file_name(env, self.editor.level_id)
 
             if self.editor.tilemap.tilemap != {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}}:
                 self.editor.tilemap.save(f'data/maps/{current_file_name}')
 
-        self.editor.level = new_level_id
+        self.editor.level_id = new_level_id
         self.map_data_reset()
 
     def load_environments(self):
@@ -200,9 +209,9 @@ class LevelManager:
 
     def full_save(self):
         # 1. Save current map to disk
-        if self.editor.level in self.editor.active_maps:
-            env = self.get_environment_by_id(self.editor.level)
-            current_file_name = self.get_file_name(env, self.editor.level)
+        if self.editor.level_id in self.editor.active_maps:
+            env = self.get_environment_by_id(self.editor.level_id)
+            current_file_name = self.get_file_name(env, self.editor.level_id)
             self.editor.tilemap.save(f'data/maps/{current_file_name}')
 
         # 2. Re-sequence IDs sequentially for surviving active_maps
@@ -246,9 +255,354 @@ class LevelManager:
 
         # 6. Update running active maps
         self.editor.active_maps = list(id_mapping.values())
-        self.editor.level = id_mapping.get(self.editor.level, 1)
+        self.editor.level_id = id_mapping.get(self.editor.level_id, 1)
 
         print("Full Save Complete: Maps reordered and deleted files removed.")
+
+class PlayTest(Game):
+    MENU_STATE = "MENU"
+    PLAYING_STATE = "PLAYING"
+
+    def __init__(self, editor_instance):
+        # ── 1. Window & display ────────────────────────────────────────────────
+        self.screen = editor_instance.screen
+        self.display = editor_instance.display
+        self.clock = pygame.time.Clock()
+        self.debug_mode = False
+
+        self.editor = editor_instance
+        self.level_manager = editor_instance.level_manager
+        self.tilemap = self.editor.tilemap
+        self.tilemap.game = self
+
+        # ── 5. Level & map data ────────────────────────────────────────────────
+        self.level_id = editor_instance.level_id
+        self.environment = editor_instance.current_environment
+        self.environments = editor_instance.environments
+        self.level = self.level_manager.get_file_name(self.environment, self.level_id)
+
+        self.b_info = {
+            "white_space": {"animated": True, "img_dur": 6, "loop": True},
+            "green_cave": {"animated": False},
+            "blue_cave": {"animated": False},
+        }
+
+        self.tile_size = self.tilemap.tile_size
+
+        self.master_volume = 1
+        player_sfx = "assets/player/sounds/"
+
+        self.music_sound_manager = Sound(self, {
+            'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
+            'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
+            'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",
+        }, is_music=True, master_volume=self.master_volume, volume=1)
+
+        self.sound_effect_manager = Sound(self, {
+            "dash": player_sfx + 'dash.wav',
+            "jump": player_sfx + 'jump.wav',
+            "run": player_sfx + 'run.wav',
+            "wall_jump": player_sfx + 'wall_jump.wav',
+            "land": player_sfx + 'land.wav',
+            "walk": None,
+            "stun": None,
+        }, is_music=False, master_volume=self.master_volume, volume=0.5)
+
+
+        # ── 3. Save & settings ─────────────────────────────────────────────────
+        self.save_system = Save(self)
+        self.current_slot = None
+
+        self.languages = ["Français", "English", "Español"]
+        self.selected_language = self.languages[1]
+        self.fullscreen = False
+        self.vsync_on = False
+        self.brightness = 0.5
+
+        # ── 4. Keybindings ─────────────────────────────────────────────────────
+        self.keyboard_layout = "AZERTY"
+        self.key_map = {
+            "key_up": pygame.K_z,
+            "key_down": pygame.K_s,
+            "key_left": pygame.K_q,
+            "key_right": pygame.K_d,
+            "key_jump": pygame.K_SPACE,
+            "key_dash": pygame.K_g,
+            "key_interact": pygame.K_e,
+            "key_noclip": pygame.K_n,
+            "key_hitbox": pygame.K_h,
+            "key_select": pygame.K_RETURN,
+        }
+        self.keybindings = {}
+        self.dict_kb = {
+            "key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
+            "key_jump": 0, "key_dash": 0, "key_noclip": 0,
+        }
+
+        # ── 6. Assets ──────────────────────────────────────────────────────────
+        self.assets = {}
+        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_player())
+        self.assets.update(load_backgrounds(self.b_info, self.environment))
+        self.assets.update(load_particles(self.environment))
+
+        self.doors_id_pairs = []
+        self.levers_id_pairs = []
+        self.buttons_id_pairs = []
+        self.tp_id_pairs = []
+
+        # ── 7. Camera ──────────────────────────────────────────────────────────
+        self.camera = Camera(self)
+        self.camera_center = None
+        self.scroll_limits_per_level = {
+            "1": {"x": (0, 0), "y": (-1230, 1233)},
+            "2": {"x": (64, 624), "y": (-176, 144)},
+        }
+        self.scroll_limits = self.scroll_limits_per_level["1"]
+        self.screenshake = 0
+
+        # ── 8. Tilemap ─────────────────────────────────────────────────────────
+        #self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
+        self.doors_rects = []
+        self.show_spikes_hitboxes = False
+
+        # ── 9. Player ──────────────────────────────────────────────────────────
+        self.player = PhysicsPlayer(self, self.tilemap, editor_instance.player_start, (16, 16))
+        self.player_dead = False
+        self.death_counter = 0
+
+        self.collected_souls = []
+        self.nb_souls = 0
+
+        self.checkpoints = []
+        self.current_checkpoint = None
+        self.active_checkpoint_anim = None
+
+        # ── 10. Activators & interactables ────────────────────────────────────
+        self.activators = []
+        self.projectiles = []
+        self.teleporting = False
+        self.tp_id = None
+        self.last_teleport_time = 0
+        self.player_grabbing = False
+
+        # ── 11. Game state & flow ─────────────────────────────────────────────
+        self.state = self.PLAYING_STATE
+        self.previous_state = None
+        self.game_initialized = False
+        self.current_mode = "default"
+
+        self.cutscene = False
+        #self.game_texts = load_game_texts()
+        self.bottom_text = None
+
+        self.attacking = False
+        self.holding_attack = False
+
+        # ── 12. Lighting ──────────────────────────────────────────────────────
+        self.darkness_level = 255
+        self.light_radius = 10
+        self.light_soft_edge = 200
+        self.light_emitting_tiles = []
+        self.light_emitting_objects = []
+
+        self.light_properties = {
+            "player": {"radius": 100, "intensity": 250, "edge_softness": 255, "color": (255, 255, 255),
+                       "flicker": False},
+            "torch": {"radius": 80, "intensity": 220, "edge_softness": 30, "color": (255, 180, 100), "flicker": True},
+            "crystal": {"radius": 120, "intensity": 200, "edge_softness": 50, "color": (100, 180, 255),
+                        "flicker": False},
+            "glowing_mushroom": {"radius": 80, "intensity": 80, "edge_softness": 500, "color": (160, 230, 180),
+                                 "flicker": False},
+            "lava": {"radius": 100, "intensity": 210, "edge_softness": 40, "color": (255, 120, 50), "flicker": True},
+        }
+        self.light_infos = {i: {"darkness_level": 180, "light_radius": 200} for i in range(5)}
+        self.player_light = self.light_properties["player"]
+
+        self.shader = Shader(self)
+        self.light_mask = pygame.Surface((self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA)
+        self.shader.create_light_mask(self.light_radius)
+
+        # ── 13. VFX & combat ──────────────────────────────────────────────────
+        self.particles = []
+        self.sparks = []
+        self.moving_visual = False
+
+        self.damage_flash_active = False
+        self.damage_flash_end_time = 0
+        self.damage_flash_duration = 100
+
+        self.fake_tiles_opacity = 255
+        self.fake_tiles_colliding_group = []
+        if hasattr(self, "fake_tile_groups"):
+            delattr(self, "fake_tile_groups")
+
+        # ── 14. UI & menu ─────────────────────────────────────────────────────
+        self.menu = Menu(self)
+
+        # ── 15. Timers & counters ─────────────────────────────────────────────
+        self.playtime = 0
+        self.menu_time = 0
+
+    def save_game(self, slot=1):
+        return False
+
+    def load_game(self, slot=1):
+        return False
+
+    def load_level(self, map_id, transition_effect=True):
+        """
+        Loads level data from a JSON file, extracts entities, and sets up level-specific logic.
+
+        Args:
+            map_id (int): The index of the level to load.
+            :param map_id:
+            :param transition_effect:
+        """
+        self.environment = self.level_manager.get_environment_by_id(self.level_id)
+        map_name = self.level_manager.get_file_name(self.environment, map_id)
+        self.assets = {}
+        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_player())
+        self.assets.update(load_backgrounds(self.b_info, self.environment))
+        self.assets.update(load_particles(self.environment))
+
+        self.tilemap.tile_size = self.tile_size
+        self.display = self.editor.display
+        self.light_emitting_tiles = []
+        self.light_emitting_objects = []
+        #self.activators_actions = load_activators_actions(map_name, self.tilemap.layers["activators"])
+
+        # --- Checkpoints & Traps ---
+        self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
+
+        self.pickups = []
+        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/pickups"))]):
+            if pickup["pos"] not in self.collected_souls:
+                self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
+
+        self.spikes = []
+        spike_types = []
+        for s in ("spikes", "gluy_spikes", "purpur_spikes"):
+            for n in range(3):
+                spike_types.append((s, n))
+
+        spike_block_types = []
+        for n in range(9):
+            spike_block_types += [("spike_roots", n)]
+
+        for spike in self.tilemap.extract(spike_types, keep=True):
+            self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]], hitbox_type='spike', rotation=spike["rotation"]))
+
+        for spike_block in  self.tilemap.extract(spike_block_types, keep=True):
+            self.spikes.append(DamageBlock(self, spike_block["pos"], self.assets[spike_block["type"]][spike_block["variant"]], hitbox_type='spike_block', rotation=spike_block["rotation"]))
+
+        # --- Objects & Particles ---
+        self.throwable = []
+        for o in self.tilemap.extract([('throwable', 0)]):
+            self.throwable.append(Throwable(self, "blue_rock", o['pos'], (16, 16)))
+
+        self.leaf_spawners = []
+        for plant in self.tilemap.extract([('vine_decor', 3), ('vine_decor', 4), ('vine_decor', 5),
+                                           ('mossy_stone_decor', 15), ('mossy_stone_decor', 16)], keep=True):
+            self.leaf_spawners.append(pygame.Rect(4 + plant['pos'][0], 4 + plant['pos'][1], 23, 13))
+
+        self.crystal_spawners = []
+        for mushroom in self.tilemap.extract([("blue_decor", 14), ("blue_decor", 15)], keep=True):
+            self.shader.register_light_emitting_tile((mushroom['pos'][0] + 8, mushroom['pos'][1] + 8), "glowing_mushroom")
+            self.crystal_spawners.append(pygame.Rect(4 + mushroom['pos'][0], 4 + mushroom['pos'][1], 23, 13))
+
+        # Initial setup for enemies and interactive objects
+        self.enemies = []
+        for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 3)]):
+            if spawner['variant'] == 1:
+                self.enemies.append(Enemy(self, "picko", spawner['pos'], (16, 16), 100,
+                                          {"attack_distance": 20, "attack_dmg": 10, "attack_time": 1.5}))
+            elif spawner['variant'] == 3:
+                self.enemies.append(DistanceEnemy(self, "glorbo", spawner['pos'], (16, 16), 100,
+                                                  {"attack_distance": 100, "attack_dmg": 10, "attack_time": 1.5}))
+
+        self.activators = []
+        for activator in self.tilemap.extract(self.levers_id_pairs + self.buttons_id_pairs + self.tp_id_pairs):
+            a = Activator(self, activator['pos'], activator['type'], i=activator["id"])
+            a.state = activator["variant"]
+            self.activators.append(a)
+
+        self.doors = []
+        '''for door in self.tilemap.extract(self.doors_id_pairs):
+            door_type = door["type"]
+            speed = int(door["opening_time"])
+            door_id = door["id"]
+            self.doors.append(
+                Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))'''
+
+        self.camera_setup = []
+        for camera in self.tilemap.extract(["camera_setup"]):
+            self.camera_setup.append(CameraSetup(self, camera))
+
+        fake_tiles_id_pairs = []
+        for tile in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/blocks")):
+            if "fake" in tile:
+                for variant in range(len(self.assets[tile])):
+                    fake_tiles_id_pairs.append((tile, variant))
+
+        if not hasattr(self, "fake_tile_groups"):
+            self.fake_tile_groups = []
+            for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
+                fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
+                fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
+                g_check = True
+                for group in self.fake_tile_groups:
+                    if fake_tile in group:
+                        g_check = False
+                        continue
+                if g_check:
+                    group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.tilemap.layers["fake_tiles"])
+                    if group not in self.fake_tile_groups:
+                        self.fake_tile_groups.append(group)
+        self.tilemap.extract(fake_tiles_id_pairs, layers=tuple(self.tilemap.layers["fake_tiles"]))
+
+        # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
+        target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
+        min_x, max_x = self.scroll_limits["x"]
+        max_x -= self.display.get_width()
+        target_x = max(min_x, min(target_x, max_x))
+        target_y = (self.player.rect().centery if self.camera_center is None else self.camera_center[1]) - self.display.get_height()/2
+        min_y, max_y = self.scroll_limits["y"]
+        max_y -= self.display.get_height()
+        target_y = max(min_y, min(target_y, max_y))
+
+        self.scroll = [target_x, target_y]
+
+
+        self.transitions = self.tilemap.extract([("transition", 0)])
+
+        # Reset VFX and interaction pools
+        self.interactable = self.throwable.copy() + self.activators.copy()
+        self.cutscene = False
+        self.particles = []
+        self.sparks = []
+        self.transition = -30 if transition_effect else 0
+        self.max_falling_depth = 50000000000
+        self.shader.update_light()
+
+    def run(self):
+        """
+        The main program entry point.
+        This function implements a state machine to switch between the Intro, Profile Menu, and Gameplay.
+        """
+        match self.state:
+            case self.MENU_STATE:
+                self.menu.draw()
+                if self.menu.menu_state == self.menu.TITLE_STATE:
+                    self.editor.state = "MapEditor"
+                    self.state = self.PLAYING_STATE
+                    self.music_sound_manager.stop('title_screen')
+            case self.PLAYING_STATE:
+                self.main_game_logic()
+                self.menu.draw_player_souls()
+        self.apply_brightness()
+        pygame.display.update()
 
 class EditorSimulation:
     SW = 960
@@ -268,7 +622,6 @@ class EditorSimulation:
         self.movement = [0, 0, 0, 0]
 
         self.current_tool = "Brush"
-        self.level = 0
         self.current_environment = "white_space"
         self.selecting_environment_mode = False
 
@@ -289,7 +642,7 @@ class EditorSimulation:
         self.active_maps.sort()
 
 
-        self.level = self.active_maps[0] if self.active_maps else 1
+        self.level_id = self.active_maps[0] if self.active_maps else 1
 
         self.tile_group = 0
         self.tile_variant = 0
@@ -312,7 +665,7 @@ class EditorSimulation:
         self.tile_size = self.tilemap.tile_size
 
         try:
-            file_name = self.level_manager.get_file_name(self.current_environment, self.level)
+            file_name = self.level_manager.get_file_name(self.current_environment, self.level_id)
             filepath = f'data/maps/{file_name}'
             self.tilemap.load(filepath)
         except FileNotFoundError:
@@ -345,6 +698,7 @@ class EditorSimulation:
         self.holding_tab = False
 
         self.moved_group = {"ongrid": {}, "offgrid": {}}
+        self.player_start = (0, 0)
 
         self.infos_per_type_per_category = {
             "Levers": {
@@ -386,6 +740,7 @@ class EditorSimulation:
         self.next_available_group_id = "0"
 
         self.ui = UI(self)
+        self.playtest = PlayTest(self)
 
         self.save_action()
 
@@ -435,7 +790,7 @@ class EditorSimulation:
             self.history_index += 1
             self.restore_snapshot(self.history[self.history_index])
             print(f"Redo: Step {self.history_index}")
-            
+
     def get_infos_tile_category(self, tile):
         for tile_category in self.infos_per_type_per_category:
             if tile_category.lower()[:-1] in tile["type"]:
@@ -443,7 +798,7 @@ class EditorSimulation:
 
     def get_categories(self):
         self.categories = {}
-        self.categories = load_editor_tiles(self.level_manager.get_environment_by_id(self.level))
+        self.categories = load_editor_tiles(self.level_manager.get_environment_by_id(self.level_id))
         self.current_category = 0
         self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
 
@@ -762,6 +1117,12 @@ class EditorSimulation:
                             self.ungroup_group(group)
                             break
 
+                if event.key == pygame.K_g:
+                    self.state = "PlayTest"
+                    self.display = pygame.Surface((self.screen_width / 2, self.screen_height / 2))
+                    self.playtest.load_settings()
+                    self.playtest.load_level(self.level_id)
+
                 if event.key == pygame.K_w:
                     self.undo()
                 if event.key == pygame.K_y:
@@ -971,7 +1332,7 @@ class EditorSimulation:
 
     def render_selection_tool(self):
         self.selector.draw(self.display)
-        
+
     def render_map_editor(self):
         match self.current_tool:
             case "Brush":
@@ -980,6 +1341,9 @@ class EditorSimulation:
                 self.render_selection_tool()
             case "Move":
                 self.render_move_tool()
+        self.render_map()
+        self.render_display()
+        self.ui.draw()
 
     def render_map(self):
         self.scroll[0] += (self.movement[1] - self.movement[0]) * 8
@@ -1012,49 +1376,47 @@ class EditorSimulation:
 
     def run(self):
         while True:
-            self.mpos_update()
-            for event in pygame.event.get():
-                match self.state:
-                    case "MapEditor":
+            match self.state:
+                case "MapEditor":
+                    self.display.fill((0, 0, 0))
+                    self.mpos_update()
+                    for event in pygame.event.get():
                         if self.current_tool == "LevelSelector":
                             pass
                         else:
                             self.handle_map_editor(event)
-                self.ui.handle_ui_event(event)
+                        self.ui.handle_ui_event(event)
 
-                if event.type == pygame.MOUSEBUTTONUP:
-                    if event.button == 1:
-                        self.clicking = False
-                        self.waiting_for_click_release = False
-                    if event.button == 3:
-                        self.right_clicking = False
-                    if event.button in (1, 3) and self.temp_snapshot:
-                        current_state = self.create_snapshot()
-                        # Simply comparing the dicts detects if anything changed
-                        if current_state != self.temp_snapshot:
-                            self.save_action()
-                if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_LSHIFT:
-                        self.shift = False
-                if event.type == pygame.VIDEORESIZE:
-                    # Update screen dimensions
-                    self.screen_width = max(event.w, 480)  # Minimum width
-                    self.screen_height = max(event.h, 300)  # Minimum height
-                    self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
+                        if event.type == pygame.MOUSEBUTTONUP:
+                            if event.button == 1:
+                                self.clicking = False
+                                self.waiting_for_click_release = False
+                            if event.button == 3:
+                                self.right_clicking = False
+                            if event.button in (1, 3) and self.temp_snapshot:
+                                current_state = self.create_snapshot()
+                                # Simply comparing the dicts detects if anything changed
+                                if current_state != self.temp_snapshot:
+                                    self.save_action()
+                        if event.type == pygame.KEYUP:
+                            if event.key == pygame.K_LSHIFT:
+                                self.shift = False
+                        if event.type == pygame.VIDEORESIZE:
+                            # Update screen dimensions
+                            self.screen_width = max(event.w, 480)  # Minimum width
+                            self.screen_height = max(event.h, 300)  # Minimum height
+                            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height),
+                                                                  pygame.RESIZABLE)
+                        if event.type == pygame.QUIT:
+                            pygame.quit()
+                            sys.exit()
 
-            self.display.fill((0, 0, 0))
-            match self.state:
-                case "MapEditor":
                     self.render_map_editor()
+                    self.clock.tick(60)
+                    pygame.display.update()
 
-            self.render_map()
-            self.render_display()
-            self.ui.draw()
-            self.clock.tick(60)
-            pygame.display.update()
+                case "PlayTest":
+                    self.playtest.run()
 
 class UI:
     TOOLBAR_COLOR = (64,64,64)
