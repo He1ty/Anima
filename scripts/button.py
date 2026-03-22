@@ -119,6 +119,87 @@ class EditorButton:
         self.hover = self.is_selected(event,offset)
         return self.is_clicked(event,offset)
 
+class IconButton(EditorButton):
+    ALPHA = 80
+    def __init__(self,label:str,img:pygame.Surface,pos_center:tuple[int,int]|tuple[float,float], width: float, height:float,bg_color:tuple[int,int,int],resize=None):
+        super().__init__(label,img,pos_center,width,height,bg_color,resize)
+        self.width = width
+        self.height = height
+        self.radius = width // 2
+
+        if resize:
+            self.img = pygame.transform.scale(self.img, (width * resize, height * resize))
+        self.img_rect = self.img.get_rect(center=self.rect.center)
+
+        self.hover_img = pygame.transform.scale_by(self.img,1.2)
+        self.hover_img_rect = self.hover_img.get_rect(center=self.rect.center)
+
+
+        self.activated = False
+
+    def draw(self, screen):
+        self.img_rect = self.img.get_rect(center=self.rect.center)
+        self.hover_img_rect = self.hover_img.get_rect(center=self.rect.center)
+        if self.activated:
+            self.img.set_alpha(255)
+
+            if self.hover:
+                pygame.draw.circle(screen, (255, 255, 255), self.rect.center, self.radius + 4, )
+                pygame.draw.circle(screen, self.bg_color, self.rect.center, self.radius + 2)
+
+                screen.blit(self.hover_img, self.hover_img_rect)
+            else:
+                pygame.draw.circle(screen,(255,255,255), self.rect.center, self.radius+2)
+                pygame.draw.circle(screen,self.bg_color,self.rect.center,self.radius)
+                screen.blit(self.img, self.img_rect)
+        else:
+            surf = pygame.Surface((self.width+10,self.height+10),pygame.SRCALPHA)
+            surf.set_alpha(self.ALPHA)
+
+            pygame.draw.circle(surf, (255,255,255), surf.get_rect().center, self.radius+2)
+            pygame.draw.circle(surf, self.bg_color, surf.get_rect().center, self.radius)
+            surf.blit(self.img, self.img.get_rect(center=surf.get_rect().center))
+            screen.blit(surf, surf.get_rect(center=self.rect.center))
+
+
+    def is_clicked(self, event, offset=None):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if offset is None:
+                if event.button == 1 and self.rect.collidepoint(event.pos):
+                    self.hover = True
+            else:
+                if event.button == 1 and self.rect.move(offset).collidepoint(event.pos):
+                    self.hover = True
+        if event.type == pygame.MOUSEMOTION and self.hover:
+            if offset is None:
+                if self.rect.collidepoint(event.pos):
+                    self.hover = True
+                else:
+                    self.hover = False
+            else:
+                if self.rect.move(offset).collidepoint(event.pos):
+                    self.hover = True
+                else:
+                    self.hover = False
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            if offset is None:
+                if self.hover and self.rect.collidepoint(event.pos):
+                    self.hover = False
+                    return True
+            else:
+                if self.hover and self.rect.move(offset).collidepoint(event.pos):
+                    self.hover = False
+                    return True
+        return False
+
+    def is_selected(self, event, offset=None):
+        pass
+    def handle_event(self,event, offset=None):
+        if self.activated:
+            return self.is_clicked(event, offset)
+        return False
+
 class Dropdown:
     def __init__(self, x, y, font, options,
                  main_color=(180, 180, 180,0),

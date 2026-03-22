@@ -12,7 +12,7 @@ from scripts.saving import Save
 from scripts.sound import Sound
 from scripts.user_interface import Menu
 from scripts.utils import load_image, create_rect_alpha, load_tiles
-from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown
+from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown, IconButton
 from scripts.text import load_game_font
 from scripts.utils import *
 from scripts.tilemap import Tilemap
@@ -1445,6 +1445,8 @@ class UI:
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "LevelSelector"]
         self.check_buttons = []
         self.check_buttons_labels = ["On grid"]
+        self.on_selection_buttons = []
+        self.on_selection_buttons_labels = ["Link","Unlink"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
         self.buttons_images = {"Brush": load_image("ui/brush.png"),
                                "Eraser": load_image("ui/eraser.png"),
@@ -1452,7 +1454,9 @@ class UI:
                                "Move": load_image("ui/move.png"),
                                "LevelSelector": load_image("ui/level_selector.png"),
                                "On grid": load_image("ui/ongrid.png"),
-                               "Properties" : load_image("ui/properties.png")}
+                               "Properties" : load_image("ui/properties.png"),
+                               "Link": load_image("ui/link.png"),
+                               "Unlink": load_image("ui/unlink.png")}
 
         self.spectial_buttons_labels = {"Brush": [],
                                         "Eraser": [],
@@ -1518,6 +1522,7 @@ class UI:
         self.assets_section_buttons = []
         self.environment_selector_buttons = []
         self.check_buttons = []
+        self.on_selection_buttons = []
 
         button_x, button_y = self.toolbar_rect.width/2, self.toolbar_rect.width/2
         for label in self.tools_buttons_labels:
@@ -1584,6 +1589,19 @@ class UI:
             self.check_buttons.append(button)
 
         self.init_assets_buttons(self.editor.categories)
+
+        button_x,button_y = self.toolbar_rect.x - self.toolbar_rect.width/2 , self.toolbar_rect.width/2
+        for label in self.on_selection_buttons_labels:
+
+            if label == "Link":
+                button_y = self.screen_height - self.toolbar_buttons_height
+                color = (98, 171, 212)
+            if label == "Unlink":
+                color = (235, 217, 103)
+            button = IconButton(label,self.buttons_images[label],(button_x, button_y),self.toolbar_buttons_width,
+                       self.toolbar_buttons_height,color,resize=0.8)
+            button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
+            self.on_selection_buttons.append(button)
 
 
     def init_assets_buttons(self, categories):
@@ -1685,6 +1703,16 @@ class UI:
 
         self.screen.blit(overlay, (0, 0))
 
+    def render_on_selection(self, centerx):
+        for button in self.on_selection_buttons:
+            if self.editor.selector.group and button.label == "Link":
+                button.activated = True
+            else:
+                button.activated = False
+            button.rect.centerx = centerx
+            button.draw(self.screen)
+
+
     def check_closed(self):
         if self.closing:
             self.toolbar_rect.width = max(0, self.toolbar_rect.width - 5)
@@ -1754,6 +1782,10 @@ class UI:
                     self.render_level_selector()
             case "Properties":
                 self.render_properties_section()
+            case "Selection" | "Move":
+                self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
+
+
 
 
 
@@ -1782,6 +1814,8 @@ class UI:
                     self.handle_level_selector_event(event)
             case "Properties":
                 self.handle_properties_section_event(event)
+            case "Selection"|"Move":
+                self.handle_on_selection_event(event)
 
     def handle_toolbar_event(self, event):
         for button in self.tools_buttons:
@@ -1872,6 +1906,10 @@ class UI:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.editor.current_tool = self.editor_previous_tool
+
+    def handle_on_selection_event(self, event):
+        for button in self.on_selection_buttons:
+            button.handle_event(event)
 
 
 if __name__ == "__main__":

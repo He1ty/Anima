@@ -112,7 +112,7 @@ class Menu:
 
         # --- Souls Animation --- #
         self.souls_animation = Animation(load_images(f'environments/{self.game.get_environment_by_id(self.game.level)}'
-                                                     f'/images/tiles/pickups/soul/idle'),5,True)
+                                                     f'/images/tiles/pickups/soul/idle'),8,True)
         self.souls_pos = []
         self.souls_end_pos = [self.SH/12, self.SH/12]
         self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
@@ -300,6 +300,7 @@ class Menu:
                 self.draw_profile_selection_menu()
             case self.PAUSE_STATE:
                 self.draw_pause_menu()
+                self.draw_player_souls()
 
 
     def save_current_button_states(self):
@@ -889,6 +890,16 @@ class Menu:
                             sys.exit()
 
     def draw_player_souls(self):
+        if self.game.state == self.game.MENU_STATE and self.menu_state == self.PAUSE_STATE:
+            self.souls_animation.update()
+            nb_souls =  self.button_font.render(f"x{self.game.nb_souls}",True,self.COLORS["white"])
+            self.screen.blit(nb_souls, nb_souls.get_rect(center=self.nb_souls_pos))
+            souls_icon = pygame.transform.scale(self.souls_animation.img(), self.souls_start_size)
+            soul_rect = souls_icon.get_rect(centerx=int(self.souls_end_pos[0]), centery=int(self.souls_end_pos[1]))
+            self.screen.blit(souls_icon, soul_rect)
+
+            return
+
         if not self.is_souls_collected:
             return
 
