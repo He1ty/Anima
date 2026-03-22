@@ -12,28 +12,29 @@ from scripts.utils import key_name
 
 class Save:
 
+    DEFAULT_BINDINGS = {
+        "Movement": {
+            "Up": pygame.K_z,
+            "Down": pygame.K_s,
+            "Left": pygame.K_q,
+            "Right": pygame.K_d,
+            "Jump": pygame.K_SPACE,
+            "Dash": pygame.K_g
+        },
+        "Action": {
+            "Select": pygame.K_RETURN,
+            "Interact": pygame.K_e,
+        },
+        "Debug": {
+            "Show hitbox": pygame.K_h,
+            "No clip": pygame.K_n
+        }
+    }
+
     def __init__(self, game):
         self.game = game
         self.save_folder = "saves"
         self.ensure_save_folder_exists()
-        self.DEFAULT_BINDINGS = {
-    "Movement": {
-        "Up"        : pygame.K_z,
-        "Down"      : pygame.K_s,
-        "Left"      : pygame.K_q,
-        "Right"     : pygame.K_d,
-        "Jump"      : pygame.K_SPACE,
-        "Dash"      : pygame.K_g
-    },
-    "Action": {
-        "Select"      : pygame.K_RETURN,
-        "Interact"    : pygame.K_e,
-    },
-    "Debug":{
-        "Show hitbox"  : pygame.K_h,
-        "No clip"      : pygame.K_n
-    }
-}
 
 
     def ensure_save_folder_exists(self):

@@ -52,73 +52,8 @@ class Menu:
 
         self.button_font.set_bold(True)
 
-        self.settings_categories = {
-                                    "GAME" :
-                                        {"LANGUAGE":
-                                             {
-                                                 "type": "multiple_choices",
-                                                 "choices": self.game.languages,
-                                                 "current": self.game.selected_language
-                                             },
-                                        "DEBUG MODE":
-                                            {
-                                            "type":"switch",
-                                            "current": self.game.debug_mode
-                                            }
-                                        },
-
-                                    "AUDIO":
-                                        {"MAIN SOUND":
-                                            {
-                                                "type": "drag",
-                                                "current": self.game.master_volume
-                                            },
-                                        "MUSIC":
-                                            {
-                                                "type": "drag",
-                                                "current": self.game.music_sound_manager.volume
-                                            },
-                                        "SOUND EFFECTS":
-                                            {
-                                                "type": "drag",
-                                                "current": self.game.sound_effect_manager.volume
-                                            },
-                                        "UI SOUNDS":
-                                            {
-                                                "type": "drag",
-                                                "current": self.game.master_volume
-                                            }
-                                        },
-
-                                    "VIDEO":
-                                        {"FULL SCREEN":
-                                             {"type" : "switch",
-                                              "current": self.game.fullscreen},
-                                        "V-SYNC" :
-                                             {
-                                                 "type" : "switch",
-                                                 "current" : self.game.vsync_on
-                                             },
-                                        "BRIGHTNESS" :
-                                             {
-                                                 "type": "drag",
-                                                 "current": self.game.brightness
-                                             }
-                                        },
-
-                                    "KEYBOARD":
-                                        {"Layout":
-                                             {
-                                                 "type":"multiple_choices",
-                                                 "choices": ["AZERTY", "QWERTY"],
-                                                 "current" : self.game.keyboard_layout
-                                             },
-                                        "Binds":
-                                            {
-                                                "type":"binds"
-                                            }
-                                         }
-                                    }
+        self.settings_categories = {}
+        self.update_settings_categories()
 
         self.thumbs = {}
         for i in range(3):

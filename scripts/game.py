@@ -36,48 +36,27 @@ class Game:
     SCREEN_HEIGHT = 600
 
     def __init__(self):
-        """
-        Initializes all engine systems in dependency order:
-        display → sound → settings → world → player → vfx → ui.
-        """
-
         pygame.init()
+        self._init_display()
+        self._init_assets()
+        self._init_sound()
+        self._init_settings()
+        self._init_runtime_state()
+        self.menu = Menu(self)
 
-        # ── 1. Window & display ────────────────────────────────────────────────
+    def _init_display(self):
         pygame.display.set_caption("Anima")
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         self.display = pygame.Surface((self.SCREEN_WIDTH / 2, self.SCREEN_HEIGHT / 2))
         self.clock = pygame.time.Clock()
         self.debug_mode = False
-
         try:
             icon = pygame.image.load("assets/images/ui/logo.png").convert_alpha()
             pygame.display.set_icon(pygame.transform.smoothscale(icon, (16, 16)))
         except FileNotFoundError:
             pass
 
-        # ── 5. Level & map data ────────────────────────────────────────────────
-        self.level_id = 1
-
-        path = 'data/environments.json'
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                self.environments = json.load(f)
-
-        self.environment = self.get_environment_by_id(self.level_id)
-        self.level = self.get_file_name(self.environment, self.level_id)
-        self.default_level = self.level
-
-        self.tile_size = 16
-        self.b_info = {
-            "white_space": {"animated": True, "img_dur": 6, "loop": True},
-            "green_cave": {"animated": False},
-            "blue_cave": {"animated": False},
-        }
-        self.spawners = {}
-        self.spawner_pos = {}
-
-        # ── 2. Sound ───────────────────────────────────────────────────────────
+    def _init_sound(self):
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=2048)
@@ -88,13 +67,11 @@ class Game:
 
         self.master_volume = 1
         player_sfx = "assets/player/sounds/"
-
         self.music_sound_manager = Sound(self, {
             'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
             'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
             'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",
         }, is_music=True, master_volume=self.master_volume, volume=1)
-
         self.sound_effect_manager = Sound(self, {
             "dash": player_sfx + 'dash.wav',
             "jump": player_sfx + 'jump.wav',
@@ -105,49 +82,66 @@ class Game:
             "stun": None,
         }, is_music=False, master_volume=self.master_volume, volume=0.5)
 
-        # ── 3. Save & settings ─────────────────────────────────────────────────
+    def _init_settings(self):
         self.save_system = Save(self)
         self.current_slot = None
-
         self.languages = ["Français", "English", "Español"]
         self.selected_language = self.languages[1]
         self.fullscreen = False
         self.vsync_on = False
         self.brightness = 0.5
-
-        # ── 4. Keybindings ─────────────────────────────────────────────────────
         self.keyboard_layout = "AZERTY"
         self.key_map = {
-            "key_up": pygame.K_z,
-            "key_down": pygame.K_s,
-            "key_left": pygame.K_q,
-            "key_right": pygame.K_d,
-            "key_jump": pygame.K_SPACE,
-            "key_dash": pygame.K_g,
-            "key_interact": pygame.K_e,
-            "key_noclip": pygame.K_n,
-            "key_hitbox": pygame.K_h,
-            "key_select": pygame.K_RETURN,
+            "key_up": pygame.K_z, "key_down": pygame.K_s,
+            "key_left": pygame.K_q, "key_right": pygame.K_d,
+            "key_jump": pygame.K_SPACE, "key_dash": pygame.K_g,
+            "key_interact": pygame.K_e, "key_noclip": pygame.K_n,
+            "key_hitbox": pygame.K_h, "key_select": pygame.K_RETURN,
         }
+
+    def _init_assets(self):
+        self.level_id = 1
+        path = 'data/environments.json'
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                self.environments = json.load(f)
+
+        self.environment = self.get_environment_by_id(self.level_id)
+        self.level = self.get_file_name(self.environment, self.level_id)
+        self.default_level = self.level
+        self.tile_size = 16
+        self.b_info = {
+            "white_space": {"animated": True, "img_dur": 6, "loop": True},
+            "green_cave": {"animated": False},
+            "blue_cave": {"animated": False},
+        }
+        self.assets = {}
+        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_player())
+        self.assets.update(load_backgrounds(self.b_info, self.environment))
+        self.assets.update(load_particles(self.environment))
+        self.doors_id_pairs = []
+        self.levers_id_pairs = []
+        self.buttons_id_pairs = []
+        self.tp_id_pairs = []
+        self.tilemap = Tilemap(self, self.tile_size)
+
+    def _init_runtime_state(self):
+        """Everything that resets on reload(). Single source of truth."""
+        # Input
         self.keybindings = {}
         self.dict_kb = {
             "key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
             "key_jump": 0, "key_dash": 0, "key_noclip": 0,
         }
 
-        # ── 6. Assets ──────────────────────────────────────────────────────────
-        self.assets = {}
-        self.assets.update(load_tiles(self.environment))
-        self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.environment))
-        self.assets.update(load_particles(self.environment))
+        # State machine
+        self.state = self.MENU_STATE
+        self.previous_state = None
+        self.game_initialized = False
+        self.current_mode = "default"
 
-        self.doors_id_pairs = []
-        self.levers_id_pairs = []
-        self.buttons_id_pairs = []
-        self.tp_id_pairs = []
-
-        # ── 7. Camera ──────────────────────────────────────────────────────────
+        # Camera
         self.camera = Camera(self)
         self.camera_center = None
         self.scroll_limits_per_level = {
@@ -156,54 +150,74 @@ class Game:
         }
         self.scroll_limits = self.scroll_limits_per_level["1"]
         self.screenshake = 0
+        self.scroll = [0.0, 0.0]
 
-        # ── 8. Tilemap ─────────────────────────────────────────────────────────
-        self.tilemap = Tilemap(self, self.tile_size)
-        self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
-        self.doors_rects = []
-        self.show_spikes_hitboxes = False
-
-        # ── 9. Player ──────────────────────────────────────────────────────────
+        # Player
         self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
         self.player_dead = False
         self.death_counter = 0
-
         self.collected_souls = []
         self.nb_souls = 0
-
         self.checkpoints = []
         self.current_checkpoint = None
         self.active_checkpoint_anim = None
         self.sections = {0: (0, 1, 2)}
+        self.spawn_point = {
+            "pos": [100, 0],
+            "level": self.level,
+            "scroll_limits": {"x": (0, 0), "y": (-1230, 1233)},
+            "camera_center": None,
+            "cameras": {}
+        }
 
-        # ── 10. Activators & interactables ────────────────────────────────────
+        # Activators / interactables
         self.activators = []
+        self.activators_actions = load_activators_actions(
+            self.level, self.tilemap.layers["activators"]
+        )
+        self.spawners = {}
+        self.spawner_pos = {}
         self.projectiles = []
         self.teleporting = False
         self.tp_id = None
         self.last_teleport_time = 0
         self.player_grabbing = False
 
-        # ── 11. Game state & flow ─────────────────────────────────────────────
-        self.state = self.MENU_STATE
-        self.previous_state = None
-        self.game_initialized = False
-        self.current_mode = "default"
-
+        # Gameplay flow
         self.cutscene = False
         self.game_texts = load_game_texts()
         self.bottom_text = None
-
         self.attacking = False
         self.holding_attack = False
+        self.transitions = []
+        self.doors_rects = []
 
-        # ── 12. Lighting ──────────────────────────────────────────────────────
+        # Lighting
+        self._init_lighting()
+
+        # VFX / combat
+        self.particles = []
+        self.sparks = []
+        self.moving_visual = False
+        self.damage_flash_active = False
+        self.damage_flash_end_time = 0
+        self.damage_flash_duration = 100
+        self.fake_tiles_opacity = 255
+        self.fake_tiles_colliding_group = []
+        if hasattr(self, "fake_tile_groups"):
+            delattr(self, "fake_tile_groups")
+
+        # Timers
+        self.playtime = 0
+        self.menu_time = 0
+        self.show_spikes_hitboxes = False
+
+    def _init_lighting(self):
         self.darkness_level = 255
         self.light_radius = 10
         self.light_soft_edge = 200
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
-
         self.light_properties = {
             "player": {"radius": 100, "intensity": 250, "edge_softness": 255, "color": (255, 255, 255),
                        "flicker": False},
@@ -216,118 +230,63 @@ class Game:
         }
         self.light_infos = {i: {"darkness_level": 180, "light_radius": 200} for i in range(5)}
         self.player_light = self.light_properties["player"]
-
         self.shader = Shader(self)
-        self.light_mask = pygame.Surface((self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA)
-        self.shader.create_light_mask(self.light_radius)
-
-        # ── 13. VFX & combat ──────────────────────────────────────────────────
-        self.particles = []
-        self.sparks = []
-        self.moving_visual = False
-
-        self.damage_flash_active = False
-        self.damage_flash_end_time = 0
-        self.damage_flash_duration = 100
-
-        self.fake_tiles_opacity = 255
-        self.fake_tiles_colliding_group = []
-        if hasattr(self, "fake_tile_groups"):
-            delattr(self, "fake_tile_groups")
-
-        # ── 14. UI & menu ─────────────────────────────────────────────────────
-        self.menu = Menu(self)
-
-        # ── 15. Timers & counters ─────────────────────────────────────────────
-        self.playtime = 0
-        self.menu_time = 0
+        self.light_mask = pygame.Surface(
+            (self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA
+        )
 
     def reload(self):
         self.previous_state = None
         self.state = self.MENU_STATE
-        self.game_initialized = False
+        self._init_runtime_state()
+        # Keep menu alive — just reset its music
+        self.music_sound_manager.play(name="title_screen", loops=-1)
 
-        self.death_counter = 0
+    def _handle_events(self):
+        """Pure event polling. Returns False if game should quit."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            self._handle_keydown(event)
+            self._handle_keyup(event)
+            self._update_dict_kb(event)
+        return True
 
-        self.spawners = {}
-        self.scroll_limits_per_level = {"1": {"x": (0, 0), "y": (-1230, 1233)},
-                                        "2": {"x": (64, 624), "y": (-176, 144)}}
+    def _handle_keydown(self, event):
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key == pygame.K_ESCAPE:
+            self.menu.capture_background()
+            self.state = self.MENU_STATE
+            self.menu.menu_state = self.menu.PAUSE_STATE
+            for key in self.dict_kb: self.dict_kb[key] = 0
+        elif event.key == self.key_map["key_interact"]:
+            update_throwable_objects_action(self)
+            if not self.player_grabbing:
+                update_activators_actions(self)
+        elif event.key == pygame.K_F11:
+            toggle_fullscreen(self)
+        elif event.key == pygame.K_f and not self.holding_attack:
+            self.dict_kb["key_attack"] = 1
+            self.holding_attack = True
+        elif event.key == self.key_map["key_hitbox"] and self.debug_mode:
+            self.toggle_hitboxes()
+        elif event.key == pygame.K_r:
+            kill_player(self)
 
-        self.scroll_limits = self.scroll_limits_per_level["1"]
-        # "x": (64, 624), "y": (-176, 144)
+    def _handle_keyup(self, event):
+        if event.type != pygame.KEYUP:
+            return
+        if event.key == pygame.K_f:
+            self.dict_kb["key_attack"] = 0
+            self.holding_attack = False
 
-        self.camera_center = None
-
-        self.camera = Camera(self)
-
-        # --- Input & Level Tracking ---
-        self.keybindings = {}
-        self.dict_kb = {"key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
-                        "key_jump": 0, "key_dash": 0, "key_noclip": 0}
-
-        self.active_checkpoint_anim = None
-
-        self.activators = []
-        self.projectiles = []
-        self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
-        self.spawner_pos = {}
-
-        self.checkpoints = []
-        self.current_checkpoint = None
-
-        # --- Player Stats & Combat ---
-        self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
-        self.player_dead = False
-
-        self.holding_attack = False
-        self.attacking = False
-
-        self.teleporting = False
-        self.tp_id = None
-        self.last_teleport_time = 0
-        self.screenshake = 0
-        self.cutscene = False
-        self.bottom_text = None
-        self.doors_rects = []
-
-        # --- Lighting System ---
-        self.darkness_level = 255
-        self.light_radius = 10
-        self.light_soft_edge = 200
-        self.light_emitting_tiles = []
-        self.light_emitting_objects = []
-
-        # --- Fake Tiles System ---
-        self.fake_tiles_opacity = 255
-        self.fake_tiles_colliding_group = []
-
-        self.shader = Shader(self)
-
-        self.light_infos = {i: {"darkness_level": 180, "light_radius": 200} for i in range(5)}
-        self.light_mask = pygame.Surface((self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA)
-        self.shader.create_light_mask(self.light_radius)
-        self.player_light = self.light_properties["player"]
-
-        # --- Interactions & VFX ---
-        self.moving_visual = False
-        self.player_grabbing = False
-        self.damage_flash_active = False
-        self.damage_flash_end_time = 0
-        self.damage_flash_duration = 100
-        self.particles = []
-        self.sparks = []
-
-        # --- Modes configuration ---
-        self.current_mode = "default"
-
-        # --- Hitboxes
-        self.show_spikes_hitboxes = False
-
-        self.playtime = 0
-        self.menu_time = 0
-
-        if hasattr(self, "fake_tile_groups"):
-            delattr(self, "fake_tile_groups")
+    def _update_dict_kb(self, event):
+        if event.type not in (pygame.KEYDOWN, pygame.KEYUP):
+            return
+        for key, mapped in self.key_map.items():
+            if event.key == mapped:
+                self.dict_kb[key] = 1 if event.type == pygame.KEYDOWN else 0
 
     def toggle_hitboxes(self):
         self.player.show_hitbox = not self.player.show_hitbox
@@ -633,140 +592,83 @@ class Game:
             self.fake_tiles_colliding_group = []
 
     def main_game_logic(self):
-        """
-        The core gameplay loop. Handles physics, collision, rendering order,
-        entity updates, and UI blitting. This is called once per frame while state is 'PLAYING'.
-        """
-        # Calculate delta time at the very start of the logic loop
-        # clock.tick returns milliseconds. 1000ms / 60fps = 16.666ms per frame.
-        # This makes dt = 1.0 at 60 FPS, and dt = 2.0 at 30 FPS.
         raw_dt = self.clock.tick(60)
-        dt = raw_dt / (1000.0 / 60.0)
+        dt = min(raw_dt / (1000.0 / 60.0), 3.0)
 
-        # Cap dt to prevent the player from clipping through walls during massive lag spikes
-        dt = min(dt, 3.0)
+        self._update_world(dt)
+        self._render_world()
+        self._render_ui()
 
-        # -- Camera & Render Scroll setup
+        if not self._handle_events():
+            pygame.quit()
+            sys.exit()
 
+    def _update_world(self, dt):
         self.update_camera_setup()
         self.camera.update_camera()
-        render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
-        display_level_bg(self, self.level_id)
-
-        # -- Tilemap Render and Update
-        self.tilemap.render(self.display, offset=render_scroll)
         self.player.physics_process(self.dict_kb, dt)
-
-        # -- Pre Game-Initialization
+        self.update_transitions()
+        if self.teleporting:
+            update_teleporter(self, self.tp_id)
+        self.player.disablePlayerInput = (
+                self.cutscene or self.moving_visual or self.teleporting
+        )
         if not self.game_initialized:
             self.start_time = time.time()
 
-        # -- Transitions Update (from one map to another)
-        self.update_transitions()
-
-        # -- Transition Animation Update
-        if self.transition < 0: self.transition += 2
-
-        # -- Checkpoints Render and Update
+    def _render_world(self):
+        render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
+        display_level_bg(self, self.level_id)
+        self.tilemap.render(self.display, offset=render_scroll)
         self.checkpoints_render_and_update(render_scroll)
         doors_render_and_update(self, render_scroll)
-
-        # -- Teleporters Render and Update
-        if self.teleporting:
-            update_teleporter(self, self.tp_id)
-
-        # -- Player Input Disable
-        self.player.disablePlayerInput = self.cutscene or self.moving_visual or self.teleporting
-
-        # -- Activators Render
         render_activators(self, render_scroll)
-
-        # -- Spikes Hitboxes render and update
         self.spike_hitbox_update(render_scroll)
-
-        # -- Particles Render and Update
         update_particles(self, render_scroll)
         particle_render(self, render_scroll)
-
-        # -- Foreground & Lighting
         self.shader.display_level_fg(self.level)
         self.shader.apply_lighting(render_scroll)
 
-
+    def _render_ui(self):
         update_bottom_text(self)
         if self.cutscene:
             draw_cutscene_border(self.display)
-        else:
-            pass
+        self._render_transition()
+        self._render_screenshake()
+        death_handling(self, self.screen)
+        self._finalize_frame()
 
-        # Handle Circle Transition Effect
+    def _render_transition(self):
+        if self.transition < 0:
+            self.transition += 2
         if self.transition:
             self.player.disablePlayerInput = True
-            transition_surf = pygame.Surface(self.display.get_size())
-            pygame.draw.circle(transition_surf, (255, 255, 255),
+            surf = pygame.Surface(self.display.get_size())
+            pygame.draw.circle(surf, (255, 255, 255),
                                (self.display.get_width() // 2, self.display.get_height() // 2),
                                (30 - abs(self.transition)) * 8)
-            transition_surf.set_colorkey((255, 255, 255))
-            self.display.blit(transition_surf, (0, 0))
+            surf.set_colorkey((255, 255, 255))
+            self.display.blit(surf, (0, 0))
         else:
             self.player.disablePlayerInput = False
 
-        # -- Screenshake Update and Render
-        # Scaling internal display to window size with screenshake
+    def _render_screenshake(self):
         self.screenshake = max(0, self.screenshake - 1)
-        screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2,
-                              random.random() * self.screenshake - self.screenshake / 2)
-        self.screen.blit(pygame.transform.scale(self.display, self.screen.get_size()), screenshake_offset)
+        offset = (
+            random.random() * self.screenshake - self.screenshake / 2,
+            random.random() * self.screenshake - self.screenshake / 2,
+        )
+        self.screen.blit(
+            pygame.transform.scale(self.display, self.screen.get_size()), offset
+        )
 
-
-        # -- Death Handling
-        death_handling(self, self.screen)
-
-        # -- Game initialization
+    def _finalize_frame(self):
         if not self.game_initialized:
             self.game_initialized = True
-            # - Save game on start
             if not os.path.exists(f"saves/save_{self.current_slot}.json"):
                 self.save_game(self.current_slot)
 
-        # -- Input Handling
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    self.menu.capture_background()
-                    self.state = self.MENU_STATE
-                    self.menu.menu_state = self.menu.PAUSE_STATE
-                    #self.menu.menu_display()
-                    for key in self.dict_kb.keys(): self.dict_kb[key] = 0
-                if event.key == self.key_map["key_interact"]:
-                    # Interact with items or levers
-                    update_throwable_objects_action(self)
-                    if not self.player_grabbing:
-                        update_activators_actions(self)
 
-                if event.key == pygame.K_F11: toggle_fullscreen(self)
-                if event.key == pygame.K_f and not self.holding_attack:
-                    self.dict_kb["key_attack"] = 1
-                    self.holding_attack = True
-                if event.key == self.key_map["key_hitbox"] and self.debug_mode:
-                    self.toggle_hitboxes()
-                if event.key == pygame.K_r:
-                    kill_player(self)
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_f:
-                    self.dict_kb["key_attack"] = 0
-                    self.holding_attack = False
-            # Generic keyboard state mapping
-            if event.type in (pygame.KEYDOWN, pygame.KEYUP):
-                for key in self.key_map.keys():
-                    if event.key  == self.key_map[key]:
-                        if event.type == pygame.KEYDOWN:
-                            self.dict_kb[key] = 1
-                        else:
-                            self.dict_kb[key] = 0
 
     def run(self):
         """
@@ -785,6 +687,7 @@ class Game:
                     self.menu.draw_player_souls()
             self.apply_brightness()
             pygame.display.update()
+
 
     def apply_brightness(self):
         width, height = self.screen.get_size()

@@ -575,7 +575,7 @@ class PlayTest(Game):
         self.scroll = [target_x, target_y]
 
 
-        self.transitions = self.tilemap.extract([("transition", 0)])
+        self.transitions = []
 
         # Reset VFX and interaction pools
         self.interactable = self.throwable.copy() + self.activators.copy()
