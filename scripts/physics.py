@@ -749,7 +749,7 @@ class PhysicsPlayer:
                                 self.dash_direction[0] == 0 or self.dash_direction[1] == 0):
                             for i in range(1, self.COLLISION_DODGED_PIXELS + 1):
                                 # Try nudging Right
-                                right_shifted_hitbox_rect = pygame.Rect(self.pos[0] + i, self.pos[1], self.size[0],
+                                right_shifted_hitbox_rect = pygame.Rect(round(self.pos[0]) + i, round(self.pos[1]), self.size[0],
                                                     self.size[1])
                                 if not any(
                                         right_shifted_hitbox_rect.colliderect(r)
@@ -759,7 +759,7 @@ class PhysicsPlayer:
                                     nudged = True
                                     break
                                 # Try nudging Left
-                                left_shifted_hitbox_rect = pygame.Rect(self.pos[0] - i, self.pos[1], self.size[0],
+                                left_shifted_hitbox_rect = pygame.Rect(round(self.pos[0]) - i, round(self.pos[1]), self.size[0],
                                                     self.size[1])
                                 if not any(
                                         left_shifted_hitbox_rect.colliderect(r)

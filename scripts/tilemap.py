@@ -2,6 +2,7 @@ import pygame
 
 import json
 import math
+import copy
 
 from pygame import BLEND_ADD, BLEND_MAX, BLEND_RGBA_MULT, BLEND_RGBA_SUB, BLEND_RGBA_ADD
 
@@ -207,6 +208,16 @@ class Tilemap:
                         new_variant = a_map[neighbors]
                         if new_variant < len(self.game.assets[tile["type"]]):
                             tile['variant'] = new_variant
+
+    def copy(self, new_game):
+        tilemap_copy = Tilemap(new_game, self.tile_size)
+        tilemap_copy.tilemap = copy.deepcopy(self.tilemap)
+        tilemap_copy.offgrid_tiles = copy.deepcopy(self.offgrid_tiles)
+        tilemap_copy.layers = copy.deepcopy(self.layers)
+        tilemap_copy.selection_groups = copy.deepcopy((self.selection_groups))
+        tilemap_copy.tag_groups = copy.deepcopy(self.tag_groups)
+
+        return tilemap_copy
 
     def solid_check(self, pos, transparent_check=True):
         tile_loc = str(int(pos[0] // self.tile_size)) + ";" + str(int(pos[1] // self.tile_size))
