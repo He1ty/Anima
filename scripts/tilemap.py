@@ -27,9 +27,9 @@ AUTOTILE_MAP = {
     tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, -1), (-1, 1)])): 14,
 }
 
-PHYSICS_TILES = {'white_blocks', 'purpur_rock', 'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass', 'mossy_stone_gluy'}
+PHYSICS_TILES = {'white_blocks', 'purpur_rock', 'vine','mossy_stone', 'gray_mossy_stone', 'mossy_stone_gluy'}
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
-AUTOTILE_TYPES = {'white_blocks', 'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
+AUTOTILE_TYPES = {'red_spikes', 'white_blocks', 'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
 AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
 
 class Tilemap:
@@ -76,6 +76,15 @@ class Tilemap:
                             del self.offgrid_tiles[layer][loc]
 
         return matches
+    
+    def remove_tile(self, pos, layer):
+        if layer in self.tilemap:
+            if pos in self.tilemap[layer]:
+                del self.tilemap[layer][pos]
+        if layer in self.offgrid_tiles:
+            if pos in self.offgrid_tiles[layer]:
+                del self.offgrid_tiles[layer][pos]
+            
 
     def neighbor_offset(self, size):
         offset = []

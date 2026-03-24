@@ -17,6 +17,57 @@ from scripts.text import load_game_texts, update_bottom_text
 from scripts.sound import Sound
 from scripts.pickup import Pickup
 
+class LevelManager:
+    def __init__(self, game):
+        self.game = game
+
+    def get_env_prefix(self, env_name):
+        # Converts "green_cave" to "gc", "white_space" to "ws"
+        return "".join([word[0] for word in env_name.split("_")])
+
+    def get_file_name(self, env_name, map_id):
+        prefix = self.get_env_prefix(env_name)
+        return f"{prefix}{map_id:03d}.json"
+
+    def get_environment_by_id(self, map_id, environments_dict=None):
+        if environments_dict is None:
+            environments_dict = self.game.environments
+        for env, ids in environments_dict.items():
+            if map_id in ids:
+                return env
+        return "white_space"
+
+    def load_level(self, level_id):
+        self.game.environment = self.get_environment_by_id(level_id)
+        map_name = self.get_file_name(self.game.environment, level_id)
+        self.game.assets = {}
+        self.game.assets.update(load_tiles(self.game.environment))
+        self.game.assets.update(load_player())
+        self.game.assets.update(load_backgrounds(self.game.b_info, self.game.environment))
+        self.game.assets.update(load_particles(self.game.environment))
+        self.game.tilemap.load("data/maps/" + map_name)
+        self.game.tilemap.tile_size = self.game.tile_size
+
+        self.game.levers = []
+        self.game.doors = []
+        self.game.spikes = []
+        self.game.fake_tiles = []
+        for group_id in self.game.tilemap.tag_groups:
+            group = self.game.tilemap.tag_groups[group_id]
+            group_tags = group["tags"]
+            match group_tags:
+                case _ if "lever" in group_tags:
+                    tag = group_tags["lever"]
+                    for tile_pos, tile_layer in group["tiles"]:
+                        self.game.tilemap.remove_tile(tile_pos, tile_layer)
+                        #self.game.levers.append(Lever(group_id, tile_pos, tag["target_group"]))
+                        pass
+                case _ if "door" in group_tags:
+                    pass
+                case _ if "spike" in group_tags:
+                    pass
+                case _ if "fake_tile" in group_tags:
+                    pass
 
 class Game:
     """
@@ -37,6 +88,8 @@ class Game:
 
     def __init__(self):
         pygame.init()
+
+        self.level_manager = LevelManager(self)
         self._init_display()
         self._init_assets()
         self._init_sound()
@@ -69,8 +122,8 @@ class Game:
         player_sfx = "assets/player/sounds/"
         self.music_sound_manager = Sound(self, {
             'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-            'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
-            'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",
+            'level_1': f"assets/environments/{self.level_manager.get_environment_by_id(1)}/sounds/map_1.wav",
+            'level_2': f"assets/environments/{self.level_manager.get_environment_by_id(2)}/sounds/map_2.wav",
         }, is_music=True, master_volume=self.master_volume, volume=1)
         self.sound_effect_manager = Sound(self, {
             "dash": player_sfx + 'dash.wav',
@@ -106,8 +159,8 @@ class Game:
             with open(path, 'r') as f:
                 self.environments = json.load(f)
 
-        self.environment = self.get_environment_by_id(self.level_id)
-        self.level = self.get_file_name(self.environment, self.level_id)
+        self.environment = self.level_manager.get_environment_by_id(self.level_id)
+        self.level = self.level_manager.get_file_name(self.environment, self.level_id)
         self.default_level = self.level
         self.tile_size = 16
         self.b_info = {
@@ -293,22 +346,6 @@ class Game:
         self.show_spikes_hitboxes = not self.show_spikes_hitboxes
         #self.tilemap.show_collisions = not self.tilemap.show_collisions
 
-    def get_env_prefix(self, env_name):
-        # Converts "green_cave" to "gc", "white_space" to "ws"
-        return "".join([word[0] for word in env_name.split("_")])
-
-    def get_file_name(self, env_name, map_id):
-        prefix = self.get_env_prefix(env_name)
-        return f"{prefix}{map_id:03d}.json"
-
-    def get_environment_by_id(self, map_id, environments_dict=None):
-        if environments_dict is None:
-            environments_dict = self.environments
-        for env, ids in environments_dict.items():
-            if map_id in ids:
-                return env
-        return "white_space"
-
     def set_keymap(self,bindings: dict):
         for cat in bindings:
             for bind in bindings[cat]:
@@ -328,18 +365,15 @@ class Game:
             :param map_id:
             :param transition_effect:
         """
-        self.environment = self.get_environment_by_id(self.level_id)
-        map_name = self.get_file_name(self.environment, map_id)
+        self.environment = self.level_manager.get_environment_by_id(self.level_id)
+        map_name = self.level_manager.get_file_name(self.environment, map_id)
         self.assets = {}
         self.assets.update(load_tiles(self.environment))
         self.assets.update(load_player())
         self.assets.update(load_backgrounds(self.b_info, self.environment))
         self.assets.update(load_particles(self.environment))
-
         self.tilemap.load("data/maps/" + map_name)
         self.tilemap.tile_size = self.tile_size
-        mult=0.5
-        self.display = pygame.Surface((self.SCREEN_WIDTH*mult, self.SCREEN_HEIGHT*mult))
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
         self.activators_actions = load_activators_actions(map_name, self.tilemap.layers["activators"])
@@ -488,7 +522,7 @@ class Game:
             if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
                     self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
                 self.level_id = int(transition["destination"])
-                self.level = self.get_file_name(self.environment, self.level_id)
+                self.level = self.level_manager.get_file_name(self.environment, self.level_id)
                 self.scroll_limits = self.scroll_limits_per_level[str(self.level_id)]
                 delattr(self, "fake_tile_groups")
                 self.load_level(self.level_id, transition_effect=False)

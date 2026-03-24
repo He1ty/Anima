@@ -330,8 +330,8 @@ class PlayTest(Game):
 
         self.music_sound_manager = Sound(self, {
             'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-            'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
-            'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",
+            'level_1': f"assets/environments/{self.level_manager.get_environment_by_id(1)}/sounds/map_1.wav",
+            'level_2': f"assets/environments/{self.level_manager.get_environment_by_id(2)}/sounds/map_2.wav",
         }, is_music=True, master_volume=self.master_volume, volume=1)
 
         self.sound_effect_manager = Sound(self, {
@@ -877,7 +877,7 @@ class EditorSimulation:
             1] < self.main_area_height:  # Only if mouse is over main area
             # Scale mouse position to account for display scaling
             scale_x = 960 / (self.screen.get_size()[0])
-            scale_y = 576 / (self.screen.get_size()[1])
+            scale_y = 600 / (self.screen.get_size()[1])
             self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
                                 (self.mpos[1] / 2) * scale_y * self.zoom)
             self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
@@ -1368,8 +1368,8 @@ class EditorSimulation:
         changing_size = False
         screenshot = self.screen.copy()
 
-        if self.display.get_size() != (int(480 * self.zoom), int(288 * self.zoom)):
-            self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
+        if self.display.get_size() != (int(480 * self.zoom), int(300 * self.zoom)):
+            self.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
             changing_size = True
 
         scaled_display = pygame.transform.scale(self.display, self.screen.get_size())
