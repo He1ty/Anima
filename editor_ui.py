@@ -1452,7 +1452,7 @@ class UI:
         self.check_buttons = []
         self.check_buttons_labels = ["On grid"]
         self.on_selection_buttons = []
-        self.on_selection_buttons_labels = ["Link","Unlink"]
+        self.on_selection_buttons_labels = ["Plus","Link","Unlink","Unlock"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
         self.buttons_images = {"Brush": load_image("ui/brush.png"),
                                "Eraser": load_image("ui/eraser.png"),
@@ -1462,7 +1462,9 @@ class UI:
                                "On grid": load_image("ui/ongrid.png"),
                                "Properties" : load_image("ui/properties.png"),
                                "Link": load_image("ui/link.png"),
-                               "Unlink": load_image("ui/unlink.png")}
+                               "Unlink": load_image("ui/unlink.png"),
+                               "Plus":load_image("ui/plus.png"),
+                               "Unlock": load_image("ui/skull.png")}
 
         self.spectial_buttons_labels = {"Brush": [],
                                         "Eraser": [],
@@ -1598,12 +1600,16 @@ class UI:
 
         button_x,button_y = self.toolbar_rect.x - self.toolbar_rect.width/2 , self.toolbar_rect.width/2
         for label in self.on_selection_buttons_labels:
-
+            if label == "Plus":
+                button_y = self.toolbar_buttons_height
+                color = (42, 90, 57)
             if label == "Link":
                 button_y = self.screen_height - self.toolbar_buttons_height
                 color = (98, 171, 212)
             if label == "Unlink":
                 color = (235, 217, 103)
+            if label == "Unlock":
+                color = (255,0,0)
             button = IconButton(label,self.buttons_images[label],(button_x, button_y),self.toolbar_buttons_width,
                        self.toolbar_buttons_height,color,resize=0.8)
             button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
@@ -1716,6 +1722,8 @@ class UI:
                     button.activated = True
                 else:
                     button.activated = False
+            elif button.label == "Plus":
+                button.activated = True
             else:
                 button.activated = False
                 if self.editor.current_layer in self.editor.tilemap.selection_groups:
