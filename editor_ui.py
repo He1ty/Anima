@@ -330,8 +330,8 @@ class PlayTest(Game):
 
         self.music_sound_manager = Sound(self, {
             'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-            'level_1': f"assets/environments/{self.get_environment_by_id(1)}/sounds/map_1.wav",
-            'level_2': f"assets/environments/{self.get_environment_by_id(2)}/sounds/map_2.wav",
+            'level_1': f"assets/environments/{self.level_manager.get_environment_by_id(1)}/sounds/map_1.wav",
+            'level_2': f"assets/environments/{self.level_manager.get_environment_by_id(2)}/sounds/map_2.wav",
         }, is_music=True, master_volume=self.master_volume, volume=1)
 
         self.sound_effect_manager = Sound(self, {
@@ -504,7 +504,6 @@ class PlayTest(Game):
         self.assets.update(load_particles(self.environment))
 
         self.tilemap.tile_size = self.tile_size
-        self.display = self.editor.display
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
         #self.activators_actions = load_activators_actions(map_name, self.tilemap.layers["activators"])
@@ -622,6 +621,15 @@ class PlayTest(Game):
         self.max_falling_depth = 50000000000
         self.shader.update_light()
 
+    def leave(self):
+        self.editor.state = "MapEditor"
+        self.state = self.PLAYING_STATE
+        self.editor.screen = self.screen
+        self.editor.screen_width, self.editor.screen_height = self.screen.get_size()
+        self.editor.screen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)
+        self.editor.ui.reload()
+        self.music_sound_manager.stop('title_screen')
+
     def run(self):
         """
         The main program entry point.
@@ -631,9 +639,7 @@ class PlayTest(Game):
             case self.MENU_STATE:
                 self.menu.draw()
                 if self.menu.menu_state == self.menu.TITLE_STATE:
-                    self.editor.state = "MapEditor"
-                    self.state = self.PLAYING_STATE
-                    self.music_sound_manager.stop('title_screen')
+                    self.leave()
             case self.PLAYING_STATE:
                 self.main_game_logic()
                 self.menu.draw_player_souls()
@@ -877,7 +883,7 @@ class EditorSimulation:
             1] < self.main_area_height:  # Only if mouse is over main area
             # Scale mouse position to account for display scaling
             scale_x = 960 / (self.screen.get_size()[0])
-            scale_y = 576 / (self.screen.get_size()[1])
+            scale_y = 600 / (self.screen.get_size()[1])
             self.mpos_scaled = ((self.mpos[0] / 2) * scale_x * self.zoom,
                                 (self.mpos[1] / 2) * scale_y * self.zoom)
             self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
@@ -1125,7 +1131,9 @@ class EditorSimulation:
 
                 if event.key == pygame.K_g:
                     self.state = "PlayTest"
-                    self.display = pygame.Surface((self.screen_width / 2, self.screen_height / 2))
+                    self.zoom = 1
+                    self.playtest.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
+                    self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
                     self.playtest.load_settings()
                     self.playtest.load_level(self.level_id)
 
@@ -1274,8 +1282,6 @@ class EditorSimulation:
             if event.key == pygame.K_LSHIFT:
                 self.shift = False
 
-
-
     def render_brush_tool(self):
         current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
         current_tile_img.set_alpha(100)
@@ -1368,8 +1374,8 @@ class EditorSimulation:
         changing_size = False
         screenshot = self.screen.copy()
 
-        if self.display.get_size() != (int(480 * self.zoom), int(288 * self.zoom)):
-            self.display = pygame.Surface((480 * self.zoom, 288 * self.zoom))
+        if self.display.get_size() != (int(480 * self.zoom), int(300 * self.zoom)):
+            self.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
             changing_size = True
 
         scaled_display = pygame.transform.scale(self.display, self.screen.get_size())

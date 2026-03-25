@@ -27,9 +27,9 @@ AUTOTILE_MAP = {
     tuple(sorted([(1, 0), (-1, 0), (0, -1), (0, 1), (1, -1), (-1, 1)])): 14,
 }
 
-PHYSICS_TILES = {'white_blocks', 'purpur_rock', 'stone', 'vine','mossy_stone', 'gray_mossy_stone', 'blue_grass', 'mossy_stone_gluy'}
+PHYSICS_TILES = {'whiter_blocks', 'white_blocks', 'purpur_rock', 'vine','mossy_stone', 'gray_mossy_stone', 'mossy_stone_gluy'}
 TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vine':[0,1,2],'hanging_vine':[0,1,2]}
-AUTOTILE_TYPES = {'white_blocks', 'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
+AUTOTILE_TYPES = {'whiter_blocks', 'red_spikes', 'white_blocks', 'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
 AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
 
 class Tilemap:
@@ -76,6 +76,15 @@ class Tilemap:
                             del self.offgrid_tiles[layer][loc]
 
         return matches
+    
+    def remove_tile(self, pos, layer):
+        if layer in self.tilemap:
+            if pos in self.tilemap[layer]:
+                del self.tilemap[layer][pos]
+        if layer in self.offgrid_tiles:
+            if pos in self.offgrid_tiles[layer]:
+                del self.offgrid_tiles[layer][pos]
+            
 
     def neighbor_offset(self, size):
         offset = []
@@ -229,6 +238,20 @@ class Tilemap:
                 elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
                     return self.tilemap[layer][tile_loc]
 
+    def transparent_tile_check(self, tile, hitbox: pygame.Rect, gravity_dir):
+        u_rects = []
+        pos, size = hitbox.topleft, hitbox.size
+        if tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
+            if not self.game.player.collide_with_passable_blocks:  # System in order to make collision with passable blocks more clean (bigger vertical collision offset)
+                print(pos[1] + size[1], tile["pos"][1] * self.tile_size)
+                if pos[1] + size[1] <= tile["pos"][1] * self.tile_size:
+                    self.game.player.collide_with_passable_blocks = True
+            if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:
+                u_rects.append(
+                    pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size,
+                                self.tile_size))
+        return u_rects
+
     def physics_rects_around(self, hitbox: pygame.Rect):
         pos, size = hitbox.topleft, hitbox.size
         rects = []
@@ -243,13 +266,8 @@ class Tilemap:
         for tile in self.tiles_under(pos, size, gravity_dir):
             if tile['type'] in PHYSICS_TILES:
                 u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
-            elif tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
-                if not self.game.player.collide_with_passable_blocks: #System in order to make collision with passable blocks more clean (bigger vertical collision offset)
-                    print(pos[1] + size[1], tile["pos"][1]*self.tile_size)
-                    if pos[1] + size[1] <= tile["pos"][1]*self.tile_size:
-                        self.game.player.collide_with_passable_blocks = True
-                if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:
-                    u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size,self.tile_size))
+            else:
+                u_rects += self.transparent_tile_check(tile, hitbox, gravity_dir)
         return u_rects
 
     def get_type_from_rect(self, rect):
@@ -329,6 +347,7 @@ class Tilemap:
                         if tile["type"] in self.game.assets:
                             img = self.game.assets[tile['type']][tile['variant']].copy()
                             mask = (255, 255, 255, tiles_opacity)
+
                             if loc in self.render_filters:
                                 if list(self.render_filters[loc].keys())[0] == "opacity":
                                     mask = (255, 255, 255, self.render_filters[loc]["opacity"])
@@ -341,7 +360,6 @@ class Tilemap:
 
                                     # Blit it onto your image
                                     img.blit(highlight, (0, 0))
-
                             else:
                                 img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
