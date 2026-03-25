@@ -150,21 +150,8 @@ class LevelManager:
     def __init__(self, editor_instance):
         self.editor = editor_instance
 
-    def get_env_prefix(self, env_name):
-        # Converts "green_cave" to "gc", "white_space" to "ws"
-        return "".join([word[0] for word in env_name.split("_")])
-
-    def get_file_name(self, env_name, map_id):
-        prefix = self.get_env_prefix(env_name)
-        return f"{prefix}{map_id:03d}.json"
-
-    def get_environment_by_id(self, map_id, environments_dict=None):
-        if environments_dict is None:
-            environments_dict = self.editor.environments
-        for env, ids in environments_dict.items():
-            if map_id in ids:
-                return env
-        return "white_space"
+    def get_file_name(self, map_id):
+        return f"{map_id:03d}.json"
 
     def get_next_file_id(self):
         existing_ids = []
@@ -175,10 +162,6 @@ class LevelManager:
                     match = re.search(r'\d+', f)
                     if match:
                         existing_ids.append(int(match.group()))
-
-        # 2. Look at environments in memory (to catch unsaved creations)
-        for ids in self.editor.environments.values():
-            existing_ids.extend(ids)
 
         if not existing_ids:
             return 1
@@ -197,16 +180,11 @@ class LevelManager:
             else:
                 # Fallback if they deleted the very last map
                 new_id = self.get_next_file_id()
-                env = list(self.editor.environments.keys())[0] if self.editor.environments else "white_space"
-                if env not in self.editor.environments:
-                    self.editor.environments[env] = []
-                self.editor.environments[env].append(new_id)
                 self.editor.active_maps.append(new_id)
                 self.change_level(new_id)
 
     def map_data_reset(self):
-        env = self.get_environment_by_id(self.editor.level_id)
-        file_name = self.get_file_name(env, self.editor.level_id)
+        file_name = self.get_file_name(self.editor.level_id)
         filepath = f'data/maps/{file_name}'
 
         try:
@@ -224,8 +202,7 @@ class LevelManager:
     def change_level(self, new_level_id):
         # Save current level before moving to the next
         if self.editor.level_id in self.editor.active_maps:
-            env = self.get_environment_by_id(self.editor.level_id)
-            current_file_name = self.get_file_name(env, self.editor.level_id)
+            current_file_name = self.get_file_name(self.editor.level_id)
 
             if self.editor.tilemap.tilemap != {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}}:
                 self.editor.tilemap.save(f'data/maps/{current_file_name}')
@@ -233,22 +210,10 @@ class LevelManager:
         self.editor.level_id = new_level_id
         self.map_data_reset()
 
-    def load_environments(self):
-        path = 'data/environments.json'
-        if os.path.exists(path):
-            with open(path, 'r') as f:
-                return json.load(f)
-        return {"white_space": [], "green_cave": [], "blue_cave": []}
-
-    def save_environments(self):
-        with open('data/environments.json', 'w') as f:
-            json.dump(self.editor.environments, f, indent=4)
-
     def full_save(self):
         # 1. Save current map to disk
         if self.editor.level_id in self.editor.active_maps:
-            env = self.get_environment_by_id(self.editor.level_id)
-            current_file_name = self.get_file_name(env, self.editor.level_id)
+            current_file_name = self.get_file_name(self.editor.level_id)
             self.editor.tilemap.save(f'data/maps/{current_file_name}')
 
         # 2. Re-sequence IDs sequentially for surviving active_maps
@@ -259,23 +224,18 @@ class LevelManager:
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
 
-        new_environments = {k: [] for k in self.editor.environments.keys()}
-
         # 3. Move valid files to temp directory with new names
         for old_id in sorted_active:
-            env_name = self.get_environment_by_id(old_id)
             new_id = id_mapping[old_id]
 
-            old_file = self.get_file_name(env_name, old_id)
-            new_file = self.get_file_name(env_name, new_id)
+            old_file = self.get_file_name(old_id)
+            new_file = self.get_file_name(new_id)
 
             src = f'data/maps/{old_file}'
             dst = f'{temp_dir}/{new_file}'
 
             if os.path.exists(src):
                 shutil.copy2(src, dst)
-
-            new_environments[env_name].append(new_id)
 
         # 4. Clear old files and replace with temp
         for f in os.listdir('data/maps/'):
@@ -286,11 +246,7 @@ class LevelManager:
             shutil.move(f'{temp_dir}/{f}', f'data/maps/{f}')
         os.rmdir(temp_dir)
 
-        # 5. Overwrite the in-memory environments dict with the cleansed version
-        self.editor.environments = new_environments
-        self.save_environments()
-
-        # 6. Update running active maps
+        # 5. Update running active maps
         self.editor.active_maps = list(id_mapping.values())
         self.editor.level_id = id_mapping.get(self.editor.level_id, 1)
 
@@ -315,7 +271,7 @@ class PlayTest(Game):
         self.level_id = editor_instance.level_id
         self.environment = editor_instance.current_environment
         self.environments = editor_instance.environments.copy()
-        self.level = self.level_manager.get_file_name(self.environment, self.level_id)
+        self.level = self.level_manager.get_file_name(self.level_id)
 
         self.b_info = {
             "white_space": {"animated": True, "img_dur": 6, "loop": True},
@@ -330,8 +286,8 @@ class PlayTest(Game):
 
         self.music_sound_manager = Sound(self, {
             'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-            'level_1': f"assets/environments/{self.level_manager.get_environment_by_id(1)}/sounds/map_1.wav",
-            'level_2': f"assets/environments/{self.level_manager.get_environment_by_id(2)}/sounds/map_2.wav",
+            'level_1': f"assets/environments/white_space/sounds/map_1.wav",
+            'level_2': f"assets/environments/green_cave/sounds/map_2.wav",
         }, is_music=True, master_volume=self.master_volume, volume=1)
 
         self.sound_effect_manager = Sound(self, {
@@ -496,7 +452,7 @@ class PlayTest(Game):
             :param transition_effect:
         """
         self.environment = self.level_manager.get_environment_by_id(self.level_id)
-        map_name = self.level_manager.get_file_name(self.environment, map_id)
+        map_name = self.level_manager.get_file_name(map_id)
         self.assets = {}
         self.assets.update(load_tiles(self.environment))
         self.assets.update(load_player())
@@ -575,15 +531,9 @@ class PlayTest(Game):
         for camera in self.tilemap.extract(["camera_setup"]):
             self.camera_setup.append(CameraSetup(self, camera))
 
-        fake_tiles_id_pairs = []
-        for tile in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/blocks")):
-            if "fake" in tile:
-                for variant in range(len(self.assets[tile])):
-                    fake_tiles_id_pairs.append((tile, variant))
-
         if not hasattr(self, "fake_tile_groups"):
             self.fake_tile_groups = []
-            for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
+            """for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
                 fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
                 fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
                 g_check = True
@@ -595,7 +545,7 @@ class PlayTest(Game):
                     group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.tilemap.layers["fake_tiles"])
                     if group not in self.fake_tile_groups:
                         self.fake_tile_groups.append(group)
-        self.tilemap.extract(fake_tiles_id_pairs, layers=tuple(self.tilemap.layers["fake_tiles"]))
+        self.tilemap.extract(fake_tiles_id_pairs, layers=tuple(self.tilemap.layers["fake_tiles"]))"""
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
@@ -675,12 +625,10 @@ class EditorSimulation:
 
         # LevelManager — doit être créé AVANT d'utiliser active_maps/environments
         self.level_manager = LevelManager(self)
-        self.environments = self.level_manager.load_environments()
 
-        # Hydrate active_maps from environments.json
         self.active_maps = []
-        for ids in self.environments.values():
-            self.active_maps.extend(ids)
+        for ids in os.listdir("data/maps"):
+            self.active_maps.append(int(ids[:-5]))
         self.active_maps.sort()
 
 
@@ -689,14 +637,17 @@ class EditorSimulation:
         self.tile_group = 0
         self.tile_variant = 0
 
-        self.categories = load_editor_tiles(self.current_environment)
+        self.environments = load_editor_tiles()
         self.assets = {}
-        for tile in self.categories.values():
-            self.assets.update(tile)
+        for category in self.environments.values():
+            for tile in category.values():
+                self.assets.update(tile)
         self.assets.update({"spawners": load_images("player/spawner"),
                             "transition": load_images("transition")})
 
-        self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
+
+
+        self.tile_type = next(iter(self.environments[next(iter(self.environments))][next(iter(self.environments[next(iter(self.environments))]))]))
 
         self.showing_all_layers = False
         self.current_layer = "0"
@@ -707,7 +658,7 @@ class EditorSimulation:
         self.tile_size = self.tilemap.tile_size
 
         try:
-            file_name = self.level_manager.get_file_name(self.current_environment, self.level_id)
+            file_name = self.level_manager.get_file_name(self.level_id)
             filepath = f'data/maps/{file_name}'
             self.tilemap.load(filepath)
         except FileNotFoundError:
@@ -839,15 +790,15 @@ class EditorSimulation:
                 return tile_category
 
     def get_categories(self):
-        self.categories = {}
-        self.categories = load_editor_tiles(self.level_manager.get_environment_by_id(self.level_id))
         self.current_category = 0
-        self.tile_type = next(iter(self.categories[next(iter(self.categories))]))
+        self.tile_type = next(iter(self.environments[next(iter(self.environments))][next(iter(self.environments[next(iter(self.environments))]))]))
 
     def get_assets(self):
         self.assets = {}
-        for tile in self.categories.values():
-            self.assets.update(tile)
+        self.assets = {}
+        for category in self.environments.values():
+            for tile in category.values():
+                self.assets.update(tile)
         self.assets.update({"spawners": load_images("player/spawner"),
                             "transition": load_images("transition")})
 
@@ -1488,7 +1439,7 @@ class UI:
                                                self.screen_width * 20 / 96, self.screen_width * 25 / 96)
 
         self.current_category = 0
-        self.current_category_name = list(self.editor.categories.keys())[self.current_category]
+        self.current_category_name = list(self.editor.environments[self.editor.current_environment].keys())[self.current_category]
 
         self.assets_section_buttons_width = self.assets_section_rect.width * (1 / 6)
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
@@ -1500,17 +1451,6 @@ class UI:
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
         self.assets_buttons = []
 
-        self.environment_selector_state = False
-        self.environment_selector_buttons_labels = list(self.editor.environments.keys())
-        #self.environment_selection_buttons_images = {env: load_image(f"ui/{env}_palette.png") for env in self.environment_selection_buttons_labels}
-        self.environment_selector_buttons_images = {env: load_image(f"ui/skull.png") for env in
-                                                    self.environment_selector_buttons_labels}
-        self.environment_selector_buttons = []
-        self.environment_selector_buttons_width = self.screen_width * (1 / 5)
-        self.environment_selector_buttons_height = self.screen_height * (1 / 4)
-        self.environment_selector_confirmation_button = None
-        self.selected_environment = "white_space"
-
         self.properties_section_default_width = self.screen_width * 20 / 96
         self.properties_section_rect = pygame.Rect(
             self.screen_width - self.toolbar_rect.width - self.properties_section_default_width,
@@ -1521,12 +1461,6 @@ class UI:
         self.properties_section_buttons_height = self.properties_section_rect.width * (1 / 8)
         self.properties_section_buttons = []
 
-        self.infos_tiles = []
-        for tile_pos in self.editor.tilemap.tilemap[self.editor.current_layer]:
-            tile = self.editor.tilemap.tilemap[self.editor.current_layer][tile_pos]
-            if "infos_type" in tile:
-                self.infos_tiles.append(tile)
-
 
         self.init_buttons()
         self.closing = False
@@ -1534,7 +1468,6 @@ class UI:
     def init_buttons(self):
         self.tools_buttons = []
         self.assets_section_buttons = []
-        self.environment_selector_buttons = []
         self.check_buttons = []
         self.on_selection_buttons = []
 
@@ -1563,32 +1496,6 @@ class UI:
                                             (self.screen_width * 5 / 16, self.screen_height * 3 / 10),
                                             self.editor.active_maps + [None])
 
-        button_x, button_y = ((10/self.editor.SW) * self.screen_width + self.environment_selector_buttons_width / 2,
-                              (10/self.editor.SH) * self.screen_height + self.environment_selector_buttons_height / 2)
-        initial_x = (10 / self.editor.SW) * self.screen_width
-        for label in self.environment_selector_buttons_labels:
-            button = EnvironmentButton(label,
-                                       self.environment_selector_buttons_images[label],
-                                       (button_x, button_y),
-                                       self.environment_selector_buttons_width,
-                                       self.environment_selector_buttons_height,
-                                       (32, 32, 32))
-            if (button_x + 10 * self.screen_width / self.editor.SW >
-                    self.screen_width - self.assets_section_rect.width - 10 * self.screen_width / self.editor.SW):
-                button_y = button_y + self.screen_height + 10*self.screen_height/self.editor.SH % self.screen_height
-                button_x = initial_x
-            else:
-                button_x = (button_x + self.environment_selector_buttons_width + 10 * self.screen_width / self.editor.SW) % (
-                            self.screen_width - self.environment_selector_buttons_width)
-            if button_x < initial_x:
-                button_x = initial_x
-            if button_y + self.screen_height / 2 > self.screen_height:
-                self.screen_height += self.screen_height + 10*self.screen_height/self.editor.SH
-
-            self.environment_selector_buttons.append(button)
-
-        button_x, button_y = (self.screen_width - 100*self.screen_width/self.editor.SW, self.screen_height - 100*self.screen_height/self.editor.SH)
-        self.environment_selector_confirmation_button = SimpleButton("Confirm", self.title_font, (button_x, button_y), (0, 0, 0), (64, 64, 64))
 
         button_x,button_y = self.toolbar_rect.width/2, self.toolbar_rect.height-3*self.toolbar_buttons_height
         for label in self.check_buttons_labels:
@@ -1602,10 +1509,11 @@ class UI:
             button_y -= 0.7*self.toolbar_buttons_height - (self.PADDING/self.editor.SH)*self.screen_height
             self.check_buttons.append(button)
 
-        self.init_assets_buttons(self.editor.categories)
+        self.init_assets_buttons(self.editor.environments[self.editor.current_environment])
 
         button_x,button_y = self.toolbar_rect.x - self.toolbar_rect.width/2 , self.toolbar_rect.width/2
         for label in self.on_selection_buttons_labels:
+            color = ()
             if label == "Plus":
                 button_y = self.toolbar_buttons_height
                 color = (42, 90, 57)
@@ -1616,10 +1524,11 @@ class UI:
                 color = (235, 217, 103)
             if label == "Unlock":
                 color = (255,0,0)
-            button = IconButton(label,self.buttons_images[label],(button_x, button_y),self.toolbar_buttons_width,
-                       self.toolbar_buttons_height,color,resize=0.8)
-            button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
-            self.on_selection_buttons.append(button)
+            if color:
+                button = IconButton(label,self.buttons_images[label],(button_x, button_y),self.toolbar_buttons_width,
+                           self.toolbar_buttons_height,color,resize=0.8)
+                button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
+                self.on_selection_buttons.append(button)
 
 
     def init_assets_buttons(self, categories):
@@ -1690,35 +1599,10 @@ class UI:
 
         self.screen.blit(overlay, self.assets_section_rect.topleft)
 
-    def render_properties_section(self):
-        overlay = pygame.Surface((self.properties_section_rect.width, self.properties_section_rect.height))
-        overlay.fill(self.ASSETS_SECTION_COLOR)
-
-        self.properties_category_button.draw(overlay)
-
-        for button in self.properties_section_buttons:
-            button.draw(overlay)
-
-        self.screen.blit(overlay, self.properties_section_rect.topleft)
-
     def render_level_selector(self):
         overlay = create_rect_alpha((0, 0, 0), (0, 0, self.screen_width, self.screen_height), 100)
         self.level_carousel.draw(overlay)
         self.level_carousel.update()
-        self.screen.blit(overlay, (0, 0))
-
-    def render_environment_selector(self):
-        overlay = create_rect_alpha((0, 0, 0), (0, 0, self.screen_width, self.screen_height), 200)
-
-        for button in self.environment_selector_buttons:
-            button.draw(overlay)
-            if button.label == self.selected_environment:
-                button.activated = True
-            else:
-                button.activated = False
-
-        self.environment_selector_confirmation_button.draw(overlay)
-
         self.screen.blit(overlay, (0, 0))
 
     def render_on_selection(self, centerx):
@@ -1774,7 +1658,7 @@ class UI:
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
         self.assets_button_width = self.assets_section_rect.width * (1 / 10)
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
-        self.init_assets_buttons(self.editor.categories)
+        self.init_assets_buttons(self.editor.environments[self.editor.current_environment])
 
         self.init_buttons()
 
@@ -1785,9 +1669,10 @@ class UI:
             self.screen_width * 20 / 96, self.screen_width * 25 / 96)
 
     def reload_assets_section(self):
+        categories = self.editor.environments[self.editor.current_environment]
         self.current_category = 0
-        self.current_category_name = list(self.editor.categories.keys())[self.current_category]
-        self.init_assets_buttons(self.editor.categories)
+        self.current_category_name = list(categories.keys())[self.current_category]
+        self.init_assets_buttons(categories)
 
     def clear_sections_rect(self):
         if self.editor.current_tool != "Brush":
@@ -1805,12 +1690,9 @@ class UI:
                 self.render_assets_section(self.screen_width - self.toolbar_rect.width  - self.assets_section_rect.width,
                                    self.screen_height - self.assets_section_rect.height)
             case "LevelSelector":
-                if self.environment_selector_state:
-                    self.render_environment_selector()
-                else:
                     self.render_level_selector()
             case "Properties":
-                self.render_properties_section()
+                pass
             case "Selection" | "Move":
                 self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
 
@@ -1835,12 +1717,9 @@ class UI:
             case "Brush":
                 self.handle_assets_section_event(event)
             case "LevelSelector":
-                if self.environment_selector_state:
-                    self.handle_environment_selector_event(event)
-                else:
-                    self.handle_level_selector_event(event)
+                self.handle_level_selector_event(event)
             case "Properties":
-                self.handle_properties_section_event(event)
+                pass
             case "Selection"|"Move":
                 self.handle_on_selection_event(event)
 
@@ -1855,20 +1734,18 @@ class UI:
                     case "On grid":
                         self.editor.ongrid = not self.editor.ongrid
 
-    def handle_properties_section_event(self, event):
-        pass
-
     def handle_assets_section_event(self, event):
+        categories = self.editor.environments[self.editor.current_environment]
         for button in self.assets_section_buttons:
             if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width - self.assets_section_rect.width,
                                                   self.screen_height - self.assets_section_rect.height)):
                 if button.label == "Next":
-                    self.current_category = (self.current_category + 1) % len(self.editor.categories)
+                    self.current_category = (self.current_category + 1) % len(categories)
                 elif button.label == "Previous":
-                    self.current_category = (self.current_category - 1) % len(self.editor.categories)
+                    self.current_category = (self.current_category - 1) % len(categories)
                 button.activated = True
-                self.current_category_name = list(self.editor.categories.keys())[self.current_category]
-                self.init_assets_buttons(self.editor.categories)
+                self.current_category_name = list(categories.keys())[self.current_category]
+                self.init_assets_buttons(categories)
             elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(
                     event,
                     offset=(self.screen_width - self.toolbar_rect.width - self.assets_section_rect.width,
@@ -1880,44 +1757,21 @@ class UI:
                 self.editor.tile_type = button.label
                 self.editor.tile_variant = 0
 
-    def handle_environment_selector_event(self, event):
-        for button in self.environment_selector_buttons:
-            if button.handle_event(event):
-                self.selected_environment = button.label
-
-        if self.environment_selector_confirmation_button.handle_event(event):
-            # Create the map with a globally new ID
-            new_id = self.editor.level_manager.get_next_file_id()
-
-            if self.selected_environment not in self.editor.environments:
-                self.editor.environments[self.selected_environment] = []
-
-            self.editor.environments[self.selected_environment].append(new_id)
-            self.editor.active_maps.append(new_id)
-            self.editor.active_maps.sort()
-
-            # Immediately save environment changes so creations persist without full_save
-            self.editor.level_manager.save_environments()
-
-            # Refresh carousel mapping
-            self.level_carousel.levels = self.editor.active_maps + [None]
-            self.level_carousel.selected = self.editor.active_maps.index(new_id)
-
-            self.editor.level_manager.change_level(new_id)
-
-            self.reload_assets_section()
-            self.editor.current_tool = self.editor_previous_tool
-            self.environment_selector_state = False
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                self.environment_selector_state = False
-
     def handle_level_selector_event(self, event):
         level_selector_state = self.level_carousel.handle_event(event)
         match level_selector_state:
             case "AddLevel":
-                self.environment_selector_state = True
+                new_id = self.editor.level_manager.get_next_file_id()
+
+                # Refresh carousel mapping
+                self.level_carousel.levels = self.editor.active_maps + [None]
+                self.level_carousel.selected = self.editor.active_maps.index(new_id)
+
+                self.editor.level_manager.change_level(new_id)
+
+                self.reload_assets_section()
+                self.editor.current_tool = self.editor_previous_tool
+                self.environment_selector_state = False
             case "DeleteLevel":
                 deleted_id = self.level_carousel.levels[self.level_carousel.selected]
                 self.level_carousel.levels.pop(self.level_carousel.selected)

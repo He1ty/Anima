@@ -7,6 +7,7 @@ import copy
 from pygame import BLEND_ADD, BLEND_MAX, BLEND_RGBA_MULT, BLEND_RGBA_SUB, BLEND_RGBA_ADD
 
 from scripts.utils import round_up
+from scripts.tile import Tile
 from scripts.pickup import pickups_render_and_update
 
 AUTOTILE_MAP = {
@@ -56,21 +57,21 @@ class Tilemap:
             for loc in self.tilemap[layer].copy():
                 tile = self.tilemap[layer][loc]
                 if "variant" in tile:
-                    check = (tile['type'], tile["variant"]) in id_pairs
+                    check = (tile.type, tile.variant) in id_pairs
                 else:
-                    check = (tile['type'] in id_pairs)
+                    check = (tile.type in id_pairs)
                 if check:
                     matches.append(tile.copy())
-                    matches[-1]['pos'] = list(matches[-1]['pos']).copy()
-                    matches[-1]['pos'][0] *= self.tile_size
-                    matches[-1]['pos'][1] *= self.tile_size
+                    matches[-1].pos = list(matches[-1].pos).copy()
+                    matches[-1].pos[0] *= self.tile_size
+                    matches[-1].pos[1] *= self.tile_size
                     if not keep:
                         del self.tilemap[layer][loc]
 
             if layer in self.offgrid_tiles:
                 for loc in self.offgrid_tiles[layer].copy():
                     tile = self.offgrid_tiles[layer][loc]
-                    if (tile['type'], tile['variant']) in id_pairs:
+                    if (tile.type, tile.variant) in id_pairs:
                         matches.append(tile.copy())
                         if not keep:
                             del self.offgrid_tiles[layer][loc]
@@ -156,9 +157,32 @@ class Tilemap:
 
     def save(self, path):
         f = open(path, 'w')
+        tilemap = {}
+        offgrid = {}
+        for layer in self.tilemap:
+            tilemap[layer] = {}
+            for tile_loc in self.tilemap[layer]:
+                tile = self.tilemap[layer][tile_loc]
+                tilemap[layer][tile_loc] = {
+                    "type": tile.type,
+                    "variant": tile.variant,
+                    "pos": tile.pos,
+                    "rotation": tile.rotation,
+                }
+                
+        for layer in self.offgrid_tiles:
+            offgrid[layer] = {}
+            for tile_loc in self.offgrid_tiles[layer]:
+                tile = self.offgrid_tiles[layer][tile_loc]
+                offgrid[layer][tile_loc] = {
+                    "type": tile.type,
+                    "variant": tile.variant,
+                    "pos": tile.pos,
+                    "rotation": tile.rotation,
+                }
 
-        json.dump({'tilemap': self.tilemap,
-                        'offgrid': self.offgrid_tiles,
+        json.dump({'tilemap': tilemap,
+                        'offgrid': offgrid,
                    'tag_groups': self.tag_groups,
                    'selection_groups': self.selection_groups,
                    'layers': self.layers,
@@ -171,14 +195,75 @@ class Tilemap:
         map_data = json.load(f)
         f.close()
 
-        self.tilemap = map_data['tilemap']
-        self.offgrid_tiles = map_data['offgrid']
+        if "tilemap" in map_data:
+            self.tilemap = {}
+            for layer in map_data["tilemap"]:
+                self.tilemap[layer] = {}
+                for tile_loc in map_data["tilemap"][layer]:
+                    tile_infos = map_data["tilemap"][layer][tile_loc]
+                    self.tilemap[layer][tile_loc] = Tile(tile_infos["pos"],tile_infos["type"], tile_infos["variant"],
+                                                         tile_infos["rotation"] if "rotation" in tile_infos else 0)
+
+        if "offgrid" in map_data:
+            self.offgrid_tiles = {}
+            for layer in map_data["offgrid"]:
+                self.offgrid_tiles[layer] = {}
+                for tile_loc in map_data["offgrid"][layer]:
+                    tile_infos = map_data["offgrid"][layer][tile_loc]
+                    self.offgrid_tiles[layer][tile_loc] = Tile(tile_infos["pos"],tile_infos["type"], tile_infos["variant"],
+                                                         tile_infos["rotation"] if "rotation" in tile_infos else 0)
         if "tag_groups" in map_data:
+            for group_id in map_data["tag_groups"]:
+                for tile_loc, tile_layer in map_data["tag_groups"][group_id]["tiles"]:
+                    self.tilemap[tile_layer][tile_loc].group = group_id
             self.tag_groups = map_data["tag_groups"]
+            
         if "selection_groups" in map_data:
             self.selection_groups = map_data['selection_groups']
         self.layers = map_data["layers"]
         self.tile_size = map_data['tilesize']
+
+    def get_rotated_autotile_map(self, angle):
+        # Helper to rotate a single coordinate pair based on your sin/cos logic
+        # We use round() before int() to avoid floating point errors (e.g., 0.999 becoming 0)
+        def rot(x, y):
+            rx = x * math.cos(angle) - y * math.sin(angle)
+            ry = x * math.sin(angle) + y * math.cos(angle)
+            return int(round(rx)), int(round(ry))
+
+        return {
+            # 2 Neighbors (Corners)
+            tuple(sorted([rot(1, 0), rot(0, 1)])): 0,
+            tuple(sorted([rot(-1, 0), rot(0, 1)])): 2,
+            tuple(sorted([rot(-1, 0), rot(0, -1)])): 4,
+            tuple(sorted([rot(1, 0), rot(0, -1)])): 6,
+
+            # 3 Neighbors (T-junctions)
+            tuple(sorted([rot(1, 0), rot(0, 1), rot(-1, 0)])): 1,
+            tuple(sorted([rot(-1, 0), rot(0, -1), rot(0, 1)])): 3,
+            tuple(sorted([rot(-1, 0), rot(0, -1), rot(1, 0)])): 5,
+            tuple(sorted([rot(1, 0), rot(0, -1), rot(0, 1)])): 7,
+
+            # 8 Neighbors (Center / Full)
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, 1), rot(1, -1), rot(-1, -1), rot(-1, 1)])): 8,
+
+            # 7 Neighbors (One corner missing)
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, -1), rot(-1, -1), rot(-1, 1)])): 9,
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, 1), rot(1, -1), rot(-1, -1)])): 10,
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, 1), rot(-1, -1), rot(-1, 1)])): 12,
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, 1), rot(1, -1), rot(-1, 1)])): 13,
+
+            # 6 Neighbors (Two corners missing)
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, 1), rot(-1, -1)])): 11,
+            tuple(sorted([rot(1, 0), rot(-1, 0), rot(0, -1), rot(0, 1),
+                          rot(1, -1), rot(-1, 1)])): 14,
+        }
 
     def autotile(self):
         for layer in self.tilemap:
@@ -187,21 +272,15 @@ class Tilemap:
                 neighbors = set()
                 corner_additional_shifts = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
                 for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)] + corner_additional_shifts:
-                    check_loc = str(tile['pos'][0] + shift[0]) + ";" + str(tile['pos'][1] + shift[1])
+                    check_loc = str(tile.pos[0] + shift[0]) + ";" + str(tile.pos[1] + shift[1])
                     if check_loc in self.tilemap[layer]:
-                        if self.tilemap[layer][check_loc]['type'] == tile['type'] or (tile["type"] in AUTOTILE_COMPATIBILITY and
-                                                                                      self.tilemap[layer][check_loc]["type"] in AUTOTILE_COMPATIBILITY[tile['type']]):
+                        if self.tilemap[layer][check_loc].type == tile.type or (tile.type in AUTOTILE_COMPATIBILITY and
+                                                                                      self.tilemap[layer][check_loc].type in AUTOTILE_COMPATIBILITY[tile.type]):
                             neighbors.add(shift)
                 neighbors = sorted(neighbors)
 
-                a_map = AUTOTILE_MAP
-                if "rotation" in tile:
-                    angle = -(tile["rotation"] - 1)*math.pi/2
-                    a_map = {
-                        tuple(sorted([(int(math.sin(angle)), int(math.cos(angle)))])): 0,
-                        tuple(sorted([(int(math.sin(angle)), int(math.cos(angle))), (int(-math.sin(angle)), int(-math.cos(angle)))])): 1,
-                        tuple(sorted([(int((-math.sin(angle))), int(-math.cos(angle)))])): 2,
-                    }
+                angle = -(tile.rotation - 1) * math.pi / 2
+                a_map = self.get_rotated_autotile_map(angle)
 
                 if tuple(neighbors) not in a_map:
                     for s in corner_additional_shifts:
@@ -210,13 +289,8 @@ class Tilemap:
 
                 neighbors = tuple(sorted(neighbors))
 
-                if (tile['type'] in AUTOTILE_TYPES) and (neighbors in a_map):
-                    if "rotation" in tile:
-                        tile['variant'] = a_map[neighbors]
-                    else:
-                        new_variant = a_map[neighbors]
-                        if new_variant < len(self.game.assets[tile["type"]]):
-                            tile['variant'] = new_variant
+                if (tile.type in AUTOTILE_TYPES) and (neighbors in a_map):
+                    tile.variant = a_map[neighbors]
 
     def copy(self, new_game):
         tilemap_copy = Tilemap(new_game, self.tile_size)
@@ -233,22 +307,22 @@ class Tilemap:
         for layer in self.tilemap:
             if tile_loc in self.tilemap[layer]:
                 tile = self.tilemap[layer][tile_loc]
-                if tile["type"] in PHYSICS_TILES:
+                if tile.type in PHYSICS_TILES:
                     return self.tilemap[layer][tile_loc]
-                elif transparent_check and tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
+                elif transparent_check and tile.type in set(TRANSPARENT_TILES.keys()) and tile.variant in TRANSPARENT_TILES[tile.type]:
                     return self.tilemap[layer][tile_loc]
 
     def transparent_tile_check(self, tile, hitbox: pygame.Rect, gravity_dir):
         u_rects = []
         pos, size = hitbox.topleft, hitbox.size
-        if tile['type'] in set(TRANSPARENT_TILES.keys()) and tile['variant'] in TRANSPARENT_TILES[tile['type']]:
+        if tile.type in set(TRANSPARENT_TILES.keys()) and tile.variant in TRANSPARENT_TILES[tile.type]:
             if not self.game.player.collide_with_passable_blocks:  # System in order to make collision with passable blocks more clean (bigger vertical collision offset)
-                print(pos[1] + size[1], tile["pos"][1] * self.tile_size)
-                if pos[1] + size[1] <= tile["pos"][1] * self.tile_size:
+                print(pos[1] + size[1], tile.pos[1] * self.tile_size)
+                if pos[1] + size[1] <= tile.pos[1] * self.tile_size:
                     self.game.player.collide_with_passable_blocks = True
             if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:
                 u_rects.append(
-                    pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size,
+                    pygame.Rect(tile.pos[0] * self.tile_size, tile.pos[1] * self.tile_size, self.tile_size,
                                 self.tile_size))
         return u_rects
 
@@ -256,16 +330,16 @@ class Tilemap:
         pos, size = hitbox.topleft, hitbox.size
         rects = []
         for tile in self.tiles_around(pos, size):
-            if tile['type'] in PHYSICS_TILES:
-                rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
+            if tile.type in PHYSICS_TILES:
+                rects.append(pygame.Rect(tile.pos[0] * self.tile_size, tile.pos[1] * self.tile_size, self.tile_size, self.tile_size))
         return rects
 
     def physics_rects_under(self, hitbox: pygame.Rect, gravity_dir):
         u_rects = []
         pos, size = hitbox.topleft, hitbox.size
         for tile in self.tiles_under(pos, size, gravity_dir):
-            if tile['type'] in PHYSICS_TILES:
-                u_rects.append(pygame.Rect(tile['pos'][0] * self.tile_size, tile['pos'][1] * self.tile_size, self.tile_size, self.tile_size))
+            if tile.type in PHYSICS_TILES:
+                u_rects.append(pygame.Rect(tile.pos[0] * self.tile_size, tile.pos[1] * self.tile_size, self.tile_size, self.tile_size))
             else:
                 u_rects += self.transparent_tile_check(tile, hitbox, gravity_dir)
         return u_rects
@@ -274,13 +348,13 @@ class Tilemap:
         for layer in self.tilemap:
             for tile in self.tilemap[layer]:
                 if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
-                    return self.tilemap[layer][tile]["type"]
+                    return self.tilemap[layer][tile].type
 
     def get_variant_from_rect(self, rect):
         for layer in self.tilemap:
             for tile in self.tilemap[layer]:
                 if str(rect.x//self.tile_size) + ";" + str(rect.y//self.tile_size) == tile:
-                    return self.tilemap[layer][tile]["variant"]
+                    return self.tilemap[layer][tile].variant
 
     def pos_visible(self, surf, pos, offset = (0, 0), additional_offset=(0, 0)):
            return (offset[0] - additional_offset[0] <= pos[0] <= offset[0] + additional_offset[0] + surf.get_width() and
@@ -293,11 +367,11 @@ class Tilemap:
         for layer in layers:
             for t in connected_tiles:
                 for offset in offsets:
-                    check_loc = f"{t["pos"][0] + offset[0]};{t["pos"][1] + offset[1]}"
+                    check_loc = f"{t.pos[0] + offset[0]};{t.pos[1] + offset[1]}"
                     if check_loc in self.tilemap[layer]:
                         layer_detected = True
                         checked_tile = self.tilemap[layer][check_loc].copy()
-                        if checked_tile["type"] != tile["type"]:
+                        if checked_tile.type != tile.type:
                             continue
                         if checked_tile not in connected_tiles:
                             connected_tiles.append(checked_tile)
@@ -307,7 +381,7 @@ class Tilemap:
         return connected_tiles
 
     def fake_tile_colliding_with_player(self, tile):
-        r = pygame.Rect(tile["pos"][0]*self.tile_size, tile["pos"][1]*self.tile_size, self.tile_size, self.tile_size)
+        r = pygame.Rect(tile.pos[0]*self.tile_size, tile.pos[1]*self.tile_size, self.tile_size, self.tile_size)
         return self.game.player.rect().colliderect(r)
 
     def set_render_filter(self, tiles, filter_instance : int|tuple[int, int, int]|tuple[int, int, int, int]):
@@ -330,7 +404,6 @@ class Tilemap:
                     tiles_opacity = 255
             else:
                 tiles_opacity = 255
-
             if with_player:
                 if layer in self.layers["player"]:
                     pickups_render_and_update(self.game, offset=offset)
@@ -344,8 +417,8 @@ class Tilemap:
                     loc = str(x) + ";" + str(y)
                     if loc in self.tilemap[layer]:
                         tile = self.tilemap[layer][loc]
-                        if tile["type"] in self.game.assets:
-                            img = self.game.assets[tile['type']][tile['variant']].copy()
+                        if tile.type in self.game.assets:
+                            img = self.game.assets[tile.type][tile.variant].copy()
                             mask = (255, 255, 255, tiles_opacity)
 
                             if loc in self.render_filters:
@@ -363,19 +436,18 @@ class Tilemap:
                             else:
                                 img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
-                            if 'rotation' in tile:
-                                img = pygame.transform.rotate(img, tile['rotation'] * -90)
+                            img = pygame.transform.rotate(img, tile.rotation * -90)
 
                             surf.blit(img, (
-                                tile['pos'][0] * self.tile_size - offset[0], tile['pos'][1] * self.tile_size - offset[1]))
+                                tile.pos[0] * self.tile_size - offset[0], tile.pos[1] * self.tile_size - offset[1]))
                         else:
                             pass
-                            #print(f"{tile["type"]} not in assets")
+                            #print(f"{tile.type} not in assets")
 
             if layer in self.offgrid_tiles:
                 for pos in self.offgrid_tiles.copy()[layer]:
                     tile = self.offgrid_tiles[layer][pos]
-                    img = self.game.assets[tile['type']][tile['variant']].copy()
+                    img = self.game.assets[tile.type][tile.variant].copy()
                     mask = (255, 255, 255, tiles_opacity)
                     if pos in self.render_filters:
                         if list(self.render_filters[pos].keys())[0] == "opacity":
@@ -394,7 +466,7 @@ class Tilemap:
                         img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
                     surf.blit(img,
-                              (tile['pos'][0] - offset[0], tile['pos'][1] - offset[1]))
+                              (tile.pos[0] - offset[0], tile.pos[1] - offset[1]))
 
 
             if layer == "2" and with_player and self.show_collisions:

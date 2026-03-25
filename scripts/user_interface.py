@@ -111,7 +111,7 @@ class Menu:
         self.init_buttons()
 
         # --- Souls Animation --- #
-        self.souls_animation = Animation(load_images(f'environments/{self.game.level_manager.get_environment_by_id(self.game.level)}'
+        self.souls_animation = Animation(load_images(f'environments/white_space'
                                                      f'/images/tiles/pickups/soul/idle'),8,True)
         self.souls_pos = []
         self.souls_end_pos = [self.SH/12, self.SH/12]
