@@ -191,11 +191,7 @@ def display_bg(surf, img, pos):
         surf.blit(img, (pos[0] + n* img.get_width(), pos[1]))
         
 def display_level_bg(game, map_id):
-    environment = "white_space"
-    for env in game.environments:
-        if map_id in game.environments[env]:
-            environment = env
-            break
+    environment = str(map_id)
 
     if environment in game.assets:
         pygame.draw.rect(game.display, (0, 0, 0), game.display.get_rect())

@@ -52,14 +52,10 @@ class Tilemap:
         extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
         where 0 <= n < len(id_pairs)"""
         matches = []
-
         for layer in (layers if layers else self.tilemap):
             for loc in self.tilemap[layer].copy():
                 tile = self.tilemap[layer][loc]
-                if "variant" in tile:
-                    check = (tile.type, tile.variant) in id_pairs
-                else:
-                    check = (tile.type in id_pairs)
+                check = (tile.type, tile.variant) in id_pairs
                 if check:
                     matches.append(tile.copy())
                     matches[-1].pos = list(matches[-1].pos).copy()
@@ -227,8 +223,8 @@ class Tilemap:
         # Helper to rotate a single coordinate pair based on your sin/cos logic
         # We use round() before int() to avoid floating point errors (e.g., 0.999 becoming 0)
         def rot(x, y):
-            rx = x * math.cos(angle) - y * math.sin(angle)
-            ry = x * math.sin(angle) + y * math.cos(angle)
+            rx = x * math.sin(angle) - y * math.cos(angle)
+            ry = x * math.cos(angle) + y * math.sin(angle)
             return int(round(rx)), int(round(ry))
 
         return {
@@ -281,6 +277,7 @@ class Tilemap:
 
                 angle = -(tile.rotation - 1) * math.pi / 2
                 a_map = self.get_rotated_autotile_map(angle)
+                print(a_map)
 
                 if tuple(neighbors) not in a_map:
                     for s in corner_additional_shifts:

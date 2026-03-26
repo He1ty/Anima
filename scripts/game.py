@@ -21,31 +21,14 @@ class LevelManager:
     def __init__(self, game):
         self.game = game
 
-    def get_env_prefix(self, env_name):
-        # Converts "green_cave" to "gc", "white_space" to "ws"
-        return "".join([word[0] for word in env_name.split("_")])
-
-    def get_file_name(self, env_name, map_id):
-        prefix = self.get_env_prefix(env_name)
-        return f"{prefix}{map_id:03d}.json"
-
-    def get_environment_by_id(self, map_id, environments_dict=None):
-        if environments_dict is None:
-            environments_dict = self.game.environments
-        for env, ids in environments_dict.items():
-            if map_id in ids:
-                return env
-        return "white_space"
-
     def load_level(self, level_id):
-        self.game.environment = self.get_environment_by_id(level_id)
-        map_name = self.get_file_name(self.game.environment, level_id)
+        #map_name = self.get_map_name(self.game.environment, level_id)
         self.game.assets = {}
-        self.game.assets.update(load_tiles(self.game.environment))
+        self.game.assets.update(load_tiles())
         self.game.assets.update(load_player())
         self.game.assets.update(load_backgrounds(self.game.b_info, self.game.environment))
-        self.game.assets.update(load_particles(self.game.environment))
-        self.game.tilemap.load("data/maps/" + map_name)
+        self.game.assets.update(load_particles())
+        self.game.tilemap.load(f"data/maps/{level_id:03d}")
         self.game.tilemap.tile_size = self.game.tile_size
 
         self.game.levers = []
@@ -122,8 +105,8 @@ class Game:
         player_sfx = "assets/player/sounds/"
         self.music_sound_manager = Sound(self, {
             'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-            'level_1': f"assets/environments/{self.level_manager.get_environment_by_id(1)}/sounds/map_1.wav",
-            'level_2': f"assets/environments/{self.level_manager.get_environment_by_id(2)}/sounds/map_2.wav",
+            'level_1': f"assets/environments/white_space/sounds/map_1.wav",
+            'level_2': f"assets/environments/green_cave/sounds/map_2.wav",
         }, is_music=True, master_volume=self.master_volume, volume=1)
         self.sound_effect_manager = Sound(self, {
             "dash": player_sfx + 'dash.wav',
@@ -159,24 +142,18 @@ class Game:
             with open(path, 'r') as f:
                 self.environments = json.load(f)
 
-        self.environment = self.level_manager.get_environment_by_id(self.level_id)
-        self.level = self.level_manager.get_file_name(self.environment, self.level_id)
+        self.level = f"{self.level_id:03d}"
         self.default_level = self.level
         self.tile_size = 16
         self.b_info = {
-            "white_space": {"animated": True, "img_dur": 6, "loop": True},
-            "green_cave": {"animated": False},
-            "blue_cave": {"animated": False},
+            "1": {"animated": True, "img_dur": 6, "loop": True, "path": f"environments/white_space/images/backgrounds"},
+            "2": {"animated": False, "path": f"environments/green_cave/images/backgrounds"},
         }
         self.assets = {}
-        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_tiles())
         self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.environment))
-        self.assets.update(load_particles(self.environment))
-        self.doors_id_pairs = []
-        self.levers_id_pairs = []
-        self.buttons_id_pairs = []
-        self.tp_id_pairs = []
+        self.assets.update(load_backgrounds(self.b_info, self.level_id))
+        self.assets.update(load_particles())
         self.tilemap = Tilemap(self, self.tile_size)
 
     def _init_runtime_state(self):
@@ -365,30 +342,30 @@ class Game:
             :param map_id:
             :param transition_effect:
         """
-        self.environment = self.level_manager.get_environment_by_id(self.level_id)
-        map_name = self.level_manager.get_file_name(self.environment, map_id)
+        #map_name = self.level_manager.get_file_name(self.environment, map_id)
+        map_name = f"{map_id:03d}"
         self.assets = {}
-        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_tiles())
         self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.environment))
-        self.assets.update(load_particles(self.environment))
-        self.tilemap.load("data/maps/" + map_name)
+        self.assets.update(load_backgrounds(self.b_info, map_id))
+        self.assets.update(load_particles())
+        self.tilemap.load(f"data/maps/{map_name}.json")
         self.tilemap.tile_size = self.tile_size
         self.light_emitting_tiles = []
         self.light_emitting_objects = []
-        self.activators_actions = load_activators_actions(map_name, self.tilemap.layers["activators"])
 
         # --- Checkpoints & Traps ---
         self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
 
         self.pickups = []
-        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/pickups"))]):
-            if pickup["pos"] not in self.collected_souls:
-                self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
+        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(f"{BASE_IMG_PATH}environments/white_space/images/tiles/pickups"))]):
+            if pickup.pos not in self.collected_souls:
+                self.pickups.append(Pickup(self, pickup.pos, pickup.type))
+
 
         self.spikes = []
         spike_types = []
-        for s in ("spikes", "gluy_spikes", "purpur_spikes"):
+        for s in ("spikes", "gluy_spikes", "purpur_spikes", "red_spikes"):
             for n in range(3):
                 spike_types.append((s, n))
 
@@ -397,71 +374,72 @@ class Game:
             spike_block_types += [("spike_roots", n)]
 
         for spike in self.tilemap.extract(spike_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]], hitbox_type='spike', rotation=spike["rotation"]))
+            self.spikes.append(DamageBlock(self, spike.pos, self.assets[spike.type][spike.variant], hitbox_type='spike', rotation=spike.rotation))
 
         for spike_block in  self.tilemap.extract(spike_block_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike_block["pos"], self.assets[spike_block["type"]][spike_block["variant"]], hitbox_type='spike_block', rotation=spike_block["rotation"]))
+            self.spikes.append(DamageBlock(self, spike_block.pos, self.assets[spike_block.type][spike_block.variant], hitbox_type='spike_block', rotation=spike_block.rotation))
 
         # --- Objects & Particles ---
         self.throwable = []
         for o in self.tilemap.extract([('throwable', 0)]):
-            self.throwable.append(Throwable(self, "blue_rock", o['pos'], (16, 16)))
+            self.throwable.append(Throwable(self, "blue_rock", o.pos, (16, 16)))
 
         self.leaf_spawners = []
         for plant in self.tilemap.extract([('vine_decor', 3), ('vine_decor', 4), ('vine_decor', 5),
                                            ('mossy_stone_decor', 15), ('mossy_stone_decor', 16)], keep=True):
-            self.leaf_spawners.append(pygame.Rect(4 + plant['pos'][0], 4 + plant['pos'][1], 23, 13))
+            self.leaf_spawners.append(pygame.Rect(4 + plant.pos[0], 4 + plant.pos[1], 23, 13))
 
         self.crystal_spawners = []
         for mushroom in self.tilemap.extract([("blue_decor", 14), ("blue_decor", 15)], keep=True):
-            self.shader.register_light_emitting_tile((mushroom['pos'][0] + 8, mushroom['pos'][1] + 8), "glowing_mushroom")
-            self.crystal_spawners.append(pygame.Rect(4 + mushroom['pos'][0], 4 + mushroom['pos'][1], 23, 13))
+            self.shader.register_light_emitting_tile((mushroom.pos[0] + 8, mushroom.pos[1] + 8), "glowing_mushroom")
+            self.crystal_spawners.append(pygame.Rect(4 + mushroom.pos[0], 4 + mushroom.pos[1], 23, 13))
 
         # Initial setup for enemies and interactive objects
         self.enemies = []
         for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 3)]):
-            if spawner['variant'] == 0:
+            if spawner.variant == 0:
                 if self.current_checkpoint is None:
-                    self.spawners[str(map_id)] = spawner["pos"].copy()
-                    self.spawner_pos[str(map_id)] = spawner["pos"]
-                    self.player.pos = spawner["pos"].copy()
-                    self.spawn_point = {"pos": spawner["pos"].copy(), "level": map_id, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
-            elif spawner['variant'] == 1:
-                self.enemies.append(Enemy(self, "picko", spawner['pos'], (16, 16), 100,
+                    self.spawners[str(map_id)] = spawner.pos.copy()
+                    self.spawner_pos[str(map_id)] = spawner.pos
+                    self.player.pos = spawner.pos.copy()
+                    self.spawn_point = {"pos": spawner.pos.copy(), "level": map_id, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
+            elif spawner.variant == 1:
+                self.enemies.append(Enemy(self, "picko", spawner.pos, (16, 16), 100,
                                           {"attack_distance": 20, "attack_dmg": 10, "attack_time": 1.5}))
-            elif spawner['variant'] == 3:
-                self.enemies.append(DistanceEnemy(self, "glorbo", spawner['pos'], (16, 16), 100,
+            elif spawner.variant == 3:
+                self.enemies.append(DistanceEnemy(self, "glorbo", spawner.pos, (16, 16), 100,
                                                   {"attack_distance": 100, "attack_dmg": 10, "attack_time": 1.5}))
 
         self.activators = []
-        for activator in self.tilemap.extract(self.levers_id_pairs + self.buttons_id_pairs + self.tp_id_pairs):
-            a = Activator(self, activator['pos'], activator['type'], i=activator["id"])
-            a.state = activator["variant"]
+        for activator in self.tilemap.extract([]):
+            a = Activator(self, activator.pos, activator.type, i=activator["id"])
+            a.state = activator.variant
             self.activators.append(a)
 
         self.doors = []
         '''for door in self.tilemap.extract(self.doors_id_pairs):
-            door_type = door["type"]
+            door_type = door.type
             speed = int(door["opening_time"])
             door_id = door["id"]
             self.doors.append(
-                Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))'''
+                Door(self.d_info[door_type]["size"], door.pos, door_type, door_id, False, speed, self))'''
 
         self.camera_setup = []
         for camera in self.tilemap.extract(["camera_setup"]):
             self.camera_setup.append(CameraSetup(self, camera))
 
         fake_tiles_id_pairs = []
-        for tile in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/blocks")):
+        """for tile in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/blocks")):
             if "fake" in tile:
                 for variant in range(len(self.assets[tile])):
                     fake_tiles_id_pairs.append((tile, variant))
+        """
 
         if not hasattr(self, "fake_tile_groups"):
             self.fake_tile_groups = []
             for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
-                fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
-                fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
+                fake_tile.pos[0] = fake_tile.pos.copy()[0] // self.tile_size
+                fake_tile.pos[1] = fake_tile.pos.copy()[1] // self.tile_size
                 g_check = True
                 for group in self.fake_tile_groups:
                     if fake_tile in group:
@@ -519,20 +497,20 @@ class Game:
 
     def update_transitions(self):
         for transition in self.transitions:
-            if (self.player.rect().left <= transition['pos'][0] <= self.player.rect().right <= transition['pos'][0] + self.tile_size and
-                    self.player.rect().bottom >= transition['pos'][1] >= self.player.rect().top):
-                self.level_id = int(transition["destination"])
-                self.level = self.level_manager.get_file_name(self.environment, self.level_id)
+            if (self.player.rect().left <= transition.pos[0] <= self.player.rect().right <= transition.pos[0] + self.tile_size and
+                    self.player.rect().bottom >= transition.pos[1] >= self.player.rect().top):
+                self.level_id = 2
+                self.level = f"{self.level_id:03d}"
                 self.scroll_limits = self.scroll_limits_per_level[str(self.level_id)]
                 delattr(self, "fake_tile_groups")
                 self.load_level(self.level_id, transition_effect=False)
-                self.player.pos = [transition["dest_pos"][0] * self.tile_size, transition["dest_pos"][1] * self.tile_size]
+                self.player.pos = [8 * self.tile_size, 5 * self.tile_size]
 
     def checkpoints_render_and_update(self, render_scroll):
         for checkpoint in self.checkpoints:
-            if not self.tilemap.pos_visible(self.display, checkpoint["pos"], render_scroll, additional_offset=(16, 16)):
+            if not self.tilemap.pos_visible(self.display, checkpoint.pos, render_scroll, additional_offset=(16, 16)):
                 continue
-            pos = checkpoint["pos"]
+            pos = checkpoint.pos
 
             if self.current_checkpoint == checkpoint:
                 checkpoint["state"] = 1
@@ -564,9 +542,9 @@ class Game:
 
                 self.current_checkpoint = checkpoint
 
-                if self.spawn_point["pos"] == self.current_checkpoint["pos"] :
+                if self.spawn_point["pos"] == self.current_checkpoint.pos :
                     continue
-                self.spawn_point = {"pos": self.current_checkpoint["pos"], "level": self.level, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
+                self.spawn_point = {"pos": self.current_checkpoint.pos, "level": self.level, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
                 for camera in self.camera_setup:
                     if camera.initial_state != camera.scroll_limits:
                         self.spawn_point["cameras"][str(camera.initial_state)] = {}
@@ -613,11 +591,11 @@ class Game:
                     group_to_remove=self.fake_tiles_colliding_group
 
             for fake_tile in group:
-                img = self.assets[fake_tile["type"]][fake_tile['variant']].copy()
+                img = self.assets[fake_tile.type][fake_tile.variant].copy()
                 img.fill((255, 255, 255, opacity),special_flags=pygame.BLEND_RGBA_MULT)
 
                 self.display.blit(img, (
-                    fake_tile['pos'][0]*self.tile_size - offset[0], fake_tile['pos'][1]*self.tile_size - offset[1]))
+                    fake_tile.pos[0]*self.tile_size - offset[0], fake_tile.pos[1]*self.tile_size - offset[1]))
 
         if group_to_remove:
             if group_to_remove in self.fake_tile_groups:

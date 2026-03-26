@@ -66,22 +66,23 @@ def load_tileset(image_path, tile_width, tile_height, spiral_order=False, size=N
 def round_up(x):#pretty basic
     return int(x) + 1 if x % 1 != 0 and x > 0 else int(x)
 
-def load_tiles(environment):
+def load_tiles():
     tiles = {}
-    path = f"{BASE_IMG_PATH}environments/{environment}/images/tiles"
-    for category in sorted(os.listdir(path)):
-        for tile in sorted(os.listdir(f"{path}/{category}")):
-            if category in ANIMATED_CATEGORIES:
-                for animation in sorted(os.listdir(f"{path}/{category}/{tile}")):
-                    tiles[tile + '/' + animation] = Animation(
-                        load_images(f"environments/{environment}/images/tiles/{category}/{tile}/{animation}"))
-            else:
-                images = load_images(f"environments/{environment}/images/tiles/{category}/{tile}")
-                if "tileset.png" in os.listdir(f'{path}/{category}/{tile}'):
-                    tiles[tile] = load_tileset(image_path=f"{path}/{category}/{tile}/tileset.png",
-                                               tile_width=16, tile_height=16, spiral_order=True)
+    for environment in os.listdir(f"{BASE_IMG_PATH}environments"):
+        path = f"{BASE_IMG_PATH}environments/{environment}/images/tiles"
+        for category in sorted(os.listdir(path)):
+            for tile in sorted(os.listdir(f"{path}/{category}")):
+                if category in ANIMATED_CATEGORIES:
+                    for animation in sorted(os.listdir(f"{path}/{category}/{tile}")):
+                        tiles[tile + '/' + animation] = Animation(
+                            load_images(f"environments/{environment}/images/tiles/{category}/{tile}/{animation}"))
                 else:
-                    tiles[tile] = images
+                    images = load_images(f"environments/{environment}/images/tiles/{category}/{tile}")
+                    if "tileset.png" in os.listdir(f'{path}/{category}/{tile}'):
+                        tiles[tile] = load_tileset(image_path=f"{path}/{category}/{tile}/tileset.png",
+                                                   tile_width=16, tile_height=16, spiral_order=True)
+                    else:
+                        tiles[tile] = images
     return tiles
 
 def load_editor_tiles():
@@ -111,22 +112,25 @@ def load_editor_tiles():
 def load_player():
     return {'player/idle': Animation(load_images(f'player/idle', (16,16)), img_dur=12)}
 
-def load_particles(environment):
+def load_particles():
     tiles = {}
-    if "particles" in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{environment}/images/")):
-        for particle in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{environment}/images/particles")):
-            tiles[f"particle/{particle}"] = Animation(load_images(f'environments/{environment}/images/particles/leaf'), loop=5)
+    for environment in sorted(os.listdir(f"{BASE_IMG_PATH}environments/")):
+        if "particles" in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{environment}/images/")):
+            for particle in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{environment}/images/particles")):
+                tiles[f"particle/{particle}"] = Animation(load_images(f'environments/{environment}/images/particles/leaf'), loop=5)
 
     return tiles
 
-def load_backgrounds(b_info, environment):
+def load_backgrounds(b_info, map_id):
+    map_id = str(map_id)
     tiles = {}
-    path = f"{BASE_IMG_PATH}environments/{environment}/images/backgrounds"
-    if b_info[environment]["animated"]:
-        tiles[environment] = Animation(load_images(f"environments/{environment}/images/backgrounds"), img_dur=b_info[environment]["img_dur"], loop=b_info[environment]["loop"])
+    path = b_info[map_id]["path"]
+
+    if b_info[map_id]["animated"]:
+        tiles[map_id] = Animation(load_images(path), img_dur=b_info[map_id]["img_dur"], loop=b_info[map_id]["loop"])
         return tiles
-    for bg in sorted(os.listdir(path)):
-            tiles[environment + "/" + bg[:-4]] = load_image(f"environments/{environment}/images/backgrounds/{bg}",
+    for bg in sorted(os.listdir(f"{BASE_IMG_PATH}{path}")):
+            tiles[map_id + "/" + bg[:-4]] = load_image(f"{path}/{bg}",
                                                        (480, 300))
     return tiles
 

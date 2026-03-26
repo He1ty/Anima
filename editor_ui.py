@@ -10,6 +10,7 @@ from scripts.physics import PhysicsPlayer
 from scripts.pickup import Pickup
 from scripts.saving import Save
 from scripts.sound import Sound
+from scripts.tile import Tile
 from scripts.user_interface import Menu
 from scripts.utils import load_image, create_rect_alpha, load_tiles
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown, IconButton
@@ -274,9 +275,8 @@ class PlayTest(Game):
         self.level = self.level_manager.get_file_name(self.level_id)
 
         self.b_info = {
-            "white_space": {"animated": True, "img_dur": 6, "loop": True},
-            "green_cave": {"animated": False},
-            "blue_cave": {"animated": False},
+            "1": {"animated": True, "img_dur": 6, "loop": True, "path": f"environments/white_space/images/backgrounds"},
+            "2": {"animated": False, "path": f"environments/green_cave/images/backgrounds"},
         }
 
         self.tile_size = self.tilemap.tile_size
@@ -333,10 +333,10 @@ class PlayTest(Game):
 
         # ── 6. Assets ──────────────────────────────────────────────────────────
         self.assets = {}
-        self.assets.update(load_tiles(self.environment))
+        self.assets.update(load_tiles())
         self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.environment))
-        self.assets.update(load_particles(self.environment))
+        self.assets.update(load_backgrounds(self.b_info, self.level_id))
+        self.assets.update(load_particles())
 
         self.doors_id_pairs = []
         self.levers_id_pairs = []
@@ -638,6 +638,14 @@ class EditorSimulation:
         self.tile_variant = 0
 
         self.environments = load_editor_tiles()
+        self.categories = {}
+        for category_dict in self.environments.values():
+            for category_name, category_tiles in category_dict.items():
+                if category_name in self.categories:
+                    self.categories[category_name].update(category_tiles)
+                else:
+                    self.categories[category_name] = category_tiles
+
         self.assets = {}
         for category in self.environments.values():
             for tile in category.values():
@@ -885,25 +893,11 @@ class EditorSimulation:
                     print("Player spawner alredy placed in this map")
                 else:
                     t = self.tile_type
-                    self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
-                        'type': t,
-                        'variant': self.tile_variant,
-                        'pos': self.tile_pos}
+                    self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = (
+                        Tile(self.tile_pos, t, self.tile_variant, self.rotation))
 
                     tile = self.tilemap.tilemap[self.current_layer][
                         str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
-
-                    if "spike" in t:
-                        self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])][
-                            "rotation"] = self.rotation
-
-                    else:
-                        """
-                        for c in self.infos_per_type_per_category:
-                            if c.lower()[:-1] in t:
-                                tile_category = self.get_infos_tile_category(tile)
-                                self.setup_edit_window(tile_category, tile)
-                                break"""
 
             else:
                 if self.current_layer not in self.tilemap.offgrid_tiles:
@@ -1236,9 +1230,8 @@ class EditorSimulation:
     def render_brush_tool(self):
         current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
         current_tile_img.set_alpha(100)
+        current_tile_img = pygame.transform.rotate(current_tile_img, self.rotation * -90)
 
-        if 'spike' in self.tile_type:
-            current_tile_img = pygame.transform.rotate(current_tile_img, self.rotation * -90)
         if self.ongrid:
             self.display.blit(current_tile_img, (self.tile_pos[0] * self.tilemap.tile_size - self.scroll[0],
                                                  self.tile_pos[1] * self.tilemap.tile_size - self.scroll[1]))
@@ -1439,7 +1432,8 @@ class UI:
                                                self.screen_width * 20 / 96, self.screen_width * 25 / 96)
 
         self.current_category = 0
-        self.current_category_name = list(self.editor.environments[self.editor.current_environment].keys())[self.current_category]
+        self.categories = editor_instance.categories
+        self.current_category_name = list(self.editor.categories.keys())[self.current_category]
 
         self.assets_section_buttons_width = self.assets_section_rect.width * (1 / 6)
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
@@ -1509,7 +1503,7 @@ class UI:
             button_y -= 0.7*self.toolbar_buttons_height - (self.PADDING/self.editor.SH)*self.screen_height
             self.check_buttons.append(button)
 
-        self.init_assets_buttons(self.editor.environments[self.editor.current_environment])
+        self.init_assets_buttons(self.categories)
 
         button_x,button_y = self.toolbar_rect.x - self.toolbar_rect.width/2 , self.toolbar_rect.width/2
         for label in self.on_selection_buttons_labels:
@@ -1658,7 +1652,7 @@ class UI:
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
         self.assets_button_width = self.assets_section_rect.width * (1 / 10)
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
-        self.init_assets_buttons(self.editor.environments[self.editor.current_environment])
+        self.init_assets_buttons(self.categories)
 
         self.init_buttons()
 
@@ -1669,7 +1663,7 @@ class UI:
             self.screen_width * 20 / 96, self.screen_width * 25 / 96)
 
     def reload_assets_section(self):
-        categories = self.editor.environments[self.editor.current_environment]
+        categories = self.categories
         self.current_category = 0
         self.current_category_name = list(categories.keys())[self.current_category]
         self.init_assets_buttons(categories)
@@ -1735,7 +1729,7 @@ class UI:
                         self.editor.ongrid = not self.editor.ongrid
 
     def handle_assets_section_event(self, event):
-        categories = self.editor.environments[self.editor.current_environment]
+        categories = self.categories
         for button in self.assets_section_buttons:
             if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width - self.assets_section_rect.width,
                                                   self.screen_height - self.assets_section_rect.height)):
