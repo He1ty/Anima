@@ -905,12 +905,7 @@ class EditorSimulation:
                 self.tilemap.offgrid_tiles[self.current_layer][
                     str(self.mpos_scaled[0] + self.scroll[0]) +
                     ";"
-                    + str(self.mpos_scaled[1] + self.scroll[1])] = \
-                    {'type': self.tile_type,
-                     'variant': self.tile_variant,
-                     'pos': (
-                         self.mpos_scaled[0] + self.scroll[0],
-                         self.mpos_scaled[1] + self.scroll[1])}
+                    + str(self.mpos_scaled[1] + self.scroll[1])] = Tile((self.mpos_scaled[0] + self.scroll[0],self.mpos_scaled[1] + self.scroll[1]), self.tile_type, self.tile_variant, self.rotation)
 
     def handle_eraser_tool(self):
         self.selector.group = []
@@ -923,9 +918,9 @@ class EditorSimulation:
             if self.current_layer in self.tilemap.offgrid_tiles:
                 for pos in self.tilemap.offgrid_tiles[self.current_layer].copy():
                     tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
-                    tile_img = self.assets[tile['type']][tile['variant']]
-                    tile_r = pygame.Rect(tile['pos'][0] - self.scroll[0],
-                                         tile['pos'][1] - self.scroll[1],
+                    tile_img = self.assets[tile.type][tile.variant]
+                    tile_r = pygame.Rect(tile.pos[0] - self.scroll[0],
+                                         tile.pos[1] - self.scroll[1],
                                          tile_img.get_width(),
                                          tile_img.get_height())
                     if tile_r.collidepoint(self.mpos_scaled):  # Check both to be safe
@@ -1765,7 +1760,6 @@ class UI:
 
                 self.reload_assets_section()
                 self.editor.current_tool = self.editor_previous_tool
-                self.environment_selector_state = False
             case "DeleteLevel":
                 deleted_id = self.level_carousel.levels[self.level_carousel.selected]
                 self.level_carousel.levels.pop(self.level_carousel.selected)

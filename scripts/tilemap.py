@@ -277,7 +277,6 @@ class Tilemap:
 
                 angle = -(tile.rotation - 1) * math.pi / 2
                 a_map = self.get_rotated_autotile_map(angle)
-                print(a_map)
 
                 if tuple(neighbors) not in a_map:
                     for s in corner_additional_shifts:
@@ -287,7 +286,9 @@ class Tilemap:
                 neighbors = tuple(sorted(neighbors))
 
                 if (tile.type in AUTOTILE_TYPES) and (neighbors in a_map):
-                    tile.variant = a_map[neighbors]
+                    new_variant = a_map[neighbors]
+                    if new_variant < len(self.game.assets[tile.type]):
+                        tile.variant = new_variant
 
     def copy(self, new_game):
         tilemap_copy = Tilemap(new_game, self.tile_size)
