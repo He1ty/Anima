@@ -10,7 +10,7 @@ from scripts.physics import PhysicsPlayer
 from scripts.pickup import Pickup
 from scripts.saving import Save
 from scripts.sound import Sound
-from scripts.tile import Tile
+from scripts.tile import TileManager
 from scripts.user_interface import Menu
 from scripts.utils import load_image, create_rect_alpha, load_tiles
 from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown, IconButton
@@ -96,6 +96,16 @@ class Selector:
                         group.append(tile_pos)
 
         return group
+
+    def delete_group(self):
+        if self.group:
+            for tile_loc in self.group:
+                space = self.editor.check_tile_space(tile_loc)
+                if space == "tilemap":
+                    del self.editor.tilemap.tilemap[self.editor.current_layer][tile_loc]
+                else:
+                    del self.editor.tilemap.offgrid_tiles[self.editor.current_layer][tile_loc]
+            self.group = []
 
     def unlink_group(self, group):
         current_layer = self.editor.current_layer
@@ -631,7 +641,6 @@ class EditorSimulation:
             self.active_maps.append(int(ids[:-5]))
         self.active_maps.sort()
 
-
         self.level_id = self.active_maps[0] if self.active_maps else 1
 
         self.tile_group = 0
@@ -650,8 +659,6 @@ class EditorSimulation:
         for category in self.environments.values():
             for tile in category.values():
                 self.assets.update(tile)
-        self.assets.update({"spawners": load_images("player/spawner"),
-                            "transition": load_images("transition")})
 
 
 
@@ -741,7 +748,8 @@ class EditorSimulation:
         self.next_available_group_id = "0"
 
         self.ui = UI(self)
-        self.playtest = PlayTest(self)
+        self.tiles_manager = TileManager()
+        self.playtest = None#PlayTest(self)
 
         self.save_action()
 
@@ -807,8 +815,6 @@ class EditorSimulation:
         for category in self.environments.values():
             for tile in category.values():
                 self.assets.update(tile)
-        self.assets.update({"spawners": load_images("player/spawner"),
-                            "transition": load_images("transition")})
 
     def sizeofmaps(self):
         return len(self.active_maps)
@@ -893,19 +899,20 @@ class EditorSimulation:
                     print("Player spawner alredy placed in this map")
                 else:
                     t = self.tile_type
+                    t_id = self.tiles_manager.get_id(t)
                     self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = (
-                        Tile(self.tile_pos, t, self.tile_variant, self.rotation))
-
-                    tile = self.tilemap.tilemap[self.current_layer][
-                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
+                        self.tiles_manager.pack_tile(t_id, self.tile_variant, self.rotation))
 
             else:
                 if self.current_layer not in self.tilemap.offgrid_tiles:
                     self.tilemap.offgrid_tiles[self.current_layer] = {}
+                t = self.tile_type
+                t_id = self.tiles_manager.get_id(t)
                 self.tilemap.offgrid_tiles[self.current_layer][
                     str(self.mpos_scaled[0] + self.scroll[0]) +
                     ";"
-                    + str(self.mpos_scaled[1] + self.scroll[1])] = Tile((self.mpos_scaled[0] + self.scroll[0],self.mpos_scaled[1] + self.scroll[1]), self.tile_type, self.tile_variant, self.rotation)
+                    + str(self.mpos_scaled[1] + self.scroll[1])] = (
+                    self.tiles_manager.pack_tile(t_id, self.tile_variant, self.rotation))
 
     def handle_eraser_tool(self):
         self.selector.group = []
@@ -916,15 +923,20 @@ class EditorSimulation:
 
 
             if self.current_layer in self.tilemap.offgrid_tiles:
-                for pos in self.tilemap.offgrid_tiles[self.current_layer].copy():
-                    tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
-                    tile_img = self.assets[tile.type][tile.variant]
-                    tile_r = pygame.Rect(tile.pos[0] - self.scroll[0],
-                                         tile.pos[1] - self.scroll[1],
+                for loc in self.tilemap.offgrid_tiles[self.current_layer].copy():
+                    pos = [float(val) for val in loc.split(";")]
+                    tile_id, variant, rot, flip_h, flip_v  = self.tiles_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
+                    images = self.tiles_manager.tiles[tile_id].images.copy()
+                    if isinstance(images, Animation):
+                        tile_img = images.img()
+                    else:
+                        tile_img = images[variant]
+                    tile_r = pygame.Rect(pos[0] - self.scroll[0],
+                                         pos[1] - self.scroll[1],
                                          tile_img.get_width(),
                                          tile_img.get_height())
                     if tile_r.collidepoint(self.mpos_scaled):  # Check both to be safe
-                        del self.tilemap.offgrid_tiles[self.current_layer][pos]
+                        del self.tilemap.offgrid_tiles[self.current_layer][loc]
 
             tile_group = self.selector.tile_has_group(tile_loc)
             if tile_group:
@@ -966,11 +978,10 @@ class EditorSimulation:
                             new_loc = self.moved_group["ongrid"][tile_loc]
                             if tile_loc in tilemap_tmp:
                                 tmp = tilemap_tmp[tile_loc]
-                                tmp["pos"] = [int(val) for val in new_loc.split(";")]
                             else:  # <=> tile_loc in self.tilemap.offgrid_tiles[self.current_layer]
                                 tmp = offgrid_tmp[tile_loc]
-                                tmp["pos"] = [int(float(val)) for val in new_loc.split(";")]
-                                new_loc = f"{tmp["pos"][0]};{tmp["pos"][1]}"
+                                pos = [int(float(val)) for val in new_loc.split(";")]
+                                new_loc = f"{pos[0]};{pos[1]}"
 
                             if self.current_layer not in self.tilemap.tilemap:
                                 self.tilemap.tilemap[self.current_layer] = {}
@@ -1011,7 +1022,6 @@ class EditorSimulation:
                                 tmp = tilemap_tmp[tile_loc]
                             else:  # <=> tile_loc in self.tilemap.offgrid_tiles[self.current_layer]
                                 tmp = offgrid_tmp[tile_loc]
-                            tmp["pos"] = [float(val) for val in new_loc.split(";")]
 
                             if self.current_layer not in self.tilemap.offgrid_tiles:
                                 self.tilemap.offgrid_tiles[self.current_layer] = {}
@@ -1202,6 +1212,9 @@ class EditorSimulation:
                     }
                     self.save_action()
 
+                if event.key == pygame.K_DELETE:
+                    self.selector.delete_group()
+
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_y:
                 self.holding_y = False
@@ -1241,44 +1254,48 @@ class EditorSimulation:
                                int((self.mpos_scaled_onclick[1]) // self.tilemap.tile_size))
             mpos_scaled_onclick = (
             self.mpos_scaled_onclick[0] - self.scroll[0], self.mpos_scaled_onclick[1] - self.scroll[1])
-            for pos in self.selector.group:
+            for loc in self.selector.group:
                 offgrid_tile = False
-                if pos in self.tilemap.tilemap[self.current_layer]:
-                    tile = self.tilemap.tilemap[self.current_layer][pos]
+                if loc in self.tilemap.tilemap[self.current_layer]:
+                    tile_id, variant, rot, flip_h, flip_v  = self.tiles_manager.unpack_tile(self.tilemap.tilemap[self.current_layer][loc])
                 else:
-                    tile = self.tilemap.offgrid_tiles[self.current_layer][pos]
+                    tile_id, variant, rot, flip_h, flip_v  = self.tiles_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
                     offgrid_tile = True
-                tile_img = self.assets[tile["type"]][tile["variant"]].copy()
+                tile_img = self.tiles_manager.get_tile_img(tile_id, variant)
 
                 if offgrid_tile:
                     if self.ongrid:
+                        pos = [int(float(val)) for val in loc.split(";")]
                         self.moved_group["offgrid"] = {}
-                        x, y = ((tile["pos"][0] // self.tilemap.tile_size + self.tile_pos[0] - tilepos_onclick[0]),
-                                (tile["pos"][1] // self.tilemap.tile_size + self.tile_pos[1] - tilepos_onclick[1]))
+                        x, y = ((pos[0] // self.tilemap.tile_size + self.tile_pos[0] - tilepos_onclick[0]),
+                                (pos[1] // self.tilemap.tile_size + self.tile_pos[1] - tilepos_onclick[1]))
 
                         self.display.blit(tile_img, (
                         x * self.tilemap.tile_size - self.scroll[0], y * self.tilemap.tile_size - self.scroll[1]))
-                        self.moved_group["ongrid"][pos] = f"{int(x)};{int(y)}"
+                        self.moved_group["ongrid"][loc] = f"{int(x)};{int(y)}"
                     else:
+                        pos = [float(val) for val in loc.split(";")]
                         self.moved_group["ongrid"] = {}
-                        x, y = (tile["pos"][0] + self.mpos_scaled[0] - mpos_scaled_onclick[0],
-                                tile["pos"][1] + self.mpos_scaled[1] - mpos_scaled_onclick[1])
+                        x, y = (pos[0] + self.mpos_scaled[0] - mpos_scaled_onclick[0],
+                                pos[1] + self.mpos_scaled[1] - mpos_scaled_onclick[1])
                         self.display.blit(tile_img, (x - self.scroll[0], y - self.scroll[1]))
-                        self.moved_group["offgrid"][pos] = f"{x};{y}"
+                        self.moved_group["offgrid"][loc] = f"{x};{y}"
                 else:
                     if self.ongrid:
+                        pos = [int(val) for val in loc.split(";")]
                         self.moved_group["offgrid"] = {}
-                        x, y = ((tile["pos"][0] + self.tile_pos[0] - tilepos_onclick[0]),
-                                (tile["pos"][1] + self.tile_pos[1] - tilepos_onclick[1]))
+                        x, y = ((pos[0] + self.tile_pos[0] - tilepos_onclick[0]),
+                                (pos[1] + self.tile_pos[1] - tilepos_onclick[1]))
                         self.display.blit(tile_img, (
                         x * self.tilemap.tile_size - self.scroll[0], y * self.tilemap.tile_size - self.scroll[1]))
-                        self.moved_group["ongrid"][pos] = f"{int(x)};{int(y)}"
+                        self.moved_group["ongrid"][loc] = f"{int(x)};{int(y)}"
                     else:
+                        pos = [float(val) for val in loc.split(";")]
                         self.moved_group["ongrid"] = {}
-                        x, y = ((tile["pos"][0] * self.tile_size + self.mpos_scaled[0] - mpos_scaled_onclick[0]),
-                                (tile["pos"][1] * self.tile_size + self.mpos_scaled[1] - mpos_scaled_onclick[1]))
+                        x, y = ((pos[0] * self.tile_size + self.mpos_scaled[0] - mpos_scaled_onclick[0]),
+                                (pos[1] * self.tile_size + self.mpos_scaled[1] - mpos_scaled_onclick[1]))
                         self.display.blit(tile_img, (x - self.scroll[0], y - self.scroll[1]))
-                        self.moved_group["offgrid"][pos] = f"{x};{y}"
+                        self.moved_group["offgrid"][loc] = f"{x};{y}"
 
     def render_selection_tool(self):
         self.selector.draw(self.display)

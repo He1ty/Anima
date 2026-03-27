@@ -38,7 +38,7 @@ class Editor:
             'spawners': load_images('spawners'),
             'transition': load_images('transition'),
             'throwable': load_images('entities/elements/blue_rock/intact'),
-            'checkpoint': load_images('checkpoint/deactivated'),
+            'checkpoint': load_images('assets/environments/global/images/tiles/checkpoint/deactivated'),
         }
 
         self.level_manager = LevelManager(self)

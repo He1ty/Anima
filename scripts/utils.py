@@ -29,6 +29,13 @@ def load_images(path, tile_size=None):
         images.append(load_image(path + '/' + img_name, (tile_size[0], tile_size[1]) if tile_size else None))
     return images
 
+def load_animations(path, tile_size=None):
+    animations = {}
+    for animation in os.listdir(f"{BASE_IMG_PATH}{path}"):
+        animations[animation] = load_images(f"{path}/{animation}")
+    return animations
+
+
 def load_tileset(image_path, tile_width, tile_height, spiral_order=False, size=None):
     """
     Slices a tileset image into a list of individual surfaces.
@@ -73,9 +80,8 @@ def load_tiles():
         for category in sorted(os.listdir(path)):
             for tile in sorted(os.listdir(f"{path}/{category}")):
                 if category in ANIMATED_CATEGORIES:
-                    for animation in sorted(os.listdir(f"{path}/{category}/{tile}")):
-                        tiles[tile + '/' + animation] = Animation(
-                            load_images(f"environments/{environment}/images/tiles/{category}/{tile}/{animation}"))
+                    tiles[tile] = Animation(
+                        load_animations(f"environments/{environment}/images/tiles/{category}/{tile}"))
                 else:
                     images = load_images(f"environments/{environment}/images/tiles/{category}/{tile}")
                     if "tileset.png" in os.listdir(f'{path}/{category}/{tile}'):
@@ -95,9 +101,8 @@ def load_editor_tiles():
             category_tiles = {category_name:{}}
             for tile in sorted(os.listdir(f"{path}/{category}")):
                 if category in ANIMATED_CATEGORIES:
-                    for animation in sorted(os.listdir(f"{path}/{category}/{tile}")):
-                        category_tiles[category_name][tile] = [load_images(f"environments/{environment}/images/tiles/{category}/{tile}/{animation}")[0]]
-                        break
+                    category_tiles[category_name][tile] = [Animation(
+                        load_animations(f"environments/{environment}/images/tiles/{category}/{tile}")).img()]
                 else:
                     images = load_images(f"environments/{environment}/images/tiles/{category}/{tile}")
                     if "tileset.png" in os.listdir(f'{path}/{category}/{tile}'):
@@ -167,8 +172,9 @@ def random_color():
             random.randrange(0, 255, 1))
 
 class Animation:
-    def __init__(self, images, img_dur = 5, loop = True):
+    def __init__(self, images, img_dur = 5, loop = -1):
         self.images = images
+        self.animation = next(iter(images))
         self.loop = loop
         self.img_duration = img_dur
         self.done = False
@@ -179,17 +185,17 @@ class Animation:
 
     def update(self):
         if self.loop > 0:
-            self.frame = (self.frame + 1) % (self.img_duration * len(self.images))
-            if type(self.loop) in (int, float):
-                self.loop -= (1/int(self.img_duration * len(self.images)))
-
+            self.frame = (self.frame + 1) % (self.img_duration * len(self.images[self.animation]))
+            self.loop -= (1/int(self.img_duration * len(self.images[self.animation])))
+        elif self.loop < 0:
+            self.frame = (self.frame + 1) % (self.img_duration * len(self.images[self.animation]))
         else:
-            self.frame = min(self.frame + 1, self.img_duration * len(self.images) - 1)
-            if self.frame >= self.img_duration * len(self.images) - 1:
+            self.frame = min(self.frame + 1, self.img_duration * len(self.images[self.animation]) - 1)
+            if self.frame >= self.img_duration * len(self.images[self.animation]) - 1:
                 self.done = True
 
     def img(self):
-        return self.images[int(self.frame / self.img_duration)]
+        return self.images[self.animation][int(self.frame / self.img_duration)]
 
 
 

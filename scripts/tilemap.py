@@ -6,7 +6,8 @@ import copy
 
 from pygame import BLEND_ADD, BLEND_MAX, BLEND_RGBA_MULT, BLEND_RGBA_SUB, BLEND_RGBA_ADD
 
-from scripts.utils import round_up
+from scripts.utils import round_up, Animation
+from scripts.tile import Tile, TileManager
 from scripts.tile import Tile
 from scripts.pickup import pickups_render_and_update
 
@@ -33,9 +34,11 @@ TRANSPARENT_TILES = {'vine_transp':[0,1,2], 'vine_transp_back':[0,1,2], 'dark_vi
 AUTOTILE_TYPES = {'whiter_blocks', 'red_spikes', 'white_blocks', 'spikes', 'purpur_spikes', 'gluy_spikes', 'purpur_rock', 'grass', 'stone', 'mossy_stone', 'blue_grass', 'spike_roots', 'gray_mossy_stone', 'hollow_stone', 'mossy_stone_gluy', 'dark_hollow_stone', 'purpur_stone'}
 AUTOTILE_COMPATIBILITY = {'purpur_spikes':["spikes"], "spikes":["purpur_spikes"] ,'mossy_stone': ["mossy_stone_gluy"], 'mossy_stone_gluy': ["mossy_stone"]}
 
+
 class Tilemap:
     def __init__(self, game, tile_size = 16):
         self.game = game
+        self.tile_manager = TileManager()
         self.tile_size = tile_size
         self.tilemap = {}
         self.offgrid_tiles = {}
@@ -153,32 +156,9 @@ class Tilemap:
 
     def save(self, path):
         f = open(path, 'w')
-        tilemap = {}
-        offgrid = {}
-        for layer in self.tilemap:
-            tilemap[layer] = {}
-            for tile_loc in self.tilemap[layer]:
-                tile = self.tilemap[layer][tile_loc]
-                tilemap[layer][tile_loc] = {
-                    "type": tile.type,
-                    "variant": tile.variant,
-                    "pos": tile.pos,
-                    "rotation": tile.rotation,
-                }
-                
-        for layer in self.offgrid_tiles:
-            offgrid[layer] = {}
-            for tile_loc in self.offgrid_tiles[layer]:
-                tile = self.offgrid_tiles[layer][tile_loc]
-                offgrid[layer][tile_loc] = {
-                    "type": tile.type,
-                    "variant": tile.variant,
-                    "pos": tile.pos,
-                    "rotation": tile.rotation,
-                }
 
-        json.dump({'tilemap': tilemap,
-                        'offgrid': offgrid,
+        json.dump({'tilemap': self.tilemap,
+                        'offgrid': self.offgrid_tiles,
                    'tag_groups': self.tag_groups,
                    'selection_groups': self.selection_groups,
                    'layers': self.layers,
@@ -186,28 +166,27 @@ class Tilemap:
                   f, indent=1)
         f.close()
 
+    def convert_on_load(self, map_data):
+        self.tilemap = {}
+        for layer in map_data["tilemap"]:
+            self.tilemap[layer] = {}
+            for tile_loc in map_data["tilemap"][layer]:
+                tile_info = map_data["tilemap"][layer][tile_loc]
+                tile_id = self.tile_manager.get_id(tile_info["type"])
+                self.tilemap[layer][tile_loc] = self.tile_manager.pack_tile(tile_id, tile_info["variant"], tile_info["rotation"])
+
     def load(self, path):
         f = open(path, 'r')
         map_data = json.load(f)
         f.close()
 
         if "tilemap" in map_data:
-            self.tilemap = {}
-            for layer in map_data["tilemap"]:
-                self.tilemap[layer] = {}
-                for tile_loc in map_data["tilemap"][layer]:
-                    tile_infos = map_data["tilemap"][layer][tile_loc]
-                    self.tilemap[layer][tile_loc] = Tile(tile_infos["pos"],tile_infos["type"], tile_infos["variant"],
-                                                         tile_infos["rotation"] if "rotation" in tile_infos else 0)
+            #self.convert_on_load(map_data)
+            self.tilemap = map_data["tilemap"]
 
         if "offgrid" in map_data:
-            self.offgrid_tiles = {}
-            for layer in map_data["offgrid"]:
-                self.offgrid_tiles[layer] = {}
-                for tile_loc in map_data["offgrid"][layer]:
-                    tile_infos = map_data["offgrid"][layer][tile_loc]
-                    self.offgrid_tiles[layer][tile_loc] = Tile(tile_infos["pos"],tile_infos["type"], tile_infos["variant"],
-                                                         tile_infos["rotation"] if "rotation" in tile_infos else 0)
+            self.offgrid_tiles = map_data["offgrid"]
+
         if "tag_groups" in map_data:
             for group_id in map_data["tag_groups"]:
                 for tile_loc, tile_layer in map_data["tag_groups"][group_id]["tiles"]:
@@ -264,18 +243,23 @@ class Tilemap:
     def autotile(self):
         for layer in self.tilemap:
             for loc in self.tilemap[layer]:
-                tile = self.tilemap[layer][loc]
+                pos = [int(val) for val in loc.split(";")]
+                tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(self.tilemap[layer][loc])
+                tile_type = self.tile_manager.tiles[tile_id].type
+
                 neighbors = set()
                 corner_additional_shifts = [(1, 1), (1, -1), (-1, -1), (-1, 1)]
                 for shift in [(1, 0), (-1, 0), (0, -1), (0, 1)] + corner_additional_shifts:
-                    check_loc = str(tile.pos[0] + shift[0]) + ";" + str(tile.pos[1] + shift[1])
+                    check_loc = str(pos[0] + shift[0]) + ";" + str(pos[1] + shift[1])
                     if check_loc in self.tilemap[layer]:
-                        if self.tilemap[layer][check_loc].type == tile.type or (tile.type in AUTOTILE_COMPATIBILITY and
-                                                                                      self.tilemap[layer][check_loc].type in AUTOTILE_COMPATIBILITY[tile.type]):
+                        check_loc_tile_id = self.tile_manager.unpack_tile(self.tilemap[layer][check_loc])[0]
+                        check_loc_type  = self.tile_manager.tiles[check_loc_tile_id].type
+                        if check_loc_type == tile_type or (tile_type in AUTOTILE_COMPATIBILITY and
+                                                                                      check_loc_type in AUTOTILE_COMPATIBILITY[tile_type]):
                             neighbors.add(shift)
                 neighbors = sorted(neighbors)
 
-                angle = -(tile.rotation - 1) * math.pi / 2
+                angle = -(rotation - 1) * math.pi / 2
                 a_map = self.get_rotated_autotile_map(angle)
 
                 if tuple(neighbors) not in a_map:
@@ -284,11 +268,10 @@ class Tilemap:
                             neighbors.remove(s)
 
                 neighbors = tuple(sorted(neighbors))
-
-                if (tile.type in AUTOTILE_TYPES) and (neighbors in a_map):
+                if (tile_type in AUTOTILE_TYPES) and (neighbors in a_map):
                     new_variant = a_map[neighbors]
-                    if new_variant < len(self.game.assets[tile.type]):
-                        tile.variant = new_variant
+                    if new_variant < len(self.game.assets[tile_type]):
+                        self.tilemap[layer][loc] = self.tile_manager.pack_tile(tile_id, new_variant, rotation, flip_x, flip_y)
 
     def copy(self, new_game):
         tilemap_copy = Tilemap(new_game, self.tile_size)
@@ -414,46 +397,55 @@ class Tilemap:
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):
                     loc = str(x) + ";" + str(y)
                     if loc in self.tilemap[layer]:
-                        tile = self.tilemap[layer][loc]
-                        if tile.type in self.game.assets:
-                            img = self.game.assets[tile.type][tile.variant].copy()
-                            mask = (255, 255, 255, tiles_opacity)
-
-                            if loc in self.render_filters:
-                                if list(self.render_filters[loc].keys())[0] == "opacity":
-                                    mask = (255, 255, 255, self.render_filters[loc]["opacity"])
-                                    img.fill(mask, special_flags=BLEND_RGBA_MULT)
-                                elif list(self.render_filters[loc].keys())[0] == "color":
-                                    mask = self.render_filters[loc]["color"]
-                                    img = pygame.transform.grayscale(img)
-                                    highlight = pygame.Surface(img.get_size(), pygame.SRCALPHA)
-                                    highlight.fill(mask)
-
-                                    # Blit it onto your image
-                                    img.blit(highlight, (0, 0))
-                            else:
-                                img.fill(mask, special_flags=BLEND_RGBA_MULT)
-
-                            img = pygame.transform.rotate(img, tile.rotation * -90)
-
-                            surf.blit(img, (
-                                tile.pos[0] * self.tile_size - offset[0], tile.pos[1] * self.tile_size - offset[1]))
+                        pos = [int(val) for val in loc.split(";")]
+                        tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(self.tilemap[layer][loc])
+                        tile = self.tile_manager.tiles[tile_id]
+                        images = tile.images.copy()
+                        if isinstance(images, Animation):
+                            img = images.img()
                         else:
-                            pass
-                            #print(f"{tile.type} not in assets")
+                            img = images[variant].copy()
+                        mask = (255, 255, 255, tiles_opacity)
 
-            if layer in self.offgrid_tiles:
-                for pos in self.offgrid_tiles.copy()[layer]:
-                    tile = self.offgrid_tiles[layer][pos]
-                    img = self.game.assets[tile.type][tile.variant].copy()
-                    mask = (255, 255, 255, tiles_opacity)
-                    if pos in self.render_filters:
-                        if list(self.render_filters[pos].keys())[0] == "opacity":
-                            mask = (255, 255, 255, self.render_filters[pos]["opacity"])
+                        if loc in self.render_filters:
+                            if list(self.render_filters[loc].keys())[0] == "opacity":
+                                mask = (255, 255, 255, self.render_filters[loc]["opacity"])
+                                img.fill(mask, special_flags=BLEND_RGBA_MULT)
+                            elif list(self.render_filters[loc].keys())[0] == "color":
+                                mask = self.render_filters[loc]["color"]
+                                img = pygame.transform.grayscale(img)
+                                highlight = pygame.Surface(img.get_size(), pygame.SRCALPHA)
+                                highlight.fill(mask)
+
+                                # Blit it onto your image
+                                img.blit(highlight, (0, 0))
+                        else:
                             img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
-                        elif list(self.render_filters[pos].keys())[0] == "color":
-                            mask = self.render_filters[pos]["color"]
+                        img = pygame.transform.rotate(img, rotation * -90)
+                        img = pygame.transform.flip(img, flip_x, flip_y)
+
+                        surf.blit(img, (
+                            pos[0] * self.tile_size - offset[0], pos[1] * self.tile_size - offset[1]))
+
+            if layer in self.offgrid_tiles:
+                for loc in self.offgrid_tiles.copy()[layer]:
+                    pos = [float(val) for val in loc.split(";")]
+                    tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(self.offgrid_tiles[layer][loc])
+                    tile = self.tile_manager.tiles[tile_id]
+                    images = tile.images.copy()
+                    if isinstance(images, Animation):
+                        img = images.img()
+                    else:
+                        img = images[variant].copy()
+                    mask = (255, 255, 255, tiles_opacity)
+                    if loc in self.render_filters:
+                        if list(self.render_filters[loc].keys())[0] == "opacity":
+                            mask = (255, 255, 255, self.render_filters[loc]["opacity"])
+                            img.fill(mask, special_flags=BLEND_RGBA_MULT)
+
+                        elif list(self.render_filters[loc].keys())[0] == "color":
+                            mask = self.render_filters[loc]["color"]
                             img = pygame.transform.grayscale(img)
                             highlight = pygame.Surface(img.get_size(), pygame.SRCALPHA)
                             highlight.fill(mask)
@@ -464,7 +456,7 @@ class Tilemap:
                         img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
                     surf.blit(img,
-                              (tile.pos[0] - offset[0], tile.pos[1] - offset[1]))
+                              (pos[0] - offset[0], pos[1] - offset[1]))
 
 
             if layer == "2" and with_player and self.show_collisions:
