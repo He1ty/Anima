@@ -31,6 +31,14 @@ class TileManager:
             passable = tile_type in self.PASSABLE_TILES
             self.tiles[t_id] = Tile(tile_type, images, solid, passable)
 
+    def reload_tiles(self):
+        self.tiles = {}
+        for tile_type in self.tiles_images:
+            t_id = self.get_id(tile_type)
+            images = self.tiles_images[tile_type]
+            solid = tile_type in self.PHYSICS_TILES
+            passable = tile_type in self.PASSABLE_TILES
+            self.tiles[t_id] = Tile(tile_type, images, solid, passable)
 
     def load_registry(self):
         if os.path.exists(self.manifest_path):
@@ -86,11 +94,11 @@ class TileManager:
 
 
 class Tile:
-    __slots__ = ["type", "images", "solid", "passable", "group"]
-    def __init__(self, t_type, images, solid, passable, group=None):
+    __slots__ = ["type", "images", "solid", "passable", "groups"]
+    def __init__(self, t_type, images, solid, passable):
         self.type = t_type
         self.images = images
         self.solid = solid
         self.passable = passable
-        self.group = group
+        self.groups = []
 

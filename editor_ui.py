@@ -32,7 +32,7 @@ class Selector:
         self.initial_pos = self.pos
         self.rect = pygame.Rect(self.pos[0], self.pos[1], 0, 0)
         self.rect_displayed = False
-        self.group = []
+        self.link = []
 
     def get_coordinates_in_rect(self, rect):
         grid = []
@@ -64,19 +64,21 @@ class Selector:
                                 abs(distx),
                                 abs(disty))
 
-    def tile_has_group(self, tile_pos):
-        if self.editor.current_layer in self.editor.tilemap.selection_groups:
-            for group in self.editor.tilemap.selection_groups[self.editor.current_layer]:
+    def tile_has_link(self, tile_pos):
+        if self.editor.ignore_links:
+            return []
+        if self.editor.current_layer in self.editor.tilemap.links:
+            for group in self.editor.tilemap.links[self.editor.current_layer]:
                 if tile_pos in group:
                     return group
         return []
 
-    def get_group_in_rect(self, rect, check_offgrid=True):
+    def get_link_in_rect(self, rect, check_offgrid=True):
         group = []
         ongrid = self.get_coordinates_in_rect(rect)
         for tile_pos in ongrid:
             if tile_pos in self.editor.tilemap.tilemap[self.editor.current_layer]:
-                tile_group = self.tile_has_group(tile_pos)
+                tile_group = self.tile_has_link(tile_pos)
                 if tile_group:
                     if not set(tile_group).issubset(set(group)):
                         group += tile_group
@@ -88,7 +90,7 @@ class Selector:
                 pos = [float(val) for val in tile_pos.split(";")]
                 if (rect.left <= pos[0] <= rect.right and
                         rect.top <= pos[1] <= rect.bottom):
-                    tile_group = self.tile_has_group(tile_pos)
+                    tile_group = self.tile_has_link(tile_pos)
                     if tile_group:
                         if not set(tile_group).issubset(set(group)):
                             group += tile_group
@@ -97,38 +99,54 @@ class Selector:
 
         return group
 
-    def delete_group(self):
-        if self.group:
-            for tile_loc in self.group:
+    def delete_link(self):
+        if self.link:
+            for tile_loc in self.link:
                 space = self.editor.check_tile_space(tile_loc)
                 if space == "tilemap":
                     del self.editor.tilemap.tilemap[self.editor.current_layer][tile_loc]
                 else:
                     del self.editor.tilemap.offgrid_tiles[self.editor.current_layer][tile_loc]
-            self.group = []
+            self.link = []
 
-    def unlink_group(self, group):
+    def unlink_link(self, link):
         current_layer = self.editor.current_layer
         tilemap = self.editor.tilemap
 
-        tilemap.selection_groups[current_layer].remove(group)
-        if not tilemap.selection_groups[current_layer]:
-            del tilemap.selection_groups[current_layer]
+        tilemap.links[current_layer].remove(link)
+        if not tilemap.links[current_layer]:
+            del tilemap.links[current_layer]
 
-    def link_group(self):
+    def link_link(self):
         current_layer = self.editor.current_layer
 
-        if current_layer in self.editor.tilemap.selection_groups:
-            groups = self.editor.tilemap.selection_groups[current_layer]
+        if current_layer in self.editor.tilemap.links:
+            groups = self.editor.tilemap.links[current_layer]
             for group in groups:
-                if set(group).issubset(set(self.group)) and group != self.group:
-                    self.unlink_group(group)
+                if set(group).issubset(set(self.link)) and group != self.link:
+                    self.unlink_link(group)
         else:
-            self.editor.tilemap.selection_groups[current_layer] = []
+            self.editor.tilemap.links[current_layer] = []
 
-        if current_layer not in self.editor.tilemap.selection_groups:
-            self.editor.tilemap.selection_groups[current_layer] = []
-        self.editor.tilemap.selection_groups[current_layer].append(self.group.copy())
+        if current_layer not in self.editor.tilemap.links:
+            self.editor.tilemap.links[current_layer] = []
+        self.editor.tilemap.links[current_layer].append(self.link.copy())
+
+    # TODO group selection ("PLUS" icon) UI
+    def add_link_to_group(self):
+        group_id = str(input("group id: "))
+        for tile_loc in self.editor.selector.link:
+            if group_id not in self.editor.tilemap.tag_groups:
+                self.editor.tilemap.tag_groups[group_id] = {"tiles": [],
+                                                            "tags": {}}
+            self.editor.tilemap.tag_groups[group_id]["tiles"].append((tile_loc, self.editor.current_layer))
+
+    def remove_link_from_group(self):
+        group_id = str(input("group id: "))
+        for tile_loc in self.editor.selector.link:
+            self.editor.tilemap.tag_groups[group_id]["tiles"].remove((tile_loc, self.editor.current_layer))
+            if self.editor.tilemap.tag_groups[group_id] == {"tiles": [], "tags": {}}:
+                del self.editor.tilemap.tag_groups[group_id]
 
     def handle_selection_rect(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -145,11 +163,11 @@ class Selector:
             if event.button == 1:
                 if self.rect_displayed:
                     self.rect_displayed = False
-                    group = self.get_group_in_rect(self.rect)
+                    group = self.get_link_in_rect(self.rect)
                     if group:
-                        self.group = list(set(self.group) | (set(group)))
+                        self.link = list(set(self.link) | (set(group)))
                     else:
-                        self.group = []
+                        self.link = []
 
         self.rect_pos_update()
 
@@ -705,7 +723,7 @@ class EditorSimulation:
         self.holding_y = False
         self.holding_tab = False
 
-        self.moved_group = {"ongrid": {}, "offgrid": {}}
+        self.moved_link = {"ongrid": {}, "offgrid": {}}
         self.player_start = (0, 0)
 
         self.infos_per_type_per_category = {
@@ -745,11 +763,9 @@ class EditorSimulation:
         self.types_per_categories = {t: set(self.infos_per_type_per_category[t].keys()) for t in
                                      self.infos_per_type_per_category}
 
-        self.next_available_group_id = "0"
-
         self.ui = UI(self)
-        self.tiles_manager = TileManager()
         self.playtest = None#PlayTest(self)
+        self.ignore_links = False
 
         self.save_action()
 
@@ -758,9 +774,8 @@ class EditorSimulation:
         return {
             'tilemap': copy.deepcopy(self.tilemap.tilemap),
             'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles),
-            'selection_groups': copy.deepcopy(self.tilemap.selection_groups),
-            'layers': copy.deepcopy(self.tilemap.layers),
-            'selected_group': copy.deepcopy(self.selector.group)
+            'links': copy.deepcopy(self.tilemap.links),
+            'selected_link': copy.deepcopy(self.selector.link)
         }
 
     def save_action(self):
@@ -784,9 +799,8 @@ class EditorSimulation:
         # 1. Load data
         self.tilemap.tilemap = copy.deepcopy(snapshot['tilemap'])
         self.tilemap.offgrid_tiles = copy.deepcopy(snapshot['offgrid'])
-        self.tilemap.selection_groups = copy.deepcopy(snapshot['selection_groups'])
-        self.tilemap.layers = copy.deepcopy(snapshot['layers'])
-        self.selector.group = copy.deepcopy(snapshot['selected_group'])
+        self.tilemap.links = copy.deepcopy(snapshot['links'])
+        self.selector.link = copy.deepcopy(snapshot['selected_link'])
 
     def undo(self):
         if self.history_index > 0:
@@ -837,7 +851,7 @@ class EditorSimulation:
 
         self.history = []
         self.history_index = -1
-        self.selector.group = []
+        self.selector.link = []
         self.save_action()  # Save the initial state (Index 0)
 
     def mpos_update(self):
@@ -878,44 +892,31 @@ class EditorSimulation:
         self.scroll[1] = pos[1] * 16 - self.screen_height * scale_y // (2 * int(2 * self.zoom))
 
     def handle_brush_tool(self):
-        self.selector.group = []
+        self.selector.link = []
         if self.clicking:
+            t = self.tile_type
+            t_id = self.tilemap.tile_manager.get_id(t)
+            t_groups = self.tilemap.tile_manager.tiles[t_id].groups
             if self.ongrid:
-                if "Activators" in self.categories:
-                    if self.tile_type in self.categories["Activators"] and self.current_layer not in \
-                            self.tilemap.layers["activators"]:
-                        self.tilemap.layers["activators"] += [self.current_layer]
-
-                if "fake" in self.tile_type and self.current_layer not in \
-                        self.tilemap.layers["fake_tiles"]:
-                    self.tilemap.layers["fake_tiles"] += [self.current_layer]
-
-                if self.tile_type == "spawners" and self.tile_variant == 0 and not self.tilemap.extract(
-                        [("spawners", 0)], keep=True):
-                    self.tilemap.layers["player"] = [self.current_layer]
-
-                if self.tile_type == "spawners" and self.tile_variant == 0 and self.tilemap.extract(
-                        [("spawners", 0)], keep=True):
-                    print("Player spawner alredy placed in this map")
-                else:
-                    t = self.tile_type
-                    t_id = self.tiles_manager.get_id(t)
-                    self.tilemap.tilemap[self.current_layer][str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = (
-                        self.tiles_manager.pack_tile(t_id, self.tile_variant, self.rotation))
+                tile_loc = str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])
+                self.tilemap.tilemap[self.current_layer][tile_loc] = (
+                    self.tilemap.tile_manager.pack_tile(t_id, self.tile_variant, self.rotation))
 
             else:
                 if self.current_layer not in self.tilemap.offgrid_tiles:
                     self.tilemap.offgrid_tiles[self.current_layer] = {}
-                t = self.tile_type
-                t_id = self.tiles_manager.get_id(t)
-                self.tilemap.offgrid_tiles[self.current_layer][
-                    str(self.mpos_scaled[0] + self.scroll[0]) +
-                    ";"
-                    + str(self.mpos_scaled[1] + self.scroll[1])] = (
-                    self.tiles_manager.pack_tile(t_id, self.tile_variant, self.rotation))
+                tile_loc = str(self.mpos_scaled[0] + self.scroll[0])+";"+ str(self.mpos_scaled[1] + self.scroll[1])
+                self.tilemap.offgrid_tiles[self.current_layer][tile_loc] = (
+                    self.tilemap.tile_manager.pack_tile(t_id, self.tile_variant, self.rotation))
+
+
+
+            if t_groups:
+                for group_id in t_groups:
+                    self.tilemap.tag_groups[group_id]["tiles"].append((tile_loc, self.current_layer))
 
     def handle_eraser_tool(self):
-        self.selector.group = []
+        self.selector.link = []
         if self.clicking:
             tile_loc = str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])
             if tile_loc in self.tilemap.tilemap[self.current_layer]:
@@ -925,8 +926,8 @@ class EditorSimulation:
             if self.current_layer in self.tilemap.offgrid_tiles:
                 for loc in self.tilemap.offgrid_tiles[self.current_layer].copy():
                     pos = [float(val) for val in loc.split(";")]
-                    tile_id, variant, rot, flip_h, flip_v  = self.tiles_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
-                    images = self.tiles_manager.tiles[tile_id].images.copy()
+                    tile_id, variant, rot, flip_h, flip_v  = self.tilemap.tile_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
+                    images = self.tilemap.tile_manager.tiles[tile_id].images.copy()
                     if isinstance(images, Animation):
                         tile_img = images.img()
                     else:
@@ -938,11 +939,11 @@ class EditorSimulation:
                     if tile_r.collidepoint(self.mpos_scaled):  # Check both to be safe
                         del self.tilemap.offgrid_tiles[self.current_layer][loc]
 
-            tile_group = self.selector.tile_has_group(tile_loc)
-            if tile_group:
-                self.tilemap.selection_groups[self.current_layer].remove(tile_group)
-                tile_group.remove(tile_loc)
-                self.tilemap.selection_groups[self.current_layer].append(tile_group)
+            tile_link = self.selector.tile_has_link(tile_loc)
+            if tile_link:
+                self.tilemap.links[self.current_layer].remove(tile_link)
+                tile_link.remove(tile_loc)
+                self.tilemap.links[self.current_layer].append(tile_link)
 
     def handle_move_tool(self, event):
         if self.clicking and event.type == pygame.MOUSEBUTTONUP:
@@ -950,13 +951,13 @@ class EditorSimulation:
             # Simply comparing the dicts detects if anything changed
             if current_state != self.temp_snapshot:
                 self.save_action()
-            if event.button == 1 and self.selector.group:
+            if event.button == 1 and self.selector.link:
                 can_place_check = True
 
-                if self.moved_group["ongrid"]:
-                    for tile_loc in self.selector.group:
-                        if (self.moved_group["ongrid"][tile_loc] in self.tilemap.tilemap[self.current_layer] and
-                            self.moved_group["ongrid"][tile_loc] not in self.moved_group["ongrid"]):
+                if self.moved_link["ongrid"]:
+                    for tile_loc in self.selector.link:
+                        if (self.moved_link["ongrid"][tile_loc] in self.tilemap.tilemap[self.current_layer] and
+                            self.moved_link["ongrid"][tile_loc] not in self.moved_link["ongrid"]):
                             can_place_check = False
                             break
 
@@ -964,7 +965,7 @@ class EditorSimulation:
                         tilemap_tmp = {}
                         offgrid_tmp = {}
 
-                        for tile_loc in self.selector.group:
+                        for tile_loc in self.selector.link:
                             space = self.check_tile_space(tile_loc)
                             if space == "tilemap":
                                 tilemap_tmp[tile_loc] = self.tilemap.tilemap[self.current_layer][tile_loc]
@@ -974,8 +975,8 @@ class EditorSimulation:
                                 del self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
 
 
-                        for tile_loc in self.selector.group:
-                            new_loc = self.moved_group["ongrid"][tile_loc]
+                        for tile_loc in self.selector.link:
+                            new_loc = self.moved_link["ongrid"][tile_loc]
                             if tile_loc in tilemap_tmp:
                                 tmp = tilemap_tmp[tile_loc]
                             else:  # <=> tile_loc in self.tilemap.offgrid_tiles[self.current_layer]
@@ -988,26 +989,31 @@ class EditorSimulation:
 
                             self.tilemap.tilemap[self.current_layer][new_loc] = tmp
 
-                        if self.current_layer in self.tilemap.selection_groups:
-                            for group in self.tilemap.selection_groups[self.current_layer]:
-                                if set(group).issubset(set(self.selector.group)):
-                                    self.tilemap.selection_groups[self.current_layer].append([self.moved_group["ongrid"][tile_loc] for tile_loc in group])
-                                    self.tilemap.selection_groups[self.current_layer].remove(group)
+                        if self.current_layer in self.tilemap.links:
+                            for link in self.tilemap.links[self.current_layer]:
+                                edited_link = link.copy()
+                                for tile_loc in link:
+                                    if tile_loc in self.moved_link["ongrid"]:
+                                        edited_link.remove(tile_loc)
+                                        edited_link.append(self.moved_link["ongrid"][tile_loc])
+                                if edited_link != link:
+                                    self.tilemap.links[self.current_layer].remove(link)
+                                    self.tilemap.links[self.current_layer].append(edited_link)
 
-                        self.selector.group = list(self.moved_group["ongrid"].values())
+                        self.selector.link = list(self.moved_link["ongrid"].values())
 
 
-                elif self.moved_group["offgrid"]:
-                    for tile_loc in self.selector.group:
+                elif self.moved_link["offgrid"]:
+                    for tile_loc in self.selector.link:
                         if self.current_layer in self.tilemap.offgrid_tiles:
-                            if (self.moved_group["offgrid"][tile_loc] in self.tilemap.offgrid_tiles[self.current_layer] and
-                                self.moved_group["offgrid"][tile_loc] not in self.moved_group["offgrid"]):
+                            if (self.moved_link["offgrid"][tile_loc] in self.tilemap.offgrid_tiles[self.current_layer] and
+                                self.moved_link["offgrid"][tile_loc] not in self.moved_link["offgrid"]):
                                 can_place_check = False
                                 break
                     if can_place_check:
                         tilemap_tmp = {}
                         offgrid_tmp = {}
-                        for tile_loc in self.selector.group:
+                        for tile_loc in self.selector.link:
                             space = self.check_tile_space(tile_loc)
                             if space == "tilemap":
                                 tilemap_tmp[tile_loc] = self.tilemap.tilemap[self.current_layer][tile_loc]
@@ -1016,8 +1022,8 @@ class EditorSimulation:
                                 offgrid_tmp[tile_loc] = self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
                                 del self.tilemap.offgrid_tiles[self.current_layer][tile_loc]
 
-                        for tile_loc in self.selector.group:
-                            new_loc = self.moved_group["offgrid"][tile_loc]
+                        for tile_loc in self.selector.link:
+                            new_loc = self.moved_link["offgrid"][tile_loc]
                             if tile_loc in tilemap_tmp:
                                 tmp = tilemap_tmp[tile_loc]
                             else:  # <=> tile_loc in self.tilemap.offgrid_tiles[self.current_layer]
@@ -1027,16 +1033,21 @@ class EditorSimulation:
                                 self.tilemap.offgrid_tiles[self.current_layer] = {}
                             self.tilemap.offgrid_tiles[self.current_layer][new_loc] = tmp
 
-                        if self.current_layer in self.tilemap.selection_groups:
-                            for group in self.tilemap.selection_groups[self.current_layer]:
-                                if set(group).issubset(set(self.selector.group)):
-                                    self.tilemap.selection_groups[self.current_layer].append([self.moved_group["offgrid"][tile_loc] for tile_loc in group])
-                                    self.tilemap.selection_groups[self.current_layer].remove(group)
+                        if self.current_layer in self.tilemap.links:
+                            for link in self.tilemap.links[self.current_layer]:
+                                edited_link = link.copy()
+                                for tile_loc in link:
+                                    if tile_loc in self.moved_link["offgrid"]:
+                                        edited_link.remove(tile_loc)
+                                        edited_link.append(self.moved_link["offgrid"][tile_loc])
+                                if edited_link != link:
+                                    self.tilemap.links[self.current_layer].remove(link)
+                                    self.tilemap.links[self.current_layer].append(edited_link)
 
-                        self.selector.group = list(self.moved_group["offgrid"].values())
+                        self.selector.link = list(self.moved_link["offgrid"].values())
 
 
-                self.moved_group = {"ongrid": {}, "offgrid": {}}
+                self.moved_link = {"ongrid": {}, "offgrid": {}}
 
     def handle_selection_tool(self, event):
         self.selector.handle_event(event)
@@ -1087,6 +1098,9 @@ class EditorSimulation:
                     self.playtest.load_settings()
                     self.playtest.load_level(self.level_id)
 
+                if event.key == pygame.K_u:
+                    self.ignore_links = not self.ignore_links
+
                 if event.key == pygame.K_w:
                     self.undo()
                 if event.key == pygame.K_y:
@@ -1113,7 +1127,7 @@ class EditorSimulation:
                         self.current_layer = str(int(self.current_layer) + 1)
                         print(f"Current layer moved to layer {self.current_layer}")
                 if event.key == pygame.K_d:
-                    self.selector.group = []
+                    self.selector.link = []
             else:
 
                 if event.key == pygame.K_i and not self.holding_i:
@@ -1123,7 +1137,7 @@ class EditorSimulation:
                         print("Layer 0, can't make any new layer under this one")
                     else:
                         self.current_layer = str(int(self.current_layer) - 1)
-                        self.selector.group = []
+                        self.selector.link = []
                         print(f"Current layer : {self.current_layer}")
                     if self.current_layer not in self.tilemap.tilemap:
                         self.tilemap.tilemap[self.current_layer] = {}
@@ -1133,7 +1147,7 @@ class EditorSimulation:
                         print("This layer is empty, can't make any new layer")
                     else:
                         self.current_layer = str(int(self.current_layer) + 1)
-                        self.selector.group = []
+                        self.selector.link = []
                         print(f"Current layer : {self.current_layer}")
 
                     if self.current_layer not in self.tilemap.tilemap:
@@ -1162,7 +1176,7 @@ class EditorSimulation:
                 if event.key == pygame.K_g:
                     self.ongrid = not self.ongrid
                 if event.key == pygame.K_t:
-                    self.tilemap.autotile()
+                    self.tilemap.autotile(self.current_layer)
                     self.save_action()
                 if event.key == pygame.K_o:
                     self.level_manager.full_save()
@@ -1213,7 +1227,7 @@ class EditorSimulation:
                     self.save_action()
 
                 if event.key == pygame.K_DELETE:
-                    self.selector.delete_group()
+                    self.selector.delete_link()
 
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_y:
@@ -1248,54 +1262,54 @@ class EditorSimulation:
 
     def render_move_tool(self):
         if self.clicking:
-            self.tilemap.set_render_filter(self.selector.group, 0)
+            self.tilemap.set_render_filter(self.selector.link, 0)
 
             tilepos_onclick = (int((self.mpos_scaled_onclick[0]) // self.tilemap.tile_size),
                                int((self.mpos_scaled_onclick[1]) // self.tilemap.tile_size))
             mpos_scaled_onclick = (
             self.mpos_scaled_onclick[0] - self.scroll[0], self.mpos_scaled_onclick[1] - self.scroll[1])
-            for loc in self.selector.group:
+            for loc in self.selector.link:
                 offgrid_tile = False
                 if loc in self.tilemap.tilemap[self.current_layer]:
-                    tile_id, variant, rot, flip_h, flip_v  = self.tiles_manager.unpack_tile(self.tilemap.tilemap[self.current_layer][loc])
+                    tile_id, variant, rot, flip_h, flip_v  = self.tilemap.tile_manager.unpack_tile(self.tilemap.tilemap[self.current_layer][loc])
                 else:
-                    tile_id, variant, rot, flip_h, flip_v  = self.tiles_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
+                    tile_id, variant, rot, flip_h, flip_v  = self.tilemap.tile_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
                     offgrid_tile = True
-                tile_img = self.tiles_manager.get_tile_img(tile_id, variant)
+                tile_img = self.tilemap.tile_manager.get_tile_img(tile_id, variant)
 
                 if offgrid_tile:
                     if self.ongrid:
                         pos = [int(float(val)) for val in loc.split(";")]
-                        self.moved_group["offgrid"] = {}
+                        self.moved_link["offgrid"] = {}
                         x, y = ((pos[0] // self.tilemap.tile_size + self.tile_pos[0] - tilepos_onclick[0]),
                                 (pos[1] // self.tilemap.tile_size + self.tile_pos[1] - tilepos_onclick[1]))
 
                         self.display.blit(tile_img, (
                         x * self.tilemap.tile_size - self.scroll[0], y * self.tilemap.tile_size - self.scroll[1]))
-                        self.moved_group["ongrid"][loc] = f"{int(x)};{int(y)}"
+                        self.moved_link["ongrid"][loc] = f"{int(x)};{int(y)}"
                     else:
                         pos = [float(val) for val in loc.split(";")]
-                        self.moved_group["ongrid"] = {}
+                        self.moved_link["ongrid"] = {}
                         x, y = (pos[0] + self.mpos_scaled[0] - mpos_scaled_onclick[0],
                                 pos[1] + self.mpos_scaled[1] - mpos_scaled_onclick[1])
                         self.display.blit(tile_img, (x - self.scroll[0], y - self.scroll[1]))
-                        self.moved_group["offgrid"][loc] = f"{x};{y}"
+                        self.moved_link["offgrid"][loc] = f"{x};{y}"
                 else:
                     if self.ongrid:
                         pos = [int(val) for val in loc.split(";")]
-                        self.moved_group["offgrid"] = {}
+                        self.moved_link["offgrid"] = {}
                         x, y = ((pos[0] + self.tile_pos[0] - tilepos_onclick[0]),
                                 (pos[1] + self.tile_pos[1] - tilepos_onclick[1]))
                         self.display.blit(tile_img, (
                         x * self.tilemap.tile_size - self.scroll[0], y * self.tilemap.tile_size - self.scroll[1]))
-                        self.moved_group["ongrid"][loc] = f"{int(x)};{int(y)}"
+                        self.moved_link["ongrid"][loc] = f"{int(x)};{int(y)}"
                     else:
                         pos = [float(val) for val in loc.split(";")]
-                        self.moved_group["ongrid"] = {}
+                        self.moved_link["ongrid"] = {}
                         x, y = ((pos[0] * self.tile_size + self.mpos_scaled[0] - mpos_scaled_onclick[0]),
                                 (pos[1] * self.tile_size + self.mpos_scaled[1] - mpos_scaled_onclick[1]))
                         self.display.blit(tile_img, (x - self.scroll[0], y - self.scroll[1]))
-                        self.moved_group["offgrid"][loc] = f"{x};{y}"
+                        self.moved_link["offgrid"][loc] = f"{x};{y}"
 
     def render_selection_tool(self):
         self.selector.draw(self.display)
@@ -1318,7 +1332,7 @@ class EditorSimulation:
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
 
-        self.tilemap.set_render_filter(self.selector.group, (152, 242, 255, 50))
+        self.tilemap.set_render_filter(self.selector.link, (152, 242, 255, 50))
 
         self.tilemap.render(self.display, offset=render_scroll,
                             precise_layer=self.current_layer if not self.showing_all_layers else None,
@@ -1414,7 +1428,7 @@ class UI:
         self.check_buttons = []
         self.check_buttons_labels = ["On grid"]
         self.on_selection_buttons = []
-        self.on_selection_buttons_labels = ["Plus","Link","Unlink","Unlock"]
+        self.on_selection_buttons_labels = ["Plus","Link","Unlink","IgnoreLinks"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
         self.buttons_images = {"Brush": load_image("ui/brush.png"),
                                "Eraser": load_image("ui/eraser.png"),
@@ -1426,7 +1440,7 @@ class UI:
                                "Link": load_image("ui/link.png"),
                                "Unlink": load_image("ui/unlink.png"),
                                "Plus":load_image("ui/plus.png"),
-                               "Unlock": load_image("ui/skull.png")}
+                               "IgnoreLinks": load_image("ui/skull.png")}
 
         self.spectial_buttons_labels = {"Brush": [],
                                         "Eraser": [],
@@ -1528,9 +1542,10 @@ class UI:
                 color = (98, 171, 212)
             if label == "Unlink":
                 color = (235, 217, 103)
-            if label == "Unlock":
+            if label == "IgnoreLinks":
                 color = (255,0,0)
             if color:
+                #TODO new button type for IgnoreLinks button, which can toggled (clicked while activated or not)
                 button = IconButton(label,self.buttons_images[label],(button_x, button_y),self.toolbar_buttons_width,
                            self.toolbar_buttons_height,color,resize=0.8)
                 button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
@@ -1613,20 +1628,30 @@ class UI:
 
     def render_on_selection(self, centerx):
         for button in self.on_selection_buttons:
-            if button.label == "Link":
-                if len(self.editor.selector.group) > 1:
-                    button.activated = True
-                else:
+
+            match button.label:
+                case "Link":
+                    if len(self.editor.selector.link) > 1:
+                        button.activated = True
+                    else:
+                        button.activated = False
+
+                case "Plus":
+                    if len(self.editor.selector.link) >= 1:
+                        button.activated = True
+                    else:
+                        button.activated = False
+
+                case "IgnoreLinks":
+                    pass
+
+                case _ :
                     button.activated = False
-            elif button.label == "Plus":
-                button.activated = True
-            else:
-                button.activated = False
-                if self.editor.current_layer in self.editor.tilemap.selection_groups:
-                    for group in self.editor.tilemap.selection_groups[self.editor.current_layer]:
-                        if set(group).issubset(set(self.editor.selector.group)):
-                            button.activated = True
-                            break
+                    if self.editor.current_layer in self.editor.tilemap.links:
+                        for link in self.editor.tilemap.links[self.editor.current_layer]:
+                            if set(link).issubset(set(self.editor.selector.link)):
+                                button.activated = True
+                                break
 
             button.rect.centerx = centerx
             button.draw(self.screen)
@@ -1685,7 +1710,6 @@ class UI:
             if self.assets_section_rect.width:
                 self.assets_section_rect.width = 0
 
-
     def draw(self):
 
         self.clear_sections_rect()
@@ -1701,8 +1725,6 @@ class UI:
                 pass
             case "Selection" | "Move":
                 self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
-
-
 
     def handle_ui_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -1798,12 +1820,16 @@ class UI:
             if button.handle_event(event):
                 match button.label:
                     case "Link":
-                        self.editor.selector.link_group()
+                        self.editor.selector.link_link()
                     case "Unlink":
-                        if self.editor.current_layer in self.editor.tilemap.selection_groups:
-                            for group in self.editor.tilemap.selection_groups[self.editor.current_layer]:
-                                if set(group).issubset(set(self.editor.selector.group)):
-                                    self.editor.selector.unlink_group(group)
+                        if self.editor.current_layer in self.editor.tilemap.links:
+                            for group in self.editor.tilemap.links[self.editor.current_layer]:
+                                if set(group).issubset(set(self.editor.selector.link)):
+                                    self.editor.selector.unlink_link(group)
+                    case "Plus":
+                        self.editor.cursor.add_link_to_group()
+                    case "IgnoreLinks":
+                        self.editor.ignore_links = True
 
 
 if __name__ == "__main__":
