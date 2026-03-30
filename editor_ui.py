@@ -13,8 +13,7 @@ from scripts.saving import Save
 from scripts.sound import Sound
 from scripts.tile import TileManager
 from scripts.user_interface import Menu
-from scripts.utils import load_image, create_rect_alpha, load_tiles
-from scripts.button import EditorButton, LevelCarousel, EnvironmentButton, SimpleButton, Dropdown, IconButton
+from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton
 from scripts.text import load_game_font
 from scripts.utils import *
 from scripts.tilemap import Tilemap
@@ -1159,10 +1158,6 @@ class EditorSimulation:
                     self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
                     self.playtest.load_settings()
                     self.playtest.load_level(self.level_id)
-
-                if event.key == pygame.K_u:
-                    self.ignore_links = not self.ignore_links
-
                 if event.key == pygame.K_w:
                     self.undo()
                 if event.key == pygame.K_y:
@@ -1458,11 +1453,28 @@ class UI:
 
         self.state = "Editor"
 
+
         self.toolbar_width = self.screen_width * 5 / 96
         self.toolbar_default_width = self.screen_width * 5 / 96
         self.toolbar_rect = pygame.Rect(self.screen_width - self.toolbar_default_width, 0,self.screen_width * 5 / 96,self.screen_height)
+
         self.toolbar_buttons_width = self.toolbar_rect.width * (3 / 5)
         self.toolbar_buttons_height = self.toolbar_rect.width * (3 / 5)
+
+        self.group_selector_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
+        self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+        print(self.group_selector_rect)
+        self.in_group_editor = False
+        self.group_selector_buttons = []
+        self.group_selector_labels = ["Next","Left","Right","Add"]
+        self.group_selector_images = {"Next":load_image("ui/skull.png"),
+                                      "Left":pygame.transform.flip(load_image("ui/next.png"), True, False),
+                                      "Right":load_image("ui/next.png"),
+                                      "Add":load_image("ui/skull.png")}
+        self.current_group_id = 0
+        self.group_list = []
+        self.group_buttons_list = []
+
         self.tools_buttons = []
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "LevelSelector"]
         self.check_buttons = []
@@ -1530,6 +1542,7 @@ class UI:
         self.assets_section_buttons = []
         self.check_buttons = []
         self.on_selection_buttons = []
+        self.group_selector_buttons = []
 
         button_x, button_y = self.toolbar_rect.width/2, self.toolbar_rect.width/2
         for label in self.tools_buttons_labels:
@@ -1574,6 +1587,7 @@ class UI:
         button_x,button_y = self.toolbar_rect.x - self.toolbar_rect.width/2 , self.toolbar_rect.width/2
         for label in self.on_selection_buttons_labels:
             color = ()
+            toggle = False
             if label == "Plus":
                 button_y = self.toolbar_buttons_height
                 color = (42, 90, 57)
@@ -1584,12 +1598,26 @@ class UI:
                 color = (235, 217, 103)
             if label == "IgnoreLinks":
                 color = (255,0,0)
+                toggle = True
             if color:
-                #TODO new button type for IgnoreLinks button, which can toggled (clicked while activated or not)
                 button = IconButton(label,self.buttons_images[label],(button_x, button_y),self.toolbar_buttons_width,
-                           self.toolbar_buttons_height,color,resize=0.8)
+                           self.toolbar_buttons_height,color,resize=0.8,toggle=toggle)
                 button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
                 self.on_selection_buttons.append(button)
+
+        button_x,button_y = self.group_selector_rect.width/2.65, self.group_selector_rect.height/4
+        for label in self.group_selector_labels:
+            color = (42, 90, 57)
+            if label == "Next" or label == "Add":
+                button = IconButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,
+                           self.toolbar_buttons_height,color,resize=0.8)
+                button.activated = True
+            else:
+                if label == "Right":
+                    button_x += self.group_selector_rect.width/15 + 4*(self.PADDING/self.editor.SW)*self.screen_width
+                button = EditorButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,self.toolbar_buttons_height,self.TOOLBAR_COLOR,resize=0.8)
+            button_x += self.toolbar_buttons_width + (self.PADDING/self.editor.SW)*self.screen_width
+            self.group_selector_buttons.append(button)
 
 
     def init_assets_buttons(self, categories):
@@ -1671,7 +1699,7 @@ class UI:
 
             match button.label:
                 case "Link":
-                    if len(self.editor.selector.link) > 1:
+                    if len(self.editor.selector.link) > 1 and not self.editor.ignore_links:
                         button.activated = True
                     else:
                         button.activated = False
@@ -1683,7 +1711,7 @@ class UI:
                         button.activated = False
 
                 case "IgnoreLinks":
-                    pass
+                    button.activated = True
 
                 case _ :
                     button.activated = False
@@ -1695,6 +1723,83 @@ class UI:
 
             button.rect.centerx = centerx
             button.draw(self.screen)
+
+    def render_group_selector(self):
+        # Update rect
+        self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+
+        # Creating the Overlay where everything will be blit
+        overlay = pygame.Surface((self.group_selector_rect.width, self.group_selector_rect.height))
+        overlay.fill(self.TOOLBAR_COLOR)
+
+        # Drawing the buttons
+        for button in self.group_selector_buttons:
+            button.draw(overlay)
+            if button.label == "Add" or button.label == "Next":
+                button.activated = True
+
+        # Drawing the rectangle where the group ID will be displayed
+        grp_id_rect = pygame.Rect(0,0,self.group_selector_rect.width/15,self.group_selector_rect.height/18)
+        grp_id_rect.center = (overlay.get_rect().centerx,int(self.group_selector_rect.height/4))
+        grp_id_txt = self.title_font.render(f"{self.current_group_id}", True, (255, 255, 255))
+        grp_id_txt_rect = grp_id_txt.get_rect(center=grp_id_rect.center)
+        pygame.draw.rect(overlay,(24,24,24),grp_id_rect)
+        overlay.blit(grp_id_txt,grp_id_txt_rect)
+
+        # Displaying text
+        grp_txt = self.title_font.render("Groups :",True,(255,255,255))
+        grp_rect = grp_txt.get_rect(center=(overlay.get_rect().centerx,overlay.get_rect().height/6))
+        overlay.blit(grp_txt, grp_rect)
+
+        # Creating the rectangle where the group created will be drawn
+        big_rect = pygame.Rect(0,0,self.group_selector_rect.width*0.80,self.group_selector_rect.height/1.8)
+        big_rect.center = int(overlay.get_rect().centerx),int(overlay.get_rect().height*2/3)
+        pygame.draw.rect(overlay,(24,24,24),big_rect)
+
+        # Drawing the group on the big rectangle
+        self.render_group_button(overlay,big_rect)
+
+        self.screen.blit(overlay, (self.group_selector_rect.x, self.group_selector_rect.y))
+
+    def render_group_button(self,surface,rect):
+        self.group_buttons_list = []
+        n = len(self.group_list)
+        if n == 0:
+            return
+        max_per_row = 8
+        max_per_col = 5
+        padding = 5
+        outer_padding = 5
+        small_width = (
+                              rect.width - 2 * outer_padding - (max_per_row - 1) * padding
+                      ) / max_per_row
+
+        small_height = (
+                               rect.height - 2 * outer_padding - (max_per_col - 1) * padding
+                       ) / max_per_col
+
+        centers = []
+
+        for i,label in enumerate(self.group_list):
+            row = i // max_per_row
+            col = i % max_per_row
+
+            if row >= max_per_col:
+                break
+
+            x = rect.x + outer_padding + col * (small_width + padding)
+            y = rect.y + outer_padding + row * (small_height + padding)
+
+            center_x = x + small_width / 2
+            center_y = y + small_height / 2
+
+            button = TextButton(str(label),(center_x,center_y),small_width,small_height,self.title_font)
+            self.group_buttons_list.append(button)
+
+        for button in self.group_buttons_list:
+            button.draw(surface)
+
+
 
 
     def check_closed(self):
@@ -1731,6 +1836,9 @@ class UI:
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
         self.init_assets_buttons(self.categories)
 
+        self.group_selector_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
+        self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+
         self.init_buttons()
 
     def reload_assets_section_rect(self):
@@ -1765,6 +1873,8 @@ class UI:
                 pass
             case "Selection" | "Move":
                 self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
+        if self.in_group_editor:
+            self.render_group_selector()
 
     def handle_ui_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -1790,6 +1900,8 @@ class UI:
                 pass
             case "Selection"|"Move":
                 self.handle_on_selection_event(event)
+        if self.in_group_editor:
+            self.handle_group_selector_event(event)
 
     def handle_toolbar_event(self, event):
         for button in self.tools_buttons:
@@ -1871,9 +1983,51 @@ class UI:
                                 if set(group).issubset(set(self.editor.selector.link)):
                                     self.editor.selector.unlink_link(group)
                     case "Plus":
-                        self.editor.selector.add_link_to_group()
+                        #self.editor.selector.add_link_to_group()
+                        self.in_group_editor = True
                     case "IgnoreLinks":
                         self.editor.ignore_links = True
+            else:
+                match button.label:
+                    case "IgnoreLinks":
+                        self.editor.ignore_links = False
+
+    def handle_group_selector_event(self, event):
+        for button in self.group_selector_buttons:
+            if button.handle_event(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
+                match button.label:
+                    case "Add":
+                        if self.current_group_id not in self.group_list:
+                            self.group_list.append(self.current_group_id)
+                            self.current_group_id += 1
+                        print(self.group_list)
+                    case "Next":
+                        new_id = 0
+                        while new_id in self.group_list:
+                            new_id += 1
+                        self.current_group_id = new_id
+
+                    case "Left":
+                        if self.current_group_id > 0:
+                            self.current_group_id -= 1
+                    case "Right":
+                        self.current_group_id += 1
+                button.activated = True
+            elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
+                if button.label == "Left" or button.label == "Right":
+                    button.activated = False
+
+        if self.group_buttons_list:
+            for button in self.group_buttons_list:
+                if button.handle_event(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
+                    self.group_buttons_list.remove(button)
+                    if int(button.label) in self.group_list:
+                        self.group_list.remove(int(button.label))
+
+            print(self.group_list)
+
+
+
 
 
 if __name__ == "__main__":

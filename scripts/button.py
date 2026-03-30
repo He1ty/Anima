@@ -121,7 +121,7 @@ class EditorButton:
 
 class IconButton(EditorButton):
     ALPHA = 80
-    def __init__(self,label:str,img:pygame.Surface,pos_center:tuple[int,int]|tuple[float,float], width: float, height:float,bg_color:tuple[int,int,int],resize=None):
+    def __init__(self,label:str,img:pygame.Surface,pos_center:tuple[int,int]|tuple[float,float], width: float, height:float,bg_color:tuple[int,int,int],resize=None,toggle=False):
         super().__init__(label,img,pos_center,width,height,bg_color,resize)
         self.width = width
         self.height = height
@@ -133,6 +133,7 @@ class IconButton(EditorButton):
 
         self.hover_img = pygame.transform.scale_by(self.img,1.2)
         self.hover_img_rect = self.hover_img.get_rect(center=self.rect.center)
+        self.toggle = toggle
 
 
         self.activated = False
@@ -163,35 +164,47 @@ class IconButton(EditorButton):
 
 
     def is_clicked(self, event, offset=None):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if offset is None:
-                if event.button == 1 and self.rect.collidepoint(event.pos):
-                    self.hover = True
-            else:
-                if event.button == 1 and self.rect.move(offset).collidepoint(event.pos):
-                    self.hover = True
-        if event.type == pygame.MOUSEMOTION and self.hover:
-            if offset is None:
-                if self.rect.collidepoint(event.pos):
-                    self.hover = True
+        if not self.toggle:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if offset is None:
+                    if event.button == 1 and self.rect.collidepoint(event.pos):
+                        self.hover = True
                 else:
-                    self.hover = False
-            else:
-                if self.rect.move(offset).collidepoint(event.pos):
-                    self.hover = True
+                    if event.button == 1 and self.rect.move(offset).collidepoint(event.pos):
+                        self.hover = True
+            if event.type == pygame.MOUSEMOTION and self.hover:
+                if offset is None:
+                    if self.rect.collidepoint(event.pos):
+                        self.hover = True
+                    else:
+                        self.hover = False
                 else:
-                    self.hover = False
+                    if self.rect.move(offset).collidepoint(event.pos):
+                        self.hover = True
+                    else:
+                        self.hover = False
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            if offset is None:
-                if self.hover and self.rect.collidepoint(event.pos):
-                    self.hover = False
-                    return True
-            else:
-                if self.hover and self.rect.move(offset).collidepoint(event.pos):
-                    self.hover = False
-                    return True
-        return False
+            if event.type == pygame.MOUSEBUTTONUP:
+                if offset is None:
+                    if self.hover and self.rect.collidepoint(event.pos):
+                        self.hover = False
+                        return True
+                else:
+                    if self.hover and self.rect.move(offset).collidepoint(event.pos):
+                        self.hover = False
+                        return True
+            return False
+        else:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if offset is None:
+                        if event.button == 1 and self.rect.collidepoint(event.pos):
+                            self.hover = not self.hover
+                    else:
+                        if event.button == 1 and self.rect.move(offset).collidepoint(event.pos):
+                            self.hover = not self.hover
+            return self.hover
+
 
     def is_selected(self, event, offset=None):
         pass
@@ -199,6 +212,39 @@ class IconButton(EditorButton):
         if self.activated:
             return self.is_clicked(event, offset)
         return False
+
+class TextButton(EditorButton):
+    def __init__(self, label: str, pos_center: tuple[int, int] | tuple[float, float], width: float,
+                 height: float,font:pygame.font.Font, resize=None):
+        super().__init__(label,pygame.Surface((0,0)) ,pos_center, width, height, resize)
+        self.font = font
+        self.text = self.font.render(label, True, (255,255,255))
+        self.text_rect = self.text.get_rect(center=self.rect.center)
+
+    def draw(self, screen):
+        # Draw 3D effect
+        if self.activated:
+            pygame.draw.line(screen, (40, 40, 40), (self.rect.x, self.rect.y), (self.rect.x, self.rect.bottom), 2)
+            pygame.draw.line(screen, (40, 40, 40,), (self.rect.x, self.rect.y), (self.rect.right, self.rect.top), 2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.y),
+                             (self.rect.right, self.rect.bottom), 2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.right, self.rect.bottom),
+                             (self.rect.left, self.rect.bottom), 2)
+            self.text_rect.center = (self.default_pos[0] + 1, self.default_pos[1] + 1)
+
+
+        else:
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.x, self.rect.y), (self.rect.x, self.rect.bottom), 2)
+            pygame.draw.line(screen, (96, 96, 96), (self.rect.x, self.rect.y), (self.rect.right, self.rect.top), 2)
+            pygame.draw.line(screen, (40, 40, 40), (self.rect.right, self.rect.y),
+                             (self.rect.right, self.rect.bottom), 2)
+            pygame.draw.line(screen, (40, 40, 40), (self.rect.right, self.rect.bottom),
+                             (self.rect.left, self.rect.bottom), 2)
+            self.text_rect.center = self.default_pos
+
+        screen.blit(self.text, self.text_rect)
+
+
 
 class Dropdown:
     def __init__(self, x, y, font, options,
