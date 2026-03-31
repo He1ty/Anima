@@ -215,10 +215,10 @@ class IconButton(EditorButton):
 
 class TextButton(EditorButton):
     def __init__(self, label: str, pos_center: tuple[int, int] | tuple[float, float], width: float,
-                 height: float,font:pygame.font.Font, resize=None):
+                 height: float, font:pygame.font.Font, resize=None, text_color=(255,255,255)):
         super().__init__(label,pygame.Surface((0,0)) ,pos_center, width, height, resize)
         self.font = font
-        self.text = self.font.render(label, True, (255,255,255))
+        self.text = self.font.render(label, True, text_color)
         self.text_rect = self.text.get_rect(center=self.rect.center)
 
     def draw(self, screen):
@@ -241,6 +241,8 @@ class TextButton(EditorButton):
             pygame.draw.line(screen, (40, 40, 40), (self.rect.right, self.rect.bottom),
                              (self.rect.left, self.rect.bottom), 2)
             self.text_rect.center = self.default_pos
+
+
 
         screen.blit(self.text, self.text_rect)
 

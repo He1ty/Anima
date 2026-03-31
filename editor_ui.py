@@ -156,21 +156,36 @@ class Selector:
             self.editor.tilemap.links[current_layer] = []
         self.editor.tilemap.links[current_layer].append(self.link.copy())
 
-    # TODO group selection ("PLUS" icon) UI
-    def add_link_to_group(self):
-        group_id = str(input("group id: "))
+    def add_link_to_group(self, group_id:str):
         for tile_loc in self.editor.selector.link:
             if group_id not in self.editor.tilemap.tag_groups:
                 self.editor.tilemap.tag_groups[group_id] = {"tiles": [],
                                                             "tags": {}}
-            self.editor.tilemap.tag_groups[group_id]["tiles"].append((tile_loc, self.editor.current_layer))
+            self.editor.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.editor.current_layer])
 
-    def remove_link_from_group(self):
-        group_id = str(input("group id: "))
+    def remove_link_from_group(self, group_id:str):
         for tile_loc in self.editor.selector.link:
-            self.editor.tilemap.tag_groups[group_id]["tiles"].remove((tile_loc, self.editor.current_layer))
+            if [tile_loc, self.editor.current_layer] in self.editor.tilemap.tag_groups[group_id]["tiles"]:
+                self.editor.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, self.editor.current_layer])
             if self.editor.tilemap.tag_groups[group_id] == {"tiles": [], "tags": {}}:
                 del self.editor.tilemap.tag_groups[group_id]
+                break
+
+    def get_link_groups(self):
+        groups = {"common": [], "uncommon": []}
+
+        for group_id, group_data in self.editor.tilemap.tag_groups.items():
+            group_positions = {tile[0] for tile in group_data["tiles"]}
+            link_set = set(self.link)
+
+            if link_set.issubset(group_positions):
+                groups["common"].append(group_id)
+            elif group_positions & link_set:
+                groups["uncommon"].append(group_id)
+
+        return groups
+
+
 
     def handle_selection_rect(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -854,9 +869,6 @@ class EditorSimulation:
             for tile in category.values():
                 self.assets.update(tile)
 
-    def sizeofmaps(self):
-        return len(self.active_maps)
-
     def check_tile_space(self, tile_loc):
         current_layer = self.current_layer
         tilemap = self.tilemap
@@ -910,6 +922,8 @@ class EditorSimulation:
         if self.current_layer in self.tilemap.offgrid_tiles:
             if tile_pos in self.tilemap.offgrid_tiles[self.current_layer]:
                 pos = [int(float(val)/self.tilemap.tile_size) for val in tile_pos.split(";")]
+
+        self.scroll = list(self.scroll)
 
         self.scroll[0] = (pos[0] * 16 - self.screen_width * scale_x) // (
                 2 * int(2 * self.zoom))
@@ -1463,7 +1477,6 @@ class UI:
 
         self.group_selector_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
         self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
-        print(self.group_selector_rect)
         self.in_group_editor = False
         self.group_selector_buttons = []
         self.group_selector_labels = ["Next","Left","Right","Add"]
@@ -1473,8 +1486,8 @@ class UI:
                                       "Add":load_image("ui/skull.png"),
                                       "Close":load_image("ui/skull.png")}
         self.current_group_id = 0
-        self.group_list = []
-        self.group_buttons_list = []
+        self.group_list = {"common":[], "uncommon":[]}
+        self.group_buttons_list = {"common":[], "uncommon":[]}
 
         self.tools_buttons = []
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "LevelSelector"]
@@ -1770,9 +1783,10 @@ class UI:
         self.group_selector_buttons[-1].draw(self.screen)
 
     def render_group_button(self,surface,rect):
-        self.group_buttons_list = []
-        n = len(self.group_list)
-        if n == 0:
+        self.group_buttons_list = {"common":[], "uncommon":[]}
+        nc = len(self.group_list["common"])
+        nu = len(self.group_list["uncommon"])
+        if nc == 0 and nu == 0:
             return
         max_per_row = 8
         max_per_col = 5
@@ -1788,27 +1802,32 @@ class UI:
 
         centers = []
 
-        for i,label in enumerate(self.group_list):
-            row = i // max_per_row
-            col = i % max_per_row
+        for c in self.group_list:
+            for i,label in enumerate(self.group_list[c]):
+                row = i // max_per_row
+                col = i % max_per_row
 
-            if row >= max_per_col:
-                break
+                if row >= max_per_col:
+                    break
 
-            x = rect.x + outer_padding + col * (small_width + padding)
-            y = rect.y + outer_padding + row * (small_height + padding)
+                x = rect.x + outer_padding + col * (small_width + padding)
+                y = rect.y + outer_padding + row * (small_height + padding)
 
-            center_x = x + small_width / 2
-            center_y = y + small_height / 2
+                center_x = x + small_width / 2
+                center_y = y + small_height / 2
 
-            button = TextButton(str(label),(center_x,center_y),small_width,small_height,self.title_font)
-            self.group_buttons_list.append(button)
+                if c == "uncommon":
 
-        for button in self.group_buttons_list:
-            button.draw(surface)
+                    color = (200, 200, 130)
+                else:
+                    color = (255, 255, 255)
 
+                button = TextButton(str(label),(center_x,center_y),small_width,small_height,self.title_font, text_color=color)
+                self.group_buttons_list[c].append(button)
 
-
+        for c in self.group_list:
+            for button in self.group_buttons_list[c]:
+                button.draw(surface)
 
     def check_closed(self):
         if self.closing:
@@ -1991,8 +2010,8 @@ class UI:
                                 if set(group).issubset(set(self.editor.selector.link)):
                                     self.editor.selector.unlink_link(group)
                     case "Plus":
-                        #self.editor.selector.add_link_to_group()
                         self.in_group_editor = True
+                        self.group_list = self.editor.selector.get_link_groups()
                     case "IgnoreLinks":
                         self.editor.ignore_links = True
             else:
@@ -2006,13 +2025,16 @@ class UI:
             if button.handle_event(event,offset if button.label != "Close" else None):
                 match button.label:
                     case "Add":
-                        if self.current_group_id not in self.group_list:
-                            self.group_list.append(self.current_group_id)
+                        if str(self.current_group_id) not in self.group_list["common"]:
+                            self.group_list["common"].append(str(self.current_group_id))
+                            if str(self.current_group_id) in self.group_list["uncommon"]:
+                                self.group_list["uncommon"].remove(str(self.current_group_id))
+                                self.editor.selector.remove_link_from_group(str(self.current_group_id))
+                            self.editor.selector.add_link_to_group(str(self.current_group_id))
                             self.current_group_id += 1
-                        print(self.group_list)
                     case "Next":
                         new_id = 0
-                        while new_id in self.group_list:
+                        while new_id in self.group_list["common"]:
                             new_id += 1
                         self.current_group_id = new_id
                     case "Left":
@@ -2027,14 +2049,14 @@ class UI:
                 if button.label == "Left" or button.label == "Right":
                     button.activated = False
 
-        if self.group_buttons_list:
-            for button in self.group_buttons_list:
-                if button.handle_event(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
-                    self.group_buttons_list.remove(button)
-                    if int(button.label) in self.group_list:
-                        self.group_list.remove(int(button.label))
-
-            print(self.group_list)
+        for c in self.group_list:
+            if self.group_buttons_list[c]:
+                for button in self.group_buttons_list[c]:
+                    if button.handle_event(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
+                        self.group_buttons_list[c].remove(button)
+                        if button.label in self.group_list[c]:
+                            self.group_list[c].remove(button.label)
+                            self.editor.selector.remove_link_from_group(button.label)
 
 
 
