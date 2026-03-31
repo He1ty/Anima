@@ -1119,7 +1119,7 @@ class EditorSimulation:
         if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
             self.clicking = False
 
-        if self.mpos_in_mainarea:
+        if self.mpos_in_mainarea and not self.ui.in_group_editor:
             match self.current_tool:
                 case "Brush":
                     self.handle_brush_tool()
@@ -1470,7 +1470,8 @@ class UI:
         self.group_selector_images = {"Next":load_image("ui/skull.png"),
                                       "Left":pygame.transform.flip(load_image("ui/next.png"), True, False),
                                       "Right":load_image("ui/next.png"),
-                                      "Add":load_image("ui/skull.png")}
+                                      "Add":load_image("ui/skull.png"),
+                                      "Close":load_image("ui/skull.png")}
         self.current_group_id = 0
         self.group_list = []
         self.group_buttons_list = []
@@ -1608,16 +1609,20 @@ class UI:
         button_x,button_y = self.group_selector_rect.width/2.65, self.group_selector_rect.height/4
         for label in self.group_selector_labels:
             color = (42, 90, 57)
-            if label == "Next" or label == "Add":
+            if label == "Next" or label == "Add" :
                 button = IconButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,
                            self.toolbar_buttons_height,color,resize=0.8)
                 button.activated = True
             else:
                 if label == "Right":
                     button_x += self.group_selector_rect.width/15 + 4*(self.PADDING/self.editor.SW)*self.screen_width
+
                 button = EditorButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,self.toolbar_buttons_height,self.TOOLBAR_COLOR,resize=0.8)
             button_x += self.toolbar_buttons_width + (self.PADDING/self.editor.SW)*self.screen_width
             self.group_selector_buttons.append(button)
+        close_button = IconButton("Close",self.group_selector_images["Close"],(self.group_selector_rect.x,self.group_selector_rect.y),
+                                            self.toolbar_buttons_width,self.toolbar_buttons_height,(200,50,50),resize=0.8)
+        self.group_selector_buttons.append(close_button)
 
 
     def init_assets_buttons(self, categories):
@@ -1734,8 +1739,9 @@ class UI:
 
         # Drawing the buttons
         for button in self.group_selector_buttons:
-            button.draw(overlay)
-            if button.label == "Add" or button.label == "Next":
+            if button.label != "Close":
+                button.draw(overlay)
+            if button.label == "Add" or button.label == "Next" or button.label == "Close":
                 button.activated = True
 
         # Drawing the rectangle where the group ID will be displayed
@@ -1760,6 +1766,8 @@ class UI:
         self.render_group_button(overlay,big_rect)
 
         self.screen.blit(overlay, (self.group_selector_rect.x, self.group_selector_rect.y))
+
+        self.group_selector_buttons[-1].draw(self.screen)
 
     def render_group_button(self,surface,rect):
         self.group_buttons_list = []
@@ -1994,7 +2002,8 @@ class UI:
 
     def handle_group_selector_event(self, event):
         for button in self.group_selector_buttons:
-            if button.handle_event(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
+            offset = (self.group_selector_rect.x,self.group_selector_rect.y)
+            if button.handle_event(event,offset if button.label != "Close" else None):
                 match button.label:
                     case "Add":
                         if self.current_group_id not in self.group_list:
@@ -2006,14 +2015,15 @@ class UI:
                         while new_id in self.group_list:
                             new_id += 1
                         self.current_group_id = new_id
-
                     case "Left":
                         if self.current_group_id > 0:
                             self.current_group_id -= 1
                     case "Right":
                         self.current_group_id += 1
+                    case "Close":
+                        self.in_group_editor = False
                 button.activated = True
-            elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(event,offset=(self.group_selector_rect.x,self.group_selector_rect.y)):
+            elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(event,offset if button.label != "Close" else None):
                 if button.label == "Left" or button.label == "Right":
                     button.activated = False
 
