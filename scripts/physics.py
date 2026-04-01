@@ -107,7 +107,7 @@ class PhysicsPlayer:
 
         self.facing = ""
         self.action = "idle"
-        self.animation = self.game.assets['player/' + "idle"].copy()
+        self.animation = self.game.assets['player/idle'].copy()
         self.collision = {'left': False, 'right': False, 'bottom': False, 'top': False}
         self.get_block_on = {'left': False, 'right': False, 'top': False, 'bottom': False}
         self.air_time = 0
@@ -181,10 +181,9 @@ class PhysicsPlayer:
                     self.game.play_se('stun')
 
                 # When stunned, only apply knockback and gravity
-                self.gravity()
-                self.apply_momentum()
+                self.gravity(dt)
+                self.apply_momentum(dt)
                 self.apply_animations()
-                self.animation.update()
                 return  # Skip the rest of the normal update logic
             else:
                 self.stunned_by = None
@@ -254,7 +253,6 @@ class PhysicsPlayer:
 
             self.apply_animations()
             self.apply_particle()
-            self.animation.update()
             self.update_slime_deformation(dt)
 
             # Mise à jour des sons

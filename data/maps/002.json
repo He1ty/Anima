@@ -3860,5 +3860,9 @@
  "tag_groups": {},
  "selection_groups": {},
  "matches": {},
+ "camera_zones": [
+  "64;-176;560;320",
+  "624;-176;256;192"
+ ],
  "tilesize": 16
 }

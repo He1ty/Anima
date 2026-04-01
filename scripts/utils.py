@@ -70,7 +70,7 @@ def load_tileset(image_path, tile_width, tile_height, spiral_order=False, size=N
 
     return tiles
 
-def round_up(x):#pretty basic
+def round_up(x): #pretty basic
     return int(x) + 1 if x % 1 != 0 and x > 0 else int(x)
 
 def load_tiles():
@@ -115,7 +115,7 @@ def load_editor_tiles():
     return categories
 
 def load_player():
-    return {'player/idle': Animation(load_images(f'player/idle', (16,16)), img_dur=12)}
+    return {'player/idle': Animation(load_animations(f'player/animations'), img_dur=12)}
 
 def load_particles():
     tiles = {}
@@ -132,7 +132,7 @@ def load_backgrounds(b_info, map_id):
     path = b_info[map_id]["path"]
 
     if b_info[map_id]["animated"]:
-        tiles[map_id] = Animation(load_images(path), img_dur=b_info[map_id]["img_dur"], loop=b_info[map_id]["loop"])
+        tiles[map_id] = Animation(load_animations(path), img_dur=b_info[map_id]["img_dur"], loop=b_info[map_id]["loop"])
         return tiles
     for bg in sorted(os.listdir(f"{BASE_IMG_PATH}{path}")):
             tiles[map_id + "/" + bg[:-4]] = load_image(f"{path}/{bg}",

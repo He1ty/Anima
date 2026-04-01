@@ -26,23 +26,25 @@ class LevelManager:
         self.game.assets = {}
         self.game.assets.update(load_tiles())
         self.game.assets.update(load_player())
-        self.game.assets.update(load_backgrounds(self.game.b_info, self.game.environment))
+        self.game.assets.update(load_backgrounds(self.game.b_info, self.game.level_id))
         self.game.assets.update(load_particles())
-        self.game.tilemap.load(f"data/maps/{level_id:03d}")
+        self.game.tilemap.load(f"data/maps/{level_id:03d}.json")
         self.game.tilemap.tile_size = self.game.tile_size
 
         self.game.levers = []
         self.game.doors = []
         self.game.spikes = []
         self.game.fake_tiles = []
+        self.game.pickups = []
+        self.game.leaf_spawners = []
         for group_id in self.game.tilemap.tag_groups:
             group = self.game.tilemap.tag_groups[group_id]
             group_tags = group["tags"]
             match group_tags:
                 case _ if "lever" in group_tags:
                     tag = group_tags["lever"]
-                    for tile_pos, tile_layer in group["tiles"]:
-                        self.game.tilemap.remove_tile(tile_pos, tile_layer)
+                    for tile_loc, tile_layer in group["tiles"]:
+                        self.game.tilemap.extract(tile_loc, tile_layer)
                         #self.game.levers.append(Lever(group_id, tile_pos, tag["target_group"]))
                         pass
                 case _ if "door" in group_tags:
@@ -51,6 +53,29 @@ class LevelManager:
                     pass
                 case _ if "fake_tile" in group_tags:
                     pass
+
+            # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
+
+        target_x = (self.game.player.rect().centerx if self.game.camera_center is None else self.game.camera_center[
+            0]) - self.game.display.get_width() / 2
+        min_x, max_x = self.game.scroll_limits["x"]
+        max_x -= self.game.display.get_width()
+        target_x = max(min_x, min(target_x, max_x))
+        target_y = (self.game.player.rect().centery if self.game.camera_center is None else self.game.camera_center[
+            1]) - self.game.display.get_height() / 2
+        min_y, max_y = self.game.scroll_limits["y"]
+        max_y -= self.game.display.get_height()
+        target_y = max(min_y, min(target_y, max_y))
+
+        self.game.scroll = [target_x, target_y]
+
+        # Reset VFX and interaction pools
+        self.game.cutscene = False
+        self.game.particles = []
+        self.game.sparks = []
+        self.game.transition = -30
+        self.game.max_falling_depth = 50000000000
+        self.game.shader.update_light()
 
 class Game:
     """
@@ -202,9 +227,6 @@ class Game:
 
         # Activators / interactables
         self.activators = []
-        self.activators_actions = load_activators_actions(
-            self.level, self.tilemap.layers["activators"]
-        )
         self.spawners = {}
         self.spawner_pos = {}
         self.projectiles = []
@@ -503,7 +525,7 @@ class Game:
                 self.level = f"{self.level_id:03d}"
                 self.scroll_limits = self.scroll_limits_per_level[str(self.level_id)]
                 delattr(self, "fake_tile_groups")
-                self.load_level(self.level_id, transition_effect=False)
+                self.level_manager.load_level(self.level_id)
                 self.player.pos = [8 * self.tile_size, 5 * self.tile_size]
 
     def checkpoints_render_and_update(self, render_scroll):
@@ -555,6 +577,7 @@ class Game:
                 self.save_game(self.current_slot)
 
     def update_camera_setup(self):
+        return
         for camera in self.camera_setup:
             camera.update()
 

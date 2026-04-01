@@ -1,6 +1,8 @@
 import math
 import sys
 
+from pygame import MOUSEBUTTONDOWN
+
 from scripts.activators import Activator
 from scripts.camera import Camera, CameraSetup
 from scripts.display import Shader
@@ -24,6 +26,238 @@ import copy
 import json
 import shutil
 import re
+
+class EditorCameraSetup:
+
+    HANDLE_SIZE = 8  # pixels around border that trigger resize
+
+    def __init__(self, editor_instance):
+        self.editor = editor_instance
+        self.cursor_pos = editor_instance.mpos_scaled
+        self.tile_size = editor_instance.tilemap.tile_size
+        self.initial_cursor_pos = self.cursor_pos
+        self.cursor_rect = pygame.Rect(self.cursor_pos[0], self.cursor_pos[1], 0, 0)
+        self.cameras = editor_instance.tilemap.camera_zones
+        self.creating = False
+
+        # Resize state
+        self.resizing = False
+        self.resize_index = None      # index in self.cameras being resized
+        self.resize_edges = None      # tuple of active edges e.g. ('left', 'top')
+        self.resize_origin = None     # world-space rect before drag started
+        self.resize_mouse_origin = None  # mouse world pos when drag started
+
+    # ------------------------------------------------------------------ helpers
+
+    def _screen_to_world(self, screen_pos):
+        return [self.tile_size*((screen_pos[0] + self.editor.scroll[0])//self.tile_size),
+                self.tile_size*((screen_pos[1] + self.editor.scroll[1])//self.tile_size)]
+
+    def _get_rect(self, camera_str):
+        x, y, w, h = (int(v) for v in camera_str.split(";"))
+        return pygame.Rect(x, y, w, h)
+
+    def _rect_to_str(self, rect):
+        return f"{rect.x};{rect.y};{rect.width};{rect.height}"
+
+    def _get_edges(self, world_rect, world_mouse):
+        mx, my = world_mouse
+        hs = self.HANDLE_SIZE
+
+        left = world_rect.left
+        right = world_rect.left + world_rect.width - hs - 1
+        top = world_rect.top
+        bottom = world_rect.top + world_rect.height - hs - 1
+
+
+        near_left = left - hs < mx < left + hs
+        near_right = right - hs < mx < right + hs
+        near_top = top - hs < my < top + hs
+        near_bottom = bottom - hs < my < bottom + hs
+
+        in_x = left - hs < mx < right + hs
+        in_y = top - hs < my < bottom + hs
+
+        edges = []
+        if near_left and in_y: edges.append('left')
+        if near_right and in_y: edges.append('right')
+        if near_top and in_x: edges.append('top')
+        if near_bottom and in_x: edges.append('bottom')
+        return tuple(edges) if edges else None
+
+    def _edges_to_cursor(self, edges):
+        """Map edge tuple to a pygame system cursor."""
+        if not edges:
+            return pygame.SYSTEM_CURSOR_ARROW
+        has_lr = 'left'  in edges or 'right'  in edges
+        has_tb = 'top'   in edges or 'bottom' in edges
+        if has_lr and has_tb:
+            # corner — pick diagonal based on which corner
+            if ('left' in edges and 'top' in edges) or ('right' in edges and 'bottom' in edges):
+                return pygame.SYSTEM_CURSOR_SIZENWSE
+            return pygame.SYSTEM_CURSOR_SIZENESW
+        if has_lr:
+            return pygame.SYSTEM_CURSOR_SIZEWE
+        return pygame.SYSTEM_CURSOR_SIZENS
+
+    def _apply_resize(self, world_mouse):
+        dx = world_mouse[0] - self.resize_mouse_origin[0]
+        dy = world_mouse[1] - self.resize_mouse_origin[1]
+
+        r = self.resize_origin.copy()
+
+        if 'left' in self.resize_edges:
+            new_left = r.left + dx
+            new_width = r.right - new_left
+            if new_width > self.tile_size:
+                r.left = new_left
+                r.width = new_width
+
+        if 'right' in self.resize_edges:
+            new_width = r.width + dx
+            if new_width > self.tile_size:
+                r.width = new_width
+
+
+        if 'top' in self.resize_edges:
+            new_top = r.top + dy
+            new_height = r.bottom - new_top
+            if new_height > self.tile_size:
+                r.top = new_top
+                r.height = new_height
+
+        if 'bottom' in self.resize_edges:
+            new_height = r.height + dy
+            if new_height > self.tile_size:
+                r.height = new_height
+
+        self.cameras[self.resize_index] = self._rect_to_str(r)
+
+    def _get_selected_zone(self):
+        for zone in self.cameras:
+            x, y, w, h = (int(v) for v in zone.split(";"))
+            left, right, bottom, top = x, x+w, y+h, y
+            mx, my = tuple(self._screen_to_world(self.editor.mpos_scaled))
+            if left < mx < right and top < my < bottom:
+                return zone
+        return None
+
+    # ------------------------------------------------------------------ public
+
+    def create_zone(self, rect_str):
+        self.editor.tilemap.camera_zones.append(rect_str)
+
+    def rect_pos_update(self):
+        self.cursor_pos = [
+            self.tile_size * (int(self.editor.mpos_scaled[0] + self.editor.scroll[0]) // self.tile_size),
+            self.tile_size * (int(self.editor.mpos_scaled[1] + self.editor.scroll[1]) // self.tile_size)
+        ]
+        distx = self.cursor_pos[0] - self.initial_cursor_pos[0]
+        disty = self.cursor_pos[1] - self.initial_cursor_pos[1]
+        left = self.initial_cursor_pos[0]
+        top  = self.initial_cursor_pos[1]
+        if distx < 0: left = self.cursor_pos[0]
+        if disty < 0: top  = self.cursor_pos[1]
+        self.cursor_rect = pygame.Rect(left, top, abs(distx), abs(disty))
+
+    def update(self):
+        """Call once per frame to handle resize dragging & cursor icon."""
+        world_mouse = self._screen_to_world(self.editor.mpos_scaled)
+
+        if self.resizing:
+            self._apply_resize(world_mouse)
+            return  # skip cursor-hover logic while dragging
+
+        # Hover: find the first zone whose edge the mouse is near
+        hovered_edges = None
+        for camera in self.cameras:
+            wrect = self._get_rect(camera)
+            edges = self._get_edges(wrect, world_mouse)
+            if edges:
+                hovered_edges = edges
+                break
+
+        pygame.mouse.set_cursor(self._edges_to_cursor(hovered_edges))
+
+    def draw(self, surface):
+        if self.creating:
+            overlay = pygame.Surface(self.cursor_rect.size)
+            overlay.fill((50, 50, 100))
+            surface.blit(overlay, (
+                self.cursor_rect.left - self.editor.scroll[0],
+                self.cursor_rect.top  - self.editor.scroll[1]
+            ))
+
+        for i, camera in enumerate(self.cameras):
+            x, y, w, h = (int(v) for v in camera.split(";"))
+            zone_rect = pygame.Rect(
+                x - self.editor.scroll[0],
+                y - self.editor.scroll[1], w, h
+            )
+            color = ((150*(x+1)) % 255, (30*y*h) % 255, (30*w) % 255)
+            overlay = create_rect_alpha(color, zone_rect, 50)
+            surface.blit(overlay, (zone_rect.x, zone_rect.y))
+            pygame.draw.rect(surface, color, zone_rect, 5)
+
+            # Draw resize handles as small squares on the border
+            hs = self.HANDLE_SIZE
+            handle_color = (255, 255, 100) if i == self.resize_index else (200, 200, 200)
+            for hx, hy in [
+                (zone_rect.left,               zone_rect.top),
+                (zone_rect.centerx - hs // 2,  zone_rect.top),
+                (zone_rect.right - hs,          zone_rect.top),
+                (zone_rect.left,               zone_rect.centery - hs // 2),
+                (zone_rect.right - hs,          zone_rect.centery - hs // 2),
+                (zone_rect.left,               zone_rect.bottom - hs),
+                (zone_rect.centerx - hs // 2,  zone_rect.bottom - hs),
+                (zone_rect.right - hs,          zone_rect.bottom - hs),
+            ]:
+                pygame.draw.rect(surface, handle_color, (hx, hy, hs, hs))
+
+    def handle_event(self, event):
+        world_mouse = self._screen_to_world(self.editor.mpos_scaled)
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Check if we're clicking a resize handle before starting creation
+            for i, camera in enumerate(self.cameras):
+                wrect = self._get_rect(camera)
+                edges = self._get_edges(wrect, world_mouse)
+                if edges:
+                    self.resizing = True
+                    self.resize_index = i
+                    self.resize_edges = edges
+                    self.resize_origin = wrect.copy()
+                    self.resize_mouse_origin = list(world_mouse)
+                    return   # consume event — don't start a new zone
+
+            # No handle hit → normal zone creation
+            self.creating = True
+            self.initial_cursor_pos = self.cursor_pos.copy()
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                if self.resizing:
+                    self.editor.save_action()   # push undo snapshot after resize
+                    self.resizing = False
+                    self.resize_index = None
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    return
+
+                if self.cursor_rect.width and self.cursor_rect.height:
+                    current_state = self.editor.create_snapshot()
+                    if current_state != self.editor.temp_snapshot:
+                        self.editor.save_action()
+                    rect_str = f"{self.cursor_rect.x};{self.cursor_rect.y};{self.cursor_rect.width};{self.cursor_rect.height}"
+                    self.create_zone(rect_str)
+                self.creating = False
+            if event.button == 3:
+                deleted_zone = self._get_selected_zone()
+                if deleted_zone:
+                    self.editor.tilemap.camera_zones.remove(deleted_zone)
+
+
+        self.cameras = self.editor.tilemap.camera_zones
+        self.rect_pos_update()
 
 class Selector:
     def __init__(self, editor_instance):
@@ -58,7 +292,6 @@ class Selector:
                 bottom = pos[1]
 
         return [(right+left)/2, (top+bottom)/2]
-
 
 
     def draw(self, surface):
@@ -803,6 +1036,7 @@ class EditorSimulation:
                                      self.infos_per_type_per_category}
 
         self.ui = UI(self)
+        self.camera_setup = EditorCameraSetup(self)
         self.playtest = None#PlayTest(self)
         self.ignore_links = False
 
@@ -813,8 +1047,8 @@ class EditorSimulation:
         return {
             'tilemap': copy.deepcopy(self.tilemap.tilemap),
             'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles),
+            'camera_zones': copy.deepcopy(self.tilemap.camera_zones),
             'links': copy.deepcopy(self.tilemap.links),
-            'selected_link': copy.deepcopy(self.selector.link)
         }
 
     def save_action(self):
@@ -838,8 +1072,9 @@ class EditorSimulation:
         # 1. Load data
         self.tilemap.tilemap = copy.deepcopy(snapshot['tilemap'])
         self.tilemap.offgrid_tiles = copy.deepcopy(snapshot['offgrid'])
+        self.tilemap.camera_zones = copy.deepcopy(snapshot["camera_zones"])
         self.tilemap.links = copy.deepcopy(snapshot['links'])
-        self.selector.link = copy.deepcopy(snapshot['selected_link'])
+        self.selector.link = []
 
     def undo(self):
         if self.history_index > 0:
@@ -1143,6 +1378,8 @@ class EditorSimulation:
                     self.handle_selection_tool(event)
                 case "Move":
                     self.handle_move_tool(event)
+                case "CameraSetup":
+                    self.camera_setup.handle_event(event)
 
         if event.type == pygame.MOUSEWHEEL:
             mods = pygame.key.get_mods()
@@ -1371,6 +1608,8 @@ class EditorSimulation:
                 self.render_selection_tool()
             case "Move":
                 self.render_move_tool()
+            case "CameraSetup":
+                self.camera_setup.draw(self.display)
         self.render_map()
         self.render_display()
         self.ui.draw()
@@ -1411,6 +1650,7 @@ class EditorSimulation:
                 case "MapEditor":
                     self.display.fill((0, 0, 0))
                     self.mpos_update()
+                    self.camera_setup.update()
                     for event in pygame.event.get():
                         if self.current_tool == "LevelSelector":
                             pass
@@ -1490,7 +1730,7 @@ class UI:
         self.group_buttons_list = {"common":[], "uncommon":[]}
 
         self.tools_buttons = []
-        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "LevelSelector"]
+        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "CameraSetup", "LevelSelector"]
         self.check_buttons = []
         self.check_buttons_labels = ["On grid"]
         self.on_selection_buttons = []
@@ -1506,6 +1746,7 @@ class UI:
                                "Link": load_image("ui/link.png"),
                                "Unlink": load_image("ui/unlink.png"),
                                "Plus":load_image("ui/plus.png"),
+                               "CameraSetup": load_image("ui/skull.png"),
                                "IgnoreLinks": load_image("ui/skull.png")}
 
         self.spectial_buttons_labels = {"Brush": [],
@@ -1802,8 +2043,9 @@ class UI:
 
         centers = []
 
+        i = 0
         for c in self.group_list:
-            for i,label in enumerate(self.group_list[c]):
+            for label in self.group_list[c]:
                 row = i // max_per_row
                 col = i % max_per_row
 
@@ -1817,13 +2059,13 @@ class UI:
                 center_y = y + small_height / 2
 
                 if c == "uncommon":
-
                     color = (200, 200, 130)
                 else:
                     color = (255, 255, 255)
 
                 button = TextButton(str(label),(center_x,center_y),small_width,small_height,self.title_font, text_color=color)
                 self.group_buttons_list[c].append(button)
+                i+=1
 
         for c in self.group_list:
             for button in self.group_buttons_list[c]:

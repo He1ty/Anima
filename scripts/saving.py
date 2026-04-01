@@ -198,7 +198,7 @@ class Save:
                self.game.playtime = save_data["playtime"]
 
             #Load level
-            self.game.load_level(level_id, transition_effect=False)
+            self.game.level_manager.load_level(level_id)
 
             #Update doors and activators state
             if "doors" in save_data:

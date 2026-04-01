@@ -35,35 +35,19 @@ class Tilemap:
         self.links = {}
         self.tag_groups = {}
         self.matches = {}
+        self.camera_zones = []
         self.show_collisions = False
         self.render_filters = {}
 
-    def extract(self, id_pairs, keep=False, layers=()):
-        """dict, bool -> list
-        extract a list of all elements in the map which are of type id_pairs[n][0] and variant id_pairs[n][1],
-        where 0 <= n < len(id_pairs)"""
-        matches = []
-        for layer in (layers if layers else self.tilemap):
-            for loc in self.tilemap[layer].copy():
-                tile = self.tilemap[layer][loc]
-                check = (tile.type, tile.variant) in id_pairs
-                if check:
-                    matches.append(tile.copy())
-                    matches[-1].pos = list(matches[-1].pos).copy()
-                    matches[-1].pos[0] *= self.tile_size
-                    matches[-1].pos[1] *= self.tile_size
-                    if not keep:
-                        del self.tilemap[layer][loc]
+    def extract(self, tile_loc, layer):
 
-            if layer in self.offgrid_tiles:
-                for loc in self.offgrid_tiles[layer].copy():
-                    tile = self.offgrid_tiles[layer][loc]
-                    if (tile.type, tile.variant) in id_pairs:
-                        matches.append(tile.copy())
-                        if not keep:
-                            del self.offgrid_tiles[layer][loc]
+        if layer in self.tilemap:
+            if tile_loc in self.tilemap[layer]:
+                del self.tilemap[layer][tile_loc]
 
-        return matches
+        if layer in self.offgrid_tiles:
+            if tile_loc in self.offgrid_tiles[layer]:
+                del self.offgrid_tiles[layer][tile_loc]
     
     def remove_tile(self, pos, layer):
         if layer in self.tilemap:
@@ -113,7 +97,7 @@ class Tilemap:
                                   16))
             for layer in self.tilemap:
                 if check_loc in self.tilemap[layer]:
-                    tiles.append(self.tilemap[layer][check_loc])
+                    tiles.append((check_loc, self.tilemap[layer][check_loc]))
         return tiles
 
     def tiles_under(self, pos, size, gravity_dir):
@@ -129,7 +113,7 @@ class Tilemap:
                                   16))
             for layer in self.tilemap:
                 if check_loc in self.tilemap[layer]:
-                    u_tiles.append(self.tilemap[layer][check_loc])
+                    u_tiles.append((check_loc, self.tilemap[layer][check_loc]))
         return u_tiles
 
     def render_tiles_under(self, pos, size, gravity_dir):
@@ -149,6 +133,7 @@ class Tilemap:
                    'tag_groups': self.tag_groups,
                    'selection_groups': self.links,
                    'matches': self.matches,
+                   "camera_zones": self.camera_zones,
                    'tilesize': self.tile_size},
                   f, indent=1)
         f.close()
@@ -189,6 +174,9 @@ class Tilemap:
 
         if "links" in map_data:
             self.links = map_data['links']
+
+        if "camera_zones" in map_data:
+            self.camera_zones = map_data["camera_zones"]
 
         self.tile_size = map_data['tilesize']
 
@@ -281,41 +269,50 @@ class Tilemap:
         for layer in self.tilemap:
             if tile_loc in self.tilemap[layer]:
                 tile = self.tilemap[layer][tile_loc]
-                if tile.type in PHYSICS_TILES:
+                tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(tile)
+                tile_type = self.tile_manager.tiles[tile_id].type
+                if tile_type in PHYSICS_TILES:
                     return self.tilemap[layer][tile_loc]
-                elif transparent_check and tile.type in set(PASSABLE_TILES.keys()) and tile.variant in PASSABLE_TILES[tile.type]:
+                elif transparent_check and tile_type in set(PASSABLE_TILES.keys()) and tile.variant in PASSABLE_TILES[tile_type]:
                     return self.tilemap[layer][tile_loc]
 
-    def transparent_tile_check(self, tile, hitbox: pygame.Rect, gravity_dir):
+    def transparent_tile_check(self, tile_pos, tile, hitbox: pygame.Rect, gravity_dir):
         u_rects = []
         pos, size = hitbox.topleft, hitbox.size
-        if tile.type in set(PASSABLE_TILES.keys()) and tile.variant in PASSABLE_TILES[tile.type]:
+        tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(tile)
+        tile_type = self.tile_manager.tiles[tile_id].type
+        if tile_type in set(PASSABLE_TILES.keys()) and variant in PASSABLE_TILES[tile_type]:
             if not self.game.player.collide_with_passable_blocks:  # System in order to make collision with passable blocks more clean (bigger vertical collision offset)
-                print(pos[1] + size[1], tile.pos[1] * self.tile_size)
                 if pos[1] + size[1] <= tile.pos[1] * self.tile_size:
                     self.game.player.collide_with_passable_blocks = True
             if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:
                 u_rects.append(
-                    pygame.Rect(tile.pos[0] * self.tile_size, tile.pos[1] * self.tile_size, self.tile_size,
+                    pygame.Rect(tile_pos[0] * self.tile_size, tile_pos[1] * self.tile_size, self.tile_size,
                                 self.tile_size))
         return u_rects
 
     def physics_rects_around(self, hitbox: pygame.Rect):
         pos, size = hitbox.topleft, hitbox.size
         rects = []
-        for tile in self.tiles_around(pos, size):
-            if tile.type in PHYSICS_TILES:
-                rects.append(pygame.Rect(tile.pos[0] * self.tile_size, tile.pos[1] * self.tile_size, self.tile_size, self.tile_size))
+        for tile_loc, tile in self.tiles_around(pos, size):
+            tile_pos = [float(val) for val in tile_loc.split(";")]
+            tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(tile)
+            tile_type = self.tile_manager.tiles[tile_id].type
+            if tile_type in PHYSICS_TILES:
+                rects.append(pygame.Rect(tile_pos[0] * self.tile_size, tile_pos[1] * self.tile_size, self.tile_size, self.tile_size))
         return rects
 
     def physics_rects_under(self, hitbox: pygame.Rect, gravity_dir):
         u_rects = []
         pos, size = hitbox.topleft, hitbox.size
-        for tile in self.tiles_under(pos, size, gravity_dir):
-            if tile.type in PHYSICS_TILES:
-                u_rects.append(pygame.Rect(tile.pos[0] * self.tile_size, tile.pos[1] * self.tile_size, self.tile_size, self.tile_size))
+        for tile_loc, tile in self.tiles_under(pos, size, gravity_dir):
+            tile_pos = [float(val) for val in tile_loc.split(";")]
+            tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(tile)
+            tile_type = self.tile_manager.tiles[tile_id].type
+            if tile_type in PHYSICS_TILES:
+                u_rects.append(pygame.Rect(tile_pos[0] * self.tile_size, tile_pos[1] * self.tile_size, self.tile_size, self.tile_size))
             else:
-                u_rects += self.transparent_tile_check(tile, hitbox, gravity_dir)
+                u_rects += self.transparent_tile_check(tile_pos, tile, hitbox, gravity_dir)
         return u_rects
 
     def get_type_from_rect(self, rect):
@@ -379,12 +376,12 @@ class Tilemap:
             else:
                 tiles_opacity = 255
             if with_player:
-                if layer in self.layers["player"]:
+                if layer == "4":
                     pickups_render_and_update(self.game, offset=offset)
                     self.game.player.render(surf, offset=offset)
-                if layer in self.layers["fake_tiles"]:
+                '''if layer in self.layers["fake_tiles"]:
                     self.game.fake_tiles_render(offset=offset)
-                    continue
+                    continue'''
 
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):

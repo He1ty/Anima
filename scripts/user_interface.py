@@ -9,7 +9,7 @@ import cv2
 from scripts.button import MenuButton, DiscreteSlider, ToggleSwitch, ArrowSelector,SaveSlotUI
 from scripts.display import  check_screen
 from scripts.keybind_menu import ControlsMenu
-from scripts.utils import load_images, load_image, Animation, load_editor_tiles
+from scripts.utils import load_images, load_image, Animation, load_editor_tiles, load_animations
 from scripts.text import load_game_font
 
 class Menu:
@@ -111,8 +111,7 @@ class Menu:
         self.init_buttons()
 
         # --- Souls Animation --- #
-        self.souls_animation = Animation(load_images(f'environments/white_space'
-                                                     f'/images/tiles/pickups/soul/idle'),8,True)
+        self.souls_animation = Animation(load_animations(f'environments/global/images/tiles/pickups/soul'))
         self.souls_pos = []
         self.souls_end_pos = [self.SH/12, self.SH/12]
         self.souls_start_size = [4 * self.SH / 75, 4 * self.SH / 75]
@@ -545,7 +544,7 @@ class Menu:
                         self.souls_collected_timer = 0
                         self.is_souls_collected = False
                         self.game.level_id = 1
-                        self.game.load_level(self.game.level_id, transition_effect=False)
+                        self.game.level_manager.load_level(self.game.level_id)
                         # Crucial: Tell the game which slot is currently active for future saves
                         self.game.current_slot = slots.slot_id
                         self.game.state = self.game.PLAYING_STATE
