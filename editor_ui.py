@@ -443,7 +443,7 @@ class Selector:
         if event:
             self.handle_selection_rect(event)
 
-class LevelManager:
+class EditorLevelManager:
     def __init__(self, editor_instance):
         self.editor = editor_instance
 
@@ -507,6 +507,44 @@ class LevelManager:
         self.editor.level_id = new_level_id
         self.map_data_reset()
 
+    def load_level(self):
+        self.editor.playtest.levers = []
+        self.editor.playtest.doors = []
+        self.editor.playtest.spikes = []
+        self.editor.playtest.fake_tiles = []
+        self.editor.playtest.pickups = []
+        self.editor.playtest.leaf_spawners = []
+        self.editor.playtest.camera_zones = []
+        for group_id in self.editor.playtest.tilemap.tag_groups:
+            group = self.editor.playtest.tilemap.tag_groups[group_id]
+            group_tags = group["tags"]
+            match group_tags:
+                case _ if "lever" in group_tags:
+                    tag = group_tags["lever"]
+                    for tile_loc, tile_layer in group["tiles"]:
+                        self.editor.playtest.tilemap.extract(tile_loc, tile_layer)
+                        #self.editor.playtest.levers.append(Lever(group_id, tile_pos, tag["target_group"]))
+                        pass
+                case _ if "door" in group_tags:
+                    pass
+                case _ if "spike" in group_tags:
+                    pass
+                case _ if "fake_tile" in group_tags:
+                    pass
+
+            # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
+
+        for zone in self.editor.playtest.tilemap.camera_zones:
+            self.editor.playtest.camera_zones.append([int(val) for val in zone.split(";")])
+
+        # Reset VFX and interaction pools
+        self.editor.playtest.cutscene = False
+        self.editor.playtest.particles = []
+        self.editor.playtest.sparks = []
+        self.editor.playtest.transition = -30
+        self.editor.playtest.max_falling_depth = 50000000000
+        self.editor.playtest.shader.update_light()
+
     def full_save(self):
         # 1. Save current map to disk
         if self.editor.level_id in self.editor.active_maps:
@@ -554,183 +592,27 @@ class PlayTest(Game):
     PLAYING_STATE = "PLAYING"
 
     def __init__(self, editor_instance):
-        # ── 1. Window & display ────────────────────────────────────────────────
-        self.screen = editor_instance.screen
-        self.display = editor_instance.display
-        self.clock = pygame.time.Clock()
-        self.debug_mode = False
 
+        # ── 1. Window & display ────────────────────────────────────────────────
         self.editor = editor_instance
+        super().__init__()
         self.level_manager = editor_instance.level_manager
         self.tilemap = editor_instance.tilemap.copy(self)
+        self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
 
         # ── 5. Level & map data ────────────────────────────────────────────────
         self.level_id = editor_instance.level_id
         self.environment = editor_instance.current_environment
         self.environments = editor_instance.environments.copy()
-        self.level = self.level_manager.get_file_name(self.level_id)
+        self.level = f"{self.level_id:03f}"
 
-        self.b_info = {
-            "1": {"animated": True, "img_dur": 6, "loop": True, "path": f"environments/white_space/images/backgrounds"},
-            "2": {"animated": False, "path": f"environments/green_cave/images/backgrounds"},
-        }
-
-        self.tile_size = self.tilemap.tile_size
-
-        self.master_volume = 1
-        player_sfx = "assets/player/sounds/"
-
-        self.music_sound_manager = Sound(self, {
-            'title_screen': "assets/ui/sounds/Title-screen-ambient-music.wav",
-            'level_1': f"assets/environments/white_space/sounds/map_1.wav",
-            'level_2': f"assets/environments/green_cave/sounds/map_2.wav",
-        }, is_music=True, master_volume=self.master_volume, volume=1)
-
-        self.sound_effect_manager = Sound(self, {
-            "dash": player_sfx + 'dash.wav',
-            "jump": player_sfx + 'jump.wav',
-            "run": player_sfx + 'run.wav',
-            "wall_jump": player_sfx + 'wall_jump.wav',
-            "land": player_sfx + 'land.wav',
-            "walk": None,
-            "stun": None,
-        }, is_music=False, master_volume=self.master_volume, volume=0.5)
-
-
-        # ── 3. Save & settings ─────────────────────────────────────────────────
-        self.save_system = Save(self)
-        self.current_slot = None
-
-        self.languages = ["Français", "English", "Español"]
-        self.selected_language = self.languages[1]
-        self.fullscreen = False
-        self.vsync_on = False
-        self.brightness = 0.5
-
-        # ── 4. Keybindings ─────────────────────────────────────────────────────
-        self.keyboard_layout = "AZERTY"
-        self.key_map = {
-            "key_up": pygame.K_z,
-            "key_down": pygame.K_s,
-            "key_left": pygame.K_q,
-            "key_right": pygame.K_d,
-            "key_jump": pygame.K_SPACE,
-            "key_dash": pygame.K_g,
-            "key_interact": pygame.K_e,
-            "key_noclip": pygame.K_n,
-            "key_hitbox": pygame.K_h,
-            "key_select": pygame.K_RETURN,
-        }
-        self.keybindings = {}
-        self.dict_kb = {
-            "key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0,
-            "key_jump": 0, "key_dash": 0, "key_noclip": 0,
-        }
-
-        # ── 6. Assets ──────────────────────────────────────────────────────────
-        self.assets = {}
-        self.assets.update(load_tiles())
-        self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.level_id))
-        self.assets.update(load_particles())
-
-        self.doors_id_pairs = []
-        self.levers_id_pairs = []
-        self.buttons_id_pairs = []
-        self.tp_id_pairs = []
-
-        # ── 7. Camera ──────────────────────────────────────────────────────────
-        self.camera = Camera(self)
-        self.camera_center = None
-        self.scroll_limits_per_level = {
-            "1": {"x": (0, 0), "y": (-1230, 1233)},
-            "2": {"x": (64, 624), "y": (-176, 144)},
-        }
-        self.scroll_limits = self.scroll_limits_per_level["1"]
-        self.screenshake = 0
-
-        # ── 8. Tilemap ─────────────────────────────────────────────────────────
-        #self.activators_actions = load_activators_actions(self.level, self.tilemap.layers["activators"])
-        self.doors_rects = []
-        self.show_spikes_hitboxes = False
-
-        # ── 9. Player ──────────────────────────────────────────────────────────
-        self.player = PhysicsPlayer(self, self.tilemap, editor_instance.player_start, (16, 16))
-        self.player_dead = False
-        self.death_counter = 0
-
-        self.collected_souls = []
-        self.nb_souls = 0
-
-        self.checkpoints = []
-        self.current_checkpoint = None
-        self.active_checkpoint_anim = None
-
-        # ── 10. Activators & interactables ────────────────────────────────────
-        self.activators = []
-        self.projectiles = []
-        self.teleporting = False
-        self.tp_id = None
-        self.last_teleport_time = 0
-        self.player_grabbing = False
-
-        # ── 11. Game state & flow ─────────────────────────────────────────────
         self.state = self.PLAYING_STATE
-        self.previous_state = None
-        self.game_initialized = False
-        self.current_mode = "default"
 
-        self.cutscene = False
-        #self.game_texts = load_game_texts()
-        self.bottom_text = None
-
-        self.attacking = False
-        self.holding_attack = False
-
-        # ── 12. Lighting ──────────────────────────────────────────────────────
-        self.darkness_level = 255
-        self.light_radius = 10
-        self.light_soft_edge = 200
-        self.light_emitting_tiles = []
-        self.light_emitting_objects = []
-
-        self.light_properties = {
-            "player": {"radius": 100, "intensity": 250, "edge_softness": 255, "color": (255, 255, 255),
-                       "flicker": False},
-            "torch": {"radius": 80, "intensity": 220, "edge_softness": 30, "color": (255, 180, 100), "flicker": True},
-            "crystal": {"radius": 120, "intensity": 200, "edge_softness": 50, "color": (100, 180, 255),
-                        "flicker": False},
-            "glowing_mushroom": {"radius": 80, "intensity": 80, "edge_softness": 500, "color": (160, 230, 180),
-                                 "flicker": False},
-            "lava": {"radius": 100, "intensity": 210, "edge_softness": 40, "color": (255, 120, 50), "flicker": True},
-        }
-        self.light_infos = {i: {"darkness_level": 180, "light_radius": 200} for i in range(5)}
-        self.player_light = self.light_properties["player"]
-
-        self.shader = Shader(self)
-        self.light_mask = pygame.Surface((self.light_radius * 2, self.light_radius * 2), pygame.SRCALPHA)
-        self.shader.create_light_mask(self.light_radius)
-
-        # ── 13. VFX & combat ──────────────────────────────────────────────────
-        self.particles = []
-        self.sparks = []
-        self.moving_visual = False
-
-        self.damage_flash_active = False
-        self.damage_flash_end_time = 0
-        self.damage_flash_duration = 100
-
-        self.fake_tiles_opacity = 255
-        self.fake_tiles_colliding_group = []
-        if hasattr(self, "fake_tile_groups"):
-            delattr(self, "fake_tile_groups")
-
-        # ── 14. UI & menu ─────────────────────────────────────────────────────
-        self.menu = Menu(self)
-
-        # ── 15. Timers & counters ─────────────────────────────────────────────
-        self.playtime = 0
-        self.menu_time = 0
+    def _init_display(self):
+        self.screen = self.editor.screen
+        self.display = self.editor.display
+        self.clock = pygame.time.Clock()
+        self.debug_mode = False
 
     def save_game(self, slot=1):
         return False
@@ -743,7 +625,7 @@ class PlayTest(Game):
         self.state = self.PLAYING_STATE
         self.editor.screen = self.screen
         self.editor.screen_width, self.editor.screen_height = self.screen.get_size()
-        self.editor.screen = pygame.display.set_mode((0, 0), pygame.RESIZABLE)
+        self.editor.screen = pygame.display.set_mode((self.editor.screen_width, self.editor.screen_height), pygame.RESIZABLE)
         self.editor.ui.reload()
         self.music_sound_manager.stop('title_screen')
 
@@ -789,8 +671,8 @@ class EditorSimulation:
         self.max_history = 50
         self.temp_snapshot = None
 
-        # LevelManager — doit être créé AVANT d'utiliser active_maps/environments
-        self.level_manager = LevelManager(self)
+        # EditorLevelManager — doit être créé AVANT d'utiliser active_maps/environments
+        self.level_manager = EditorLevelManager(self)
 
         self.active_maps = []
         for ids in os.listdir("data/maps"):
@@ -903,7 +785,7 @@ class EditorSimulation:
 
         self.ui = UI(self)
         self.camera_setup = EditorCameraSetup(self)
-        self.playtest = None#PlayTest(self)
+        self.playtest = PlayTest(self)
         self.ignore_links = False
 
         self.save_action()
@@ -914,6 +796,7 @@ class EditorSimulation:
             'tilemap': copy.deepcopy(self.tilemap.tilemap),
             'offgrid': copy.deepcopy(self.tilemap.offgrid_tiles),
             'camera_zones': copy.deepcopy(self.tilemap.camera_zones),
+            'selected_link': copy.deepcopy(self.selector.link),
             'links': copy.deepcopy(self.tilemap.links),
         }
 
@@ -940,7 +823,7 @@ class EditorSimulation:
         self.tilemap.offgrid_tiles = copy.deepcopy(snapshot['offgrid'])
         self.tilemap.camera_zones = copy.deepcopy(snapshot["camera_zones"])
         self.tilemap.links = copy.deepcopy(snapshot['links'])
-        self.selector.link = []
+        self.selector.link = copy.deepcopy(snapshot['selected_link'])
 
     def undo(self):
         if self.history_index > 0:
@@ -1274,7 +1157,7 @@ class EditorSimulation:
                     self.playtest.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
                     self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
                     self.playtest.load_settings()
-                    self.playtest.load_level(self.level_id)
+                    self.playtest.level_manager.load_level()
                 if event.key == pygame.K_w:
                     self.undo()
                 if event.key == pygame.K_y:

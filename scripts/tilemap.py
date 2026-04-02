@@ -264,8 +264,9 @@ class Tilemap:
         tilemap_copy = Tilemap(new_game, self.tile_size)
         tilemap_copy.tilemap = copy.deepcopy(self.tilemap)
         tilemap_copy.offgrid_tiles = copy.deepcopy(self.offgrid_tiles)
-        tilemap_copy.layers = copy.deepcopy(self.layers)
-        tilemap_copy.links = copy.deepcopy((self.links))
+        tilemap_copy.links = copy.deepcopy(self.links)
+        tilemap_copy.matches = copy.deepcopy(self.matches)
+        tilemap_copy.camera_zones = copy.deepcopy(self.camera_zones)
         tilemap_copy.tag_groups = copy.deepcopy(self.tag_groups)
 
         return tilemap_copy
