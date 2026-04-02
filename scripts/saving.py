@@ -36,7 +36,6 @@ class Save:
         self.save_folder = "saves"
         self.ensure_save_folder_exists()
 
-
     def ensure_save_folder_exists(self):
         """Creates the save directory if it doesn't exist."""
         if not os.path.exists(self.save_folder):
@@ -84,11 +83,6 @@ class Save:
                 "spawn_point": self.game.spawn_point,
                 "current_checkpoint": self.game.current_checkpoint,
                 "death": self.game.death_counter,
-            },
-            "camera": {
-                "scroll_limits":self.game.spawn_point["scroll_limits"],
-                "center":self.game.spawn_point["camera_center"],
-                "cameras": self.game.spawn_point["cameras"]
             },
             "collected_souls": self.game.collected_souls,
             "doors": [],
@@ -166,7 +160,7 @@ class Save:
                 save_data = json.load(save_file)
 
             # --- Restore Core Game State ---
-            level = save_data.get("level", "ws001")
+            level = save_data.get("level", "001")
             level_id = save_data.get("level_id", 1)
             self.game.level = level
             self.game.level_id = level_id
@@ -187,8 +181,6 @@ class Save:
             if "camera" in save_data:
                 if "scroll_limits" in save_data["camera"]:
                     self.game.scroll_limits = save_data["camera"]["scroll_limits"]
-                if "center" in save_data["camera"]:
-                    self.game.camera_center = save_data["camera"]["center"]
 
             if "collected_souls" in save_data:
                self.game.collected_souls = save_data["collected_souls"]
@@ -212,14 +204,6 @@ class Save:
                         if activator.id in save_data["activators"][activator.type]:
                             activator.state = 1
                             activator.activated = False
-
-            if "camera" in save_data:
-                if "cameras" in save_data["camera"]:
-                    for camera in self.game.camera_setup:
-                        if str(camera.initial_state) in save_data["camera"]["cameras"]:
-                            camera.scroll_limits = save_data["camera"]["cameras"][str(camera.initial_state)]["scroll_limits"]
-                            if "center" in save_data["camera"]["cameras"][str(camera.initial_state)]:
-                                camera.center = save_data["camera"]["cameras"][str(camera.initial_state)]["center"]
 
             print(f"Game loaded successfully from {save_path}")
             return True

@@ -86,19 +86,11 @@
  "offgrid": {
   "3": {}
  },
- "tag_groups": {
-  "1": {
-   "tiles": [
-    [
-     "20;10",
-     "3"
-    ]
-   ],
-   "tags": {}
-  }
- },
+ "tag_groups": {},
  "selection_groups": {},
  "matches": {},
- "camera_zones": [],
+ "camera_zones": [
+  "-64;0;512;240"
+ ],
  "tilesize": 16
 }

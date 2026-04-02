@@ -12,7 +12,7 @@ from scripts.user_interface import Menu
 from scripts.saving import Save
 from scripts.doors import Door, doors_render_and_update
 from scripts.display import *
-from scripts.camera import CameraSetup, Camera
+from scripts.camera import Camera
 from scripts.text import load_game_texts, update_bottom_text
 from scripts.sound import Sound
 from scripts.pickup import Pickup
@@ -20,9 +20,10 @@ from scripts.pickup import Pickup
 class LevelManager:
     def __init__(self, game):
         self.game = game
+        self.first_level_id = 1
+        game.level_id = self.first_level_id
 
     def load_level(self, level_id):
-        #map_name = self.get_map_name(self.game.environment, level_id)
         self.game.assets = {}
         self.game.assets.update(load_tiles())
         self.game.assets.update(load_player())
@@ -37,6 +38,7 @@ class LevelManager:
         self.game.fake_tiles = []
         self.game.pickups = []
         self.game.leaf_spawners = []
+        self.game.camera_zones = []
         for group_id in self.game.tilemap.tag_groups:
             group = self.game.tilemap.tag_groups[group_id]
             group_tags = group["tags"]
@@ -56,7 +58,10 @@ class LevelManager:
 
             # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
 
-        target_x = (self.game.player.rect().centerx if self.game.camera_center is None else self.game.camera_center[
+        for zone in self.game.tilemap.camera_zones:
+            self.game.camera_zones.append([int(val) for val in zone.split(";")])
+
+        '''target_x = (self.game.player.rect().centerx if self.game.camera_center is None else self.game.camera_center[
             0]) - self.game.display.get_width() / 2
         min_x, max_x = self.game.scroll_limits["x"]
         max_x -= self.game.display.get_width()
@@ -67,7 +72,7 @@ class LevelManager:
         max_y -= self.game.display.get_height()
         target_y = max(min_y, min(target_y, max_y))
 
-        self.game.scroll = [target_x, target_y]
+        self.game.scroll = [target_x, target_y]'''
 
         # Reset VFX and interaction pools
         self.game.cutscene = False
@@ -161,14 +166,12 @@ class Game:
         }
 
     def _init_assets(self):
-        self.level_id = 1
         path = 'data/environments.json'
         if os.path.exists(path):
             with open(path, 'r') as f:
                 self.environments = json.load(f)
 
         self.level = f"{self.level_id:03d}"
-        self.default_level = self.level
         self.tile_size = 16
         self.b_info = {
             "1": {"animated": True, "img_dur": 6, "loop": True, "path": f"environments/white_space/images/backgrounds"},
@@ -198,12 +201,8 @@ class Game:
 
         # Camera
         self.camera = Camera(self)
-        self.camera_center = None
-        self.scroll_limits_per_level = {
-            "1": {"x": (0, 0), "y": (-1230, 1233)},
-            "2": {"x": (64, 624), "y": (-176, 144)},
-        }
-        self.scroll_limits = self.scroll_limits_per_level["1"]
+        self.camera_zones = []
+        self.scroll_limits = {}
         self.screenshake = 0
         self.scroll = [0.0, 0.0]
 
@@ -340,6 +339,16 @@ class Game:
             if event.key == mapped:
                 self.dict_kb[key] = 1 if event.type == pygame.KEYDOWN else 0
 
+    def _camera_borders_check(self):
+        for zone in self.camera_zones:
+            left, right, top, bottom = zone[0], zone[0] + zone[2], zone[1], zone[1] + zone[3]
+            if left <= self.player.pos[0] < right and top <= self.player.pos[1] < bottom:
+                self.scroll_limits = {"x": [left, right], "y": [top, bottom]}
+                return
+        self.scroll_limits = {"x": [-5000, 5000], "y" : [-5000, 5000]}
+
+
+
     def toggle_hitboxes(self):
         self.player.show_hitbox = not self.player.show_hitbox
         self.show_spikes_hitboxes = not self.show_spikes_hitboxes
@@ -354,148 +363,6 @@ class Game:
                     self.key_map["key_noclip"] = bindings[cat][bind]
                 else:
                     self.key_map[f"key_{bind.lower()}"] = bindings[cat][bind]
-
-    def load_level(self, map_id, transition_effect=True):
-        """
-        Loads level data from a JSON file, extracts entities, and sets up level-specific logic.
-
-        Args:
-            map_id (int): The index of the level to load.
-            :param map_id:
-            :param transition_effect:
-        """
-        #map_name = self.level_manager.get_file_name(self.environment, map_id)
-        map_name = f"{map_id:03d}"
-        self.assets = {}
-        self.assets.update(load_tiles())
-        self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, map_id))
-        self.assets.update(load_particles())
-        self.tilemap.load(f"data/maps/{map_name}.json")
-        self.tilemap.tile_size = self.tile_size
-        self.light_emitting_tiles = []
-        self.light_emitting_objects = []
-
-        # --- Checkpoints & Traps ---
-        self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
-
-        self.pickups = []
-        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(f"{BASE_IMG_PATH}environments/white_space/images/tiles/pickups"))]):
-            if pickup.pos not in self.collected_souls:
-                self.pickups.append(Pickup(self, pickup.pos, pickup.type))
-
-
-        self.spikes = []
-        spike_types = []
-        for s in ("spikes", "gluy_spikes", "purpur_spikes", "red_spikes"):
-            for n in range(3):
-                spike_types.append((s, n))
-
-        spike_block_types = []
-        for n in range(9):
-            spike_block_types += [("spike_roots", n)]
-
-        for spike in self.tilemap.extract(spike_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike.pos, self.assets[spike.type][spike.variant], hitbox_type='spike', rotation=spike.rotation))
-
-        for spike_block in  self.tilemap.extract(spike_block_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike_block.pos, self.assets[spike_block.type][spike_block.variant], hitbox_type='spike_block', rotation=spike_block.rotation))
-
-        # --- Objects & Particles ---
-        self.throwable = []
-        for o in self.tilemap.extract([('throwable', 0)]):
-            self.throwable.append(Throwable(self, "blue_rock", o.pos, (16, 16)))
-
-        self.leaf_spawners = []
-        for plant in self.tilemap.extract([('vine_decor', 3), ('vine_decor', 4), ('vine_decor', 5),
-                                           ('mossy_stone_decor', 15), ('mossy_stone_decor', 16)], keep=True):
-            self.leaf_spawners.append(pygame.Rect(4 + plant.pos[0], 4 + plant.pos[1], 23, 13))
-
-        self.crystal_spawners = []
-        for mushroom in self.tilemap.extract([("blue_decor", 14), ("blue_decor", 15)], keep=True):
-            self.shader.register_light_emitting_tile((mushroom.pos[0] + 8, mushroom.pos[1] + 8), "glowing_mushroom")
-            self.crystal_spawners.append(pygame.Rect(4 + mushroom.pos[0], 4 + mushroom.pos[1], 23, 13))
-
-        # Initial setup for enemies and interactive objects
-        self.enemies = []
-        for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 3)]):
-            if spawner.variant == 0:
-                if self.current_checkpoint is None:
-                    self.spawners[str(map_id)] = spawner.pos.copy()
-                    self.spawner_pos[str(map_id)] = spawner.pos
-                    self.player.pos = spawner.pos.copy()
-                    self.spawn_point = {"pos": spawner.pos.copy(), "level": map_id, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
-            elif spawner.variant == 1:
-                self.enemies.append(Enemy(self, "picko", spawner.pos, (16, 16), 100,
-                                          {"attack_distance": 20, "attack_dmg": 10, "attack_time": 1.5}))
-            elif spawner.variant == 3:
-                self.enemies.append(DistanceEnemy(self, "glorbo", spawner.pos, (16, 16), 100,
-                                                  {"attack_distance": 100, "attack_dmg": 10, "attack_time": 1.5}))
-
-        self.activators = []
-        for activator in self.tilemap.extract([]):
-            a = Activator(self, activator.pos, activator.type, i=activator["id"])
-            a.state = activator.variant
-            self.activators.append(a)
-
-        self.doors = []
-        '''for door in self.tilemap.extract(self.doors_id_pairs):
-            door_type = door.type
-            speed = int(door["opening_time"])
-            door_id = door["id"]
-            self.doors.append(
-                Door(self.d_info[door_type]["size"], door.pos, door_type, door_id, False, speed, self))'''
-
-        self.camera_setup = []
-        for camera in self.tilemap.extract(["camera_setup"]):
-            self.camera_setup.append(CameraSetup(self, camera))
-
-        fake_tiles_id_pairs = []
-        """for tile in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/blocks")):
-            if "fake" in tile:
-                for variant in range(len(self.assets[tile])):
-                    fake_tiles_id_pairs.append((tile, variant))
-        """
-
-        if not hasattr(self, "fake_tile_groups"):
-            self.fake_tile_groups = []
-            for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
-                fake_tile.pos[0] = fake_tile.pos.copy()[0] // self.tile_size
-                fake_tile.pos[1] = fake_tile.pos.copy()[1] // self.tile_size
-                g_check = True
-                for group in self.fake_tile_groups:
-                    if fake_tile in group:
-                        g_check = False
-                        continue
-                if g_check:
-                    group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.tilemap.layers["fake_tiles"])
-                    if group not in self.fake_tile_groups:
-                        self.fake_tile_groups.append(group)
-        self.tilemap.extract(fake_tiles_id_pairs, layers=tuple(self.tilemap.layers["fake_tiles"]))
-
-        # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
-        target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
-        min_x, max_x = self.scroll_limits["x"]
-        max_x -= self.display.get_width()
-        target_x = max(min_x, min(target_x, max_x))
-        target_y = (self.player.rect().centery if self.camera_center is None else self.camera_center[1]) - self.display.get_height()/2
-        min_y, max_y = self.scroll_limits["y"]
-        max_y -= self.display.get_height()
-        target_y = max(min_y, min(target_y, max_y))
-
-        self.scroll = [target_x, target_y]
-
-
-        self.transitions = self.tilemap.extract([("transition", 0)])
-
-        # Reset VFX and interaction pools
-        self.interactable = self.throwable.copy() + self.activators.copy()
-        self.cutscene = False
-        self.particles = []
-        self.sparks = []
-        self.transition = -30 if transition_effect else 0
-        self.max_falling_depth = 50000000000
-        self.shader.update_light()
 
     def save_game(self, slot=1):
         if hasattr(self, 'save_system'):
@@ -576,11 +443,6 @@ class Game:
                             self.spawn_point["cameras"][str(camera.initial_state)]["center"] = camera.center
                 self.save_game(self.current_slot)
 
-    def update_camera_setup(self):
-        return
-        for camera in self.camera_setup:
-            camera.update()
-
     def spike_hitbox_update(self, render_scroll):
         for spike_hitbox in self.spikes:
             if not self.player.noclip:
@@ -639,7 +501,7 @@ class Game:
             sys.exit()
 
     def _update_world(self, dt):
-        self.update_camera_setup()
+        self._camera_borders_check()
         self.camera.update_camera()
         self.player.physics_process(self.dict_kb, dt)
         self.update_transitions()

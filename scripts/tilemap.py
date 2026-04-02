@@ -164,6 +164,12 @@ class Tilemap:
         if "tag_groups" in map_data:
             self.tag_groups = map_data["tag_groups"]
 
+        g = open("data/global_groups.json", 'r')
+        global_groups = json.load(g)
+        for group_id, group_infos in global_groups.items():
+            if group_id not in self.tag_groups:
+                self.tag_groups[group_id] = group_infos
+
         if "matches" in map_data:
             self.matches = map_data["matches"]
 

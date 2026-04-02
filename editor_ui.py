@@ -1,12 +1,8 @@
-import math
 import sys
 
-from pygame import MOUSEBUTTONDOWN
-
 from scripts.activators import Activator
-from scripts.camera import Camera, CameraSetup
+from scripts.camera import Camera
 from scripts.display import Shader
-from scripts.doors import Door
 from scripts.entities import DamageBlock, Throwable, Enemy, DistanceEnemy
 from scripts.game import Game
 from scripts.physics import PhysicsPlayer
@@ -33,12 +29,13 @@ class EditorCameraSetup:
 
     def __init__(self, editor_instance):
         self.editor = editor_instance
-        self.cursor_pos = editor_instance.mpos_scaled
+        self.cursor_pos = list(editor_instance.mpos_scaled)
         self.tile_size = editor_instance.tilemap.tile_size
         self.initial_cursor_pos = self.cursor_pos
         self.cursor_rect = pygame.Rect(self.cursor_pos[0], self.cursor_pos[1], 0, 0)
         self.cameras = editor_instance.tilemap.camera_zones
         self.creating = False
+        self.clicking = False
 
         # Resize state
         self.resizing = False
@@ -162,6 +159,8 @@ class EditorCameraSetup:
 
     def update(self):
         """Call once per frame to handle resize dragging & cursor icon."""
+        self.rect_pos_update()
+        self.cameras = self.editor.tilemap.camera_zones
         world_mouse = self._screen_to_world(self.editor.mpos_scaled)
 
         if self.resizing:
@@ -216,48 +215,45 @@ class EditorCameraSetup:
 
     def handle_event(self, event):
         world_mouse = self._screen_to_world(self.editor.mpos_scaled)
+        if not self.editor.ui.toolbar_rect.collidepoint(self.editor.mpos):
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Check if we're clicking a resize handle before starting creation
+                for i, camera in enumerate(self.cameras):
+                    wrect = self._get_rect(camera)
+                    edges = self._get_edges(wrect, world_mouse)
+                    if edges:
+                        self.resizing = True
+                        self.resize_index = i
+                        self.resize_edges = edges
+                        self.resize_origin = wrect.copy()
+                        self.resize_mouse_origin = list(world_mouse)
+                        return   # consume event — don't start a new zone
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Check if we're clicking a resize handle before starting creation
-            for i, camera in enumerate(self.cameras):
-                wrect = self._get_rect(camera)
-                edges = self._get_edges(wrect, world_mouse)
-                if edges:
-                    self.resizing = True
-                    self.resize_index = i
-                    self.resize_edges = edges
-                    self.resize_origin = wrect.copy()
-                    self.resize_mouse_origin = list(world_mouse)
-                    return   # consume event — don't start a new zone
+                # No handle hit → normal zone creation
+                self.creating = True
+                self.initial_cursor_pos = self.cursor_pos.copy()
 
-            # No handle hit → normal zone creation
-            self.creating = True
-            self.initial_cursor_pos = self.cursor_pos.copy()
+            if event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.clicking = False
+                    if self.resizing:
+                        self.editor.save_action()   # push undo snapshot after resize
+                        self.resizing = False
+                        self.resize_index = None
+                        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                        return
 
-        if event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:
-                if self.resizing:
-                    self.editor.save_action()   # push undo snapshot after resize
-                    self.resizing = False
-                    self.resize_index = None
-                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-                    return
-
-                if self.cursor_rect.width and self.cursor_rect.height:
-                    current_state = self.editor.create_snapshot()
-                    if current_state != self.editor.temp_snapshot:
-                        self.editor.save_action()
-                    rect_str = f"{self.cursor_rect.x};{self.cursor_rect.y};{self.cursor_rect.width};{self.cursor_rect.height}"
-                    self.create_zone(rect_str)
-                self.creating = False
-            if event.button == 3:
-                deleted_zone = self._get_selected_zone()
-                if deleted_zone:
-                    self.editor.tilemap.camera_zones.remove(deleted_zone)
-
-
-        self.cameras = self.editor.tilemap.camera_zones
-        self.rect_pos_update()
+                    if self.creating and self.cursor_rect.width and self.cursor_rect.height:
+                        current_state = self.editor.create_snapshot()
+                        if current_state != self.editor.temp_snapshot:
+                            self.editor.save_action()
+                        rect_str = f"{self.cursor_rect.x};{self.cursor_rect.y};{self.cursor_rect.width};{self.cursor_rect.height}"
+                        self.create_zone(rect_str)
+                    self.creating = False
+                if event.button == 3:
+                    deleted_zone = self._get_selected_zone()
+                    if deleted_zone:
+                        self.editor.tilemap.camera_zones.remove(deleted_zone)
 
 class Selector:
     def __init__(self, editor_instance):
@@ -742,135 +738,6 @@ class PlayTest(Game):
     def load_game(self, slot=1):
         return False
 
-    def load_level(self, map_id, transition_effect=True):
-        """
-        Loads level data from a JSON file, extracts entities, and sets up level-specific logic.
-
-        Args:
-            map_id (int): The index of the level to load.
-            :param map_id:
-            :param transition_effect:
-        """
-        self.environment = self.level_manager.get_environment_by_id(self.level_id)
-        map_name = self.level_manager.get_file_name(map_id)
-        self.assets = {}
-        self.assets.update(load_tiles(self.environment))
-        self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.environment))
-        self.assets.update(load_particles(self.environment))
-
-        self.tilemap.tile_size = self.tile_size
-        self.light_emitting_tiles = []
-        self.light_emitting_objects = []
-        #self.activators_actions = load_activators_actions(map_name, self.tilemap.layers["activators"])
-
-        # --- Checkpoints & Traps ---
-        self.checkpoints = self.tilemap.extract([("checkpoint", 0)])
-
-        self.pickups = []
-        for pickup in self.tilemap.extract([(p, 0) for p in sorted(os.listdir(f"{BASE_IMG_PATH}environments/{self.environment}/images/tiles/pickups"))]):
-            if pickup["pos"] not in self.collected_souls:
-                self.pickups.append(Pickup(self, pickup["pos"], pickup["type"]))
-
-        self.spikes = []
-        spike_types = []
-        for s in ("spikes", "gluy_spikes", "purpur_spikes"):
-            for n in range(3):
-                spike_types.append((s, n))
-
-        spike_block_types = []
-        for n in range(9):
-            spike_block_types += [("spike_roots", n)]
-
-        for spike in self.tilemap.extract(spike_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike["pos"], self.assets[spike["type"]][spike["variant"]], hitbox_type='spike', rotation=spike["rotation"]))
-
-        for spike_block in  self.tilemap.extract(spike_block_types, keep=True):
-            self.spikes.append(DamageBlock(self, spike_block["pos"], self.assets[spike_block["type"]][spike_block["variant"]], hitbox_type='spike_block', rotation=spike_block["rotation"]))
-
-        # --- Objects & Particles ---
-        self.throwable = []
-        for o in self.tilemap.extract([('throwable', 0)]):
-            self.throwable.append(Throwable(self, "blue_rock", o['pos'], (16, 16)))
-
-        self.leaf_spawners = []
-        for plant in self.tilemap.extract([('vine_decor', 3), ('vine_decor', 4), ('vine_decor', 5),
-                                           ('mossy_stone_decor', 15), ('mossy_stone_decor', 16)], keep=True):
-            self.leaf_spawners.append(pygame.Rect(4 + plant['pos'][0], 4 + plant['pos'][1], 23, 13))
-
-        self.crystal_spawners = []
-        for mushroom in self.tilemap.extract([("blue_decor", 14), ("blue_decor", 15)], keep=True):
-            self.shader.register_light_emitting_tile((mushroom['pos'][0] + 8, mushroom['pos'][1] + 8), "glowing_mushroom")
-            self.crystal_spawners.append(pygame.Rect(4 + mushroom['pos'][0], 4 + mushroom['pos'][1], 23, 13))
-
-        # Initial setup for enemies and interactive objects
-        self.enemies = []
-        for spawner in self.tilemap.extract([('spawners', 0), ('spawners', 1), ('spawners', 3)]):
-            if spawner['variant'] == 1:
-                self.enemies.append(Enemy(self, "picko", spawner['pos'], (16, 16), 100,
-                                          {"attack_distance": 20, "attack_dmg": 10, "attack_time": 1.5}))
-            elif spawner['variant'] == 3:
-                self.enemies.append(DistanceEnemy(self, "glorbo", spawner['pos'], (16, 16), 100,
-                                                  {"attack_distance": 100, "attack_dmg": 10, "attack_time": 1.5}))
-
-        self.activators = []
-        for activator in self.tilemap.extract(self.levers_id_pairs + self.buttons_id_pairs + self.tp_id_pairs):
-            a = Activator(self, activator['pos'], activator['type'], i=activator["id"])
-            a.state = activator["variant"]
-            self.activators.append(a)
-
-        self.doors = []
-        '''for door in self.tilemap.extract(self.doors_id_pairs):
-            door_type = door["type"]
-            speed = int(door["opening_time"])
-            door_id = door["id"]
-            self.doors.append(
-                Door(self.d_info[door_type]["size"], door["pos"], door_type, door_id, False, speed, self))'''
-
-        self.camera_setup = []
-        for camera in self.tilemap.extract(["camera_setup"]):
-            self.camera_setup.append(CameraSetup(self, camera))
-
-        if not hasattr(self, "fake_tile_groups"):
-            self.fake_tile_groups = []
-            """for fake_tile in self.tilemap.extract(fake_tiles_id_pairs, keep=True, layers=tuple(self.tilemap.layers["fake_tiles"])):
-                fake_tile["pos"][0] = fake_tile["pos"].copy()[0] // self.tile_size
-                fake_tile["pos"][1] = fake_tile["pos"].copy()[1] // self.tile_size
-                g_check = True
-                for group in self.fake_tile_groups:
-                    if fake_tile in group:
-                        g_check = False
-                        continue
-                if g_check:
-                    group = self.tilemap.get_same_type_connected_tiles(fake_tile, self.tilemap.layers["fake_tiles"])
-                    if group not in self.fake_tile_groups:
-                        self.fake_tile_groups.append(group)
-        self.tilemap.extract(fake_tiles_id_pairs, layers=tuple(self.tilemap.layers["fake_tiles"]))"""
-
-        # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
-        target_x = (self.player.rect().centerx if self.camera_center is None else self.camera_center[0]) - self.display.get_width() / 2
-        min_x, max_x = self.scroll_limits["x"]
-        max_x -= self.display.get_width()
-        target_x = max(min_x, min(target_x, max_x))
-        target_y = (self.player.rect().centery if self.camera_center is None else self.camera_center[1]) - self.display.get_height()/2
-        min_y, max_y = self.scroll_limits["y"]
-        max_y -= self.display.get_height()
-        target_y = max(min_y, min(target_y, max_y))
-
-        self.scroll = [target_x, target_y]
-
-
-        self.transitions = []
-
-        # Reset VFX and interaction pools
-        self.interactable = self.throwable.copy() + self.activators.copy()
-        self.cutscene = False
-        self.particles = []
-        self.sparks = []
-        self.transition = -30 if transition_effect else 0
-        self.max_falling_depth = 50000000000
-        self.shader.update_light()
-
     def leave(self):
         self.editor.state = "MapEditor"
         self.state = self.PLAYING_STATE
@@ -902,7 +769,6 @@ class EditorSimulation:
 
     def __init__(self):
         pygame.init()
-
         pygame.display.set_caption("Editor")
         self.screen_width = self.SW
         self.screen_height = self.SH
@@ -1461,7 +1327,6 @@ class EditorSimulation:
                     if self.current_layer not in self.tilemap.tilemap:
                         self.tilemap.tilemap[self.current_layer] = {}
                 if event.key == pygame.K_TAB and not self.holding_tab:
-                    self.showing_all_layers = not self.showing_all_layers
                     self.holding_tab = True
                 if event.key == pygame.K_LSHIFT:
                     self.shift = True
@@ -1650,13 +1515,14 @@ class EditorSimulation:
                 case "MapEditor":
                     self.display.fill((0, 0, 0))
                     self.mpos_update()
-                    self.camera_setup.update()
                     for event in pygame.event.get():
                         if self.current_tool == "LevelSelector":
                             pass
                         else:
                             self.handle_map_editor(event)
                         self.ui.handle_ui_event(event)
+                        if self.current_tool == "CameraSetup":
+                            self.camera_setup.update()
 
                         if event.type == pygame.MOUSEBUTTONUP:
                             if event.button == 1:
@@ -1732,16 +1598,17 @@ class UI:
         self.tools_buttons = []
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "CameraSetup", "LevelSelector"]
         self.check_buttons = []
-        self.check_buttons_labels = ["On grid"]
+        self.check_buttons_labels = ["All_layers", "On_grid"]
         self.on_selection_buttons = []
-        self.on_selection_buttons_labels = ["Plus","Link","Unlink","IgnoreLinks"]
+        self.on_selection_buttons_labels = ["Plus", "Link","Unlink","IgnoreLinks"]
         #self.tools_buttons_images = {tool: load_image(f"ui/{tool.lower()}.png") for tool in self.tools_buttons_labels}
         self.buttons_images = {"Brush": load_image("ui/brush.png"),
                                "Eraser": load_image("ui/eraser.png"),
                                "Selection": load_image("ui/selection.png"),
                                "Move": load_image("ui/move.png"),
                                "LevelSelector": load_image("ui/level_selector.png"),
-                               "On grid": load_image("ui/ongrid.png"),
+                               "On_grid": load_image("ui/ongrid.png"),
+                               "All_layers": load_image("ui/skull.png"),
                                "Properties" : load_image("ui/properties.png"),
                                "Link": load_image("ui/link.png"),
                                "Unlink": load_image("ui/unlink.png"),
@@ -1832,9 +1699,8 @@ class UI:
                                   0.7*self.toolbar_buttons_width,
                                   0.7*self.toolbar_buttons_height,
                                   (64, 64, 64),
-
                                   resize=0.8)
-            button_y -= 0.7*self.toolbar_buttons_height - (self.PADDING/self.editor.SH)*self.screen_height
+            button_y -= self.toolbar_buttons_height - (0.5*self.PADDING/self.editor.SW)*self.screen_width
             self.check_buttons.append(button)
 
         self.init_assets_buttons(self.categories)
@@ -1878,7 +1744,6 @@ class UI:
                                             self.toolbar_buttons_width,self.toolbar_buttons_height,(200,50,50),resize=0.8)
         self.group_selector_buttons.append(close_button)
 
-
     def init_assets_buttons(self, categories):
         self.assets_buttons = []
 
@@ -1915,10 +1780,18 @@ class UI:
                 button.activated = False
         for button in self.check_buttons:
             button.draw(overlay)
-            if button.label == "On grid" and self.editor.ongrid:
-                button.activated = True
-            else:
-                button.activated = False
+
+            if button.label == "On_grid":
+                if self.editor.ongrid:
+                    button.activated = True
+                else:
+                    button.activated = False
+            elif button.label == "All_layers":
+                if self.editor.showing_all_layers:
+                    button.activated = True
+                else:
+                    button.activated = False
+
         self.toolbar_rect.x,self.toolbar_rect.y = (self.screen_width - self.toolbar_rect.width, 0)
 
         self.screen.blit(overlay, (self.toolbar_rect.x,self.toolbar_rect.y))
@@ -2181,8 +2054,10 @@ class UI:
         for button in self.check_buttons:
             if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width, 0)):
                 match button.label:
-                    case "On grid":
+                    case "On_grid":
                         self.editor.ongrid = not self.editor.ongrid
+                    case "All_layers":
+                        self.editor.showing_all_layers = not self.editor.showing_all_layers
 
     def handle_assets_section_event(self, event):
         categories = self.categories
@@ -2234,6 +2109,7 @@ class UI:
                 loaded_id = self.level_carousel.levels[self.level_carousel.selected]
                 self.editor.level_manager.change_level(loaded_id)
                 self.editor.current_tool = self.editor_previous_tool
+                self.editor.camera_setup.creating = False
                 self.reload_assets_section()
 
         if event.type == pygame.KEYDOWN:

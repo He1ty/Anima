@@ -543,7 +543,7 @@ class Menu:
                         # START NEW GAME
                         self.souls_collected_timer = 0
                         self.is_souls_collected = False
-                        self.game.level_id = 1
+                        self.game.level_id = self.game.level_manager.first_level_id
                         self.game.level_manager.load_level(self.game.level_id)
                         # Crucial: Tell the game which slot is currently active for future saves
                         self.game.current_slot = slots.slot_id

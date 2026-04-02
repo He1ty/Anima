@@ -195,7 +195,6 @@ def display_level_bg(game, map_id):
 
     if environment in game.assets:
         pygame.draw.rect(game.display, (0, 0, 0), game.display.get_rect())
-        print(game.assets[environment])
         game.assets[environment].update()
         game.display.blit(game.assets[environment].img(), (0, 0))
         fog_surface = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
