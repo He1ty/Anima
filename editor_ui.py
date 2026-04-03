@@ -508,6 +508,11 @@ class EditorLevelManager:
         self.map_data_reset()
 
     def load_level(self):
+        self.editor.playtest.level_id = self.editor.level_id
+        self.editor.playtest.level = f"{self.editor.level_id:03d}"
+        self.editor.playtest.tilemap = self.editor.tilemap.copy(self.editor.playtest)
+        self.editor.playtest.player = PhysicsPlayer(self.editor.playtest, self.editor.playtest.tilemap, self.editor.player_start, (16, 16))
+
         self.editor.playtest.levers = []
         self.editor.playtest.doors = []
         self.editor.playtest.spikes = []
@@ -536,6 +541,11 @@ class EditorLevelManager:
 
         for zone in self.editor.playtest.tilemap.camera_zones:
             self.editor.playtest.camera_zones.append([int(val) for val in zone.split(";")])
+
+        target_x = self.editor.playtest.player.rect().centerx - self.editor.playtest.display.get_width() / 2
+        target_y = self.editor.playtest.player.rect().centery - self.editor.playtest.display.get_height() / 2
+
+        self.editor.playtest.scroll = [target_x, target_y]
 
         # Reset VFX and interaction pools
         self.editor.playtest.cutscene = False
@@ -598,12 +608,10 @@ class PlayTest(Game):
         super().__init__()
         self.level_manager = editor_instance.level_manager
         self.tilemap = editor_instance.tilemap.copy(self)
-        self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
+        self.player = PhysicsPlayer(self, self.tilemap, editor_instance.player_start, (16, 16))
 
         # ── 5. Level & map data ────────────────────────────────────────────────
         self.level_id = editor_instance.level_id
-        self.environment = editor_instance.current_environment
-        self.environments = editor_instance.environments.copy()
         self.level = f"{self.level_id:03f}"
 
         self.state = self.PLAYING_STATE
@@ -662,7 +670,6 @@ class EditorSimulation:
         self.movement = [0, 0, 0, 0]
 
         self.current_tool = "Brush"
-        self.current_environment = "white_space"
         self.selecting_environment_mode = False
 
         # Undo/Redo
@@ -742,9 +749,10 @@ class EditorSimulation:
         self.holding_b = False
         self.holding_y = False
         self.holding_tab = False
+        self.shift = False
 
         self.moved_link = {"ongrid": {}, "offgrid": {}}
-        self.player_start = (0, 0)
+        self.player_start = (100, 0)
 
         self.infos_per_type_per_category = {
             "Levers": {
@@ -1113,10 +1121,8 @@ class EditorSimulation:
 
     def handle_map_editor(self, event):
 
-
         if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
             self.clicking = False
-
         if self.mpos_in_mainarea and not self.ui.in_group_editor:
             match self.current_tool:
                 case "Brush":
@@ -1150,15 +1156,17 @@ class EditorSimulation:
         if event.type == pygame.KEYDOWN:
             mods = pygame.key.get_mods()
             if mods & pygame.KMOD_CTRL:
-
                 if event.key == pygame.K_g:
+                    if self.shift:
+                        self.player_start = (self.tile_pos[0]*self.tile_size, self.tile_pos[1]*self.tile_size)
                     self.state = "PlayTest"
                     self.zoom = 1
                     self.playtest.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
                     self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
                     self.playtest.load_settings()
                     self.playtest.level_manager.load_level()
-                if event.key == pygame.K_w:
+
+                if event.key == pygame.K_z:
                     self.undo()
                 if event.key == pygame.K_y:
                     self.redo()
@@ -1185,8 +1193,14 @@ class EditorSimulation:
                         print(f"Current layer moved to layer {self.current_layer}")
                 if event.key == pygame.K_d:
                     self.selector.link = []
-            else:
 
+                if event.key == pygame.K_MINUS:
+                    self.zoom += 0.1
+                    self.zoom = max(0.2, min(self.zoom, 8))
+                if event.key == pygame.K_PLUS:
+                    self.zoom -= 0.1
+                    self.zoom = max(0.2, min(self.zoom, 8))
+            else:
                 if event.key == pygame.K_i and not self.holding_i:
                     self.holding_i = True
                 if event.key == pygame.K_DOWN:
@@ -1211,8 +1225,6 @@ class EditorSimulation:
                         self.tilemap.tilemap[self.current_layer] = {}
                 if event.key == pygame.K_TAB and not self.holding_tab:
                     self.holding_tab = True
-                if event.key == pygame.K_LSHIFT:
-                    self.shift = True
                 # Show camera setup zones
                 if event.key == pygame.K_b and not self.holding_b:
                     self.current_tool = "Brush"
@@ -1222,11 +1234,11 @@ class EditorSimulation:
                     self.current_tool = "Eraser"
                     self.rotation = 0
 
-                if event.key == pygame.K_q:
+                if event.scancode == 4:
                     self.movement[0] = True
                 if event.key == pygame.K_d:
                     self.movement[1] = True
-                if event.key == pygame.K_z:
+                if event.scancode == 26:
                     self.movement[2] = True
                 if event.key == pygame.K_s:
                     self.movement[3] = True
@@ -1243,46 +1255,7 @@ class EditorSimulation:
                     print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
                 if event.key == pygame.K_r:
                     self.rotation = (self.rotation + 1) % 4
-                # Unused key
-                if event.key == pygame.K_y and not self.holding_y:
-                    pass
-                # Shortcut for placing camera setup
-                if event.key == pygame.K_k:
-                    self.tilemap.tilemap[self.current_layer][
-                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
-                        'type': "camera_setup",
-                        'pos': self.tile_pos
-                    }
-                    tile = self.tilemap.tilemap[self.current_layer][
-                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
-                    tile_category = self.get_infos_tile_category(tile)
-                    self.setup_edit_window(tile_category, tile)
-                    self.save_action()
-                # Shortcut for placing transitions
-                if event.key == pygame.K_p:
-                    dest = "0"  # Default value
-                    self.tilemap.tilemap[self.current_layer][
-                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
-                        'type': "transition",
-                        'variant': self.tile_variant,
-                        'pos': self.tile_pos,
-                        'destination': dest,
-                        'dest_pos': [0, 0]}
-                    tile = self.tilemap.tilemap[self.current_layer][
-                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])]
-                    tile_category = self.get_infos_tile_category(tile)
-                    self.setup_edit_window(tile_category, tile)
-                    self.save_action()
-                # Shortcut for placing checkpoints
-                if event.key == pygame.K_j:
-                    self.tilemap.tilemap[self.current_layer][
-                        str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])] = {
-                        'type': "checkpoint",
-                        'variant': 0,
-                        'pos': self.tile_pos,
-                        'state': 0
-                    }
-                    self.save_action()
+
 
                 if event.key == pygame.K_DELETE:
                     self.selector.delete_link()
@@ -1294,18 +1267,16 @@ class EditorSimulation:
                 self.holding_b = False
             if event.key == pygame.K_i:
                 self.holding_i = False
-            if event.key == pygame.K_q:
+            if event.scancode == 4:
                 self.movement[0] = False
             if event.key == pygame.K_d:
                 self.movement[1] = False
-            if event.key == pygame.K_z:
+            if event.scancode == 26:
                 self.movement[2] = False
             if event.key == pygame.K_s:
                 self.movement[3] = False
             if event.key == pygame.K_TAB:
                 self.holding_tab = False
-            if event.key == pygame.K_LSHIFT:
-                self.shift = False
 
     def render_brush_tool(self):
         current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
@@ -1407,6 +1378,12 @@ class EditorSimulation:
                         if self.current_tool == "CameraSetup":
                             self.camera_setup.update()
 
+                        if event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_LSHIFT:
+                                self.shift = True
+                        if event.type == pygame.KEYUP:
+                            if event.key == pygame.K_LSHIFT:
+                                self.shift = False
                         if event.type == pygame.MOUSEBUTTONUP:
                             if event.button == 1:
                                 self.clicking = False
@@ -1418,9 +1395,6 @@ class EditorSimulation:
                                 # Simply comparing the dicts detects if anything changed
                                 if current_state != self.temp_snapshot:
                                     self.save_action()
-                        if event.type == pygame.KEYUP:
-                            if event.key == pygame.K_LSHIFT:
-                                self.shift = False
                         if event.type == pygame.VIDEORESIZE:
                             # Update screen dimensions
                             self.screen_width = max(event.w, 480)  # Minimum width

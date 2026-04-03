@@ -126,17 +126,18 @@ def load_particles():
 
     return tiles
 
-def load_backgrounds(b_info, map_id):
-    map_id = str(map_id)
+def load_backgrounds(b_info):
     tiles = {}
-    path = b_info[map_id]["path"]
+    for map_id in b_info:
+        path = b_info[map_id]["path"]
 
-    if b_info[map_id]["animated"]:
-        tiles[map_id] = Animation(load_animations(path), img_dur=b_info[map_id]["img_dur"], loop=b_info[map_id]["loop"])
-        return tiles
-    for bg in sorted(os.listdir(f"{BASE_IMG_PATH}{path}")):
-            tiles[map_id + "/" + bg[:-4]] = load_image(f"{path}/{bg}",
-                                                       (480, 300))
+        if b_info[map_id]["animated"]:
+            tiles[map_id] = Animation(load_animations(path), img_dur=b_info[map_id]["img_dur"], loop=b_info[map_id]["loop"])
+            continue
+        for bg in sorted(os.listdir(f"{BASE_IMG_PATH}{path}")):
+                tiles[map_id + "/" + bg[:-4]] = load_image(f"{path}/{bg}",
+                                                           (480, 300))
+
     return tiles
 
 def create_rect_alpha(color, rect, alpha):

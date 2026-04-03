@@ -8,7 +8,7 @@ from scripts.entities import deal_knockback, update_throwable_objects_action
 class PhysicsPlayer:
 
     # Constants for movement
-    GRAVITY_ACCELERATION = 0.42
+    GRAVITY_ACCELERATION = 0.35
     GRAVITY_DIRECTION = 1
     SPEED = 2.3
     DASH_SPEED = 6

@@ -192,7 +192,6 @@ def display_bg(surf, img, pos):
         
 def display_level_bg(game, map_id):
     environment = str(map_id)
-
     if environment in game.assets:
         pygame.draw.rect(game.display, (0, 0, 0), game.display.get_rect())
         game.assets[environment].update()

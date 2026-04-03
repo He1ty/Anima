@@ -24,11 +24,6 @@ class LevelManager:
         game.level_id = self.first_level_id
 
     def load_level(self, level_id):
-        self.game.assets = {}
-        self.game.assets.update(load_tiles())
-        self.game.assets.update(load_player())
-        self.game.assets.update(load_backgrounds(self.game.b_info, self.game.level_id))
-        self.game.assets.update(load_particles())
         self.game.tilemap.load(f"data/maps/{level_id:03d}.json")
         self.game.tilemap.tile_size = self.game.tile_size
 
@@ -61,18 +56,10 @@ class LevelManager:
         for zone in self.game.tilemap.camera_zones:
             self.game.camera_zones.append([int(val) for val in zone.split(";")])
 
-        '''target_x = (self.game.player.rect().centerx if self.game.camera_center is None else self.game.camera_center[
-            0]) - self.game.display.get_width() / 2
-        min_x, max_x = self.game.scroll_limits["x"]
-        max_x -= self.game.display.get_width()
-        target_x = max(min_x, min(target_x, max_x))
-        target_y = (self.game.player.rect().centery if self.game.camera_center is None else self.game.camera_center[
-            1]) - self.game.display.get_height() / 2
-        min_y, max_y = self.game.scroll_limits["y"]
-        max_y -= self.game.display.get_height()
-        target_y = max(min_y, min(target_y, max_y))
+        target_x = self.game.player.rect().centerx  - self.game.display.get_width() / 2
+        target_y = self.game.player.rect().centery  - self.game.display.get_height() / 2
 
-        self.game.scroll = [target_x, target_y]'''
+        self.game.scroll = [target_x, target_y]
 
         # Reset VFX and interaction pools
         self.game.cutscene = False
@@ -105,6 +92,7 @@ class Game:
         self.level_manager = LevelManager(self)
         self._init_display()
         self._init_assets()
+        self.tilemap = Tilemap(self, self.tile_size)
         self._init_sound()
         self._init_settings()
         self._init_runtime_state()
@@ -178,11 +166,9 @@ class Game:
             "2": {"animated": False, "path": f"environments/green_cave/images/backgrounds"},
         }
         self.assets = {}
-        self.assets.update(load_tiles())
         self.assets.update(load_player())
-        self.assets.update(load_backgrounds(self.b_info, self.level_id))
+        self.assets.update(load_backgrounds(self.b_info))
         self.assets.update(load_particles())
-        self.tilemap = Tilemap(self, self.tile_size)
 
     def _init_runtime_state(self):
         """Everything that resets on reload(). Single source of truth."""
