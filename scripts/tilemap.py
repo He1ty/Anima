@@ -131,7 +131,7 @@ class Tilemap:
         json.dump({'tilemap': self.tilemap,
                         'offgrid': self.offgrid_tiles,
                    'tag_groups': self.tag_groups,
-                   'selection_groups': self.links,
+                   'links': self.links,
                    'matches': self.matches,
                    "camera_zones": self.camera_zones,
                    'tilesize': self.tile_size},
