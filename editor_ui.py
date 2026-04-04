@@ -1,5 +1,7 @@
 import sys
 
+from PIL.Image import SupportsGetData
+
 from scripts.activators import Activator
 from scripts.camera import Camera
 from scripts.display import Shader
@@ -389,14 +391,24 @@ class Selector:
         for tile_loc in self.editor.selector.link:
             if group_id not in self.editor.tilemap.tag_groups:
                 self.editor.tilemap.tag_groups[group_id] = {"tiles": [],
-                                                            "tags": {}}
+                                                            "tags": {},
+                                                            "flags":{"AutoTile": True,
+                                                                     "Matched": False,
+                                                                     "Global": False}
+                                                            }
             self.editor.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.editor.current_layer])
 
     def remove_link_from_group(self, group_id:str):
         for tile_loc in self.editor.selector.link:
             if [tile_loc, self.editor.current_layer] in self.editor.tilemap.tag_groups[group_id]["tiles"]:
                 self.editor.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, self.editor.current_layer])
-            if self.editor.tilemap.tag_groups[group_id] == {"tiles": [], "tags": {}}:
+            if self.editor.tilemap.tag_groups[group_id] == {"tiles": [],
+                                                            "tags": {},
+                                                            "flags":{
+                                                                     "AutoTile": True,
+                                                                     "Matched": False,
+                                                                     "Global": False}
+                                                            }:
                 del self.editor.tilemap.tag_groups[group_id]
                 break
 
@@ -417,15 +429,17 @@ class Selector:
 
 
     def handle_selection_rect(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1 :
-                button_collision = False
-                for button in self.editor.ui.on_selection_buttons:
-                    if button.rect.collidepoint(self.editor.mpos):
-                        button_collision = True
-                if not self.rect_displayed and not button_collision:
-                    self.rect_displayed = True
-                    self.initial_pos = self.pos
+        if not(self.editor.ui.toolbar_rect.collidepoint(self.editor.mpos)
+                or self.editor.ui.assets_section_rect.collidepoint(self.editor.mpos)):
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1 :
+                    button_collision = False
+                    for button in self.editor.ui.on_selection_buttons:
+                        if button.rect.collidepoint(self.editor.mpos):
+                            button_collision = True
+                    if not self.rect_displayed and not button_collision:
+                        self.rect_displayed = True
+                        self.initial_pos = self.pos
 
         if event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
@@ -778,8 +792,38 @@ class EditorSimulation:
         tilemap_tmp = {}
         offgrid_tmp = {}
 
+        # 0. Check if no block will be overlapped
+        for loc in self.selector.link:
+            pos = [float(v) for v in loc.split(";")]
+            space = self.check_tile_space(loc)
+
+            if space == "tilemap":
+                cx = round(cx)
+                cy = round(cy)
+                dx = pos[0] - cx
+                dy = pos[1] - cy
+                new_x = int(cx - dy)
+                new_y = int(cy + dx)
+                new_loc = f"{new_x};{new_y}"
+                if new_loc in self.tilemap.tilemap[self.current_layer] and new_loc not in self.selector.link:
+                    print("Rotation blocked: collision on grid.")
+                    return
+
+            elif space == "offgrid":
+                pcx = cx
+                pcy = cy
+                dx = pos[0] - pcx
+                dy = pos[1] - pcy
+                new_x = pcx - dy
+                new_y = pcy + dx
+                new_loc = f"{new_x};{new_y}"
+                if new_loc in self.tilemap.offgrid_tiles[self.current_layer] and new_loc not in self.selector.link:
+                    print("Rotation blocked: collision off grid.")
+                    return
+
         # 1. Pull all tiles out
         for loc in self.selector.link:
+
             space = self.check_tile_space(loc)
             if space == "tilemap":
                 tilemap_tmp[loc] = self.tilemap.tilemap[self.current_layer].pop(loc)
@@ -1258,7 +1302,7 @@ class EditorSimulation:
 
         if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
             self.clicking = False
-        if self.mpos_in_mainarea and not self.ui.in_group_editor:
+        if self.mpos_in_mainarea and not self.ui.in_group_selector :
             match self.current_tool:
                 case "Brush":
                     self.handle_brush_tool()
@@ -1394,7 +1438,7 @@ class EditorSimulation:
                 if event.key == pygame.K_c:
                     print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
                 if event.key == pygame.K_r:
-                    if self.selector.link:
+                    if self.selector.link and not self.clicking:
                         self._rotate_link_90()
                     else:
                         self.rotation = (self.rotation + 1) % 4
@@ -1585,7 +1629,7 @@ class UI:
 
         self.group_selector_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
         self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
-        self.in_group_editor = False
+        self.in_group_selector = False
         self.group_selector_buttons = []
         self.group_selector_labels = ["Next","Left","Right","Add"]
         self.group_selector_images = {"Next":load_image("ui/skull.png"),
@@ -1597,8 +1641,16 @@ class UI:
         self.group_list = {"common":[], "uncommon":[]}
         self.group_buttons_list = {"common":[], "uncommon":[]}
 
+        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.85, self.screen_height * 0.85)
+        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+        self.in_group_editor = False
+        self.group_editor_buttons = []
+        self.group_editor_labels = []
+        self.edited_group_id = 0
+
+
         self.tools_buttons = []
-        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Properties", "CameraSetup", "LevelSelector"]
+        self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Groups", "CameraSetup", "LevelSelector"]
         self.check_buttons = []
         self.check_buttons_labels = ["All_layers", "On_grid"]
         self.on_selection_buttons = []
@@ -1611,7 +1663,7 @@ class UI:
                                "LevelSelector": load_image("ui/level_selector.png"),
                                "On_grid": load_image("ui/ongrid.png"),
                                "All_layers": load_image("ui/skull.png"),
-                               "Properties" : load_image("ui/properties.png"),
+                               "Groups" : load_image("ui/properties.png"),
                                "Link": load_image("ui/link.png"),
                                "Unlink": load_image("ui/unlink.png"),
                                "Plus":load_image("ui/plus.png"),
@@ -2017,7 +2069,7 @@ class UI:
                 pass
             case "Selection" | "Move":
                 self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
-        if self.in_group_editor:
+        if self.in_group_selector:
             self.render_group_selector()
 
     def handle_ui_event(self, event):
@@ -2044,7 +2096,7 @@ class UI:
                 pass
             case "Selection"|"Move":
                 self.handle_on_selection_event(event)
-        if self.in_group_editor:
+        if self.in_group_selector:
             self.handle_group_selector_event(event)
 
     def handle_toolbar_event(self, event):
@@ -2130,7 +2182,7 @@ class UI:
                                 if set(group).issubset(set(self.editor.selector.link)):
                                     self.editor.selector.unlink_link(group)
                     case "Plus":
-                        self.in_group_editor = True
+                        self.in_group_selector = True
                         self.group_list = self.editor.selector.get_link_groups()
                     case "IgnoreLinks":
                         self.editor.ignore_links = True
@@ -2163,7 +2215,7 @@ class UI:
                     case "Right":
                         self.current_group_id += 1
                     case "Close":
-                        self.in_group_editor = False
+                        self.in_group_selector = False
                 button.activated = True
             elif event.type == pygame.MOUSEBUTTONUP or event.type == pygame.MOUSEMOTION and not button.is_selected(event,offset if button.label != "Close" else None):
                 if button.label == "Left" or button.label == "Right":
@@ -2177,9 +2229,6 @@ class UI:
                         if button.label in self.group_list[c]:
                             self.group_list[c].remove(button.label)
                             self.editor.selector.remove_link_from_group(button.label)
-
-
-
 
 
 if __name__ == "__main__":

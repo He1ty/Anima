@@ -452,6 +452,9 @@ class Tilemap:
                     else:
                         img.fill(mask, special_flags=BLEND_RGBA_MULT)
 
+                    img = pygame.transform.rotate(img, rotation * -90)
+                    img = pygame.transform.flip(img, flip_x, flip_y)
+
                     surf.blit(img,
                               (pos[0] - offset[0], pos[1] - offset[1]))
 
