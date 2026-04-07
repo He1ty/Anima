@@ -1,5 +1,11 @@
 import pygame
 import datetime
+# --- Configuration ---
+COLOR_BG = (30, 30, 30)
+COLOR_PARENT = (50, 80, 200)
+COLOR_CHILD = (200, 70, 70)
+COLOR_TEXT_BG = (200, 200, 200)
+COLOR_ACTIVE = (255, 255, 255)
 
 from scripts.utils import load_image, random_color
 class SimpleButton:
@@ -165,12 +171,12 @@ class IconButton(EditorButton):
 
     def is_clicked(self, event, offset=None):
         if not self.toggle:
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if offset is None:
-                    if event.button == 1 and self.rect.collidepoint(event.pos):
+                    if self.rect.collidepoint(event.pos):
                         self.hover = True
                 else:
-                    if event.button == 1 and self.rect.move(offset).collidepoint(event.pos):
+                    if self.rect.move(offset).collidepoint(event.pos):
                         self.hover = True
             if event.type == pygame.MOUSEMOTION and self.hover:
                 if offset is None:
@@ -245,6 +251,218 @@ class TextButton(EditorButton):
 
 
         screen.blit(self.text, self.text_rect)
+
+class ChildButton:
+    """ A child element. Closing it does NOT affect its brothers. """
+
+    def __init__(self, x, y,width, height,font):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.variable_input_rect = pygame.Rect(x + width, y, width * 5, height)
+        self.variable_text_input = ""
+        self.value_input_rect = pygame.Rect(self.variable_input_rect.right + 20, y, width * 5, height)
+        self.value_text_input = ""
+        self.variable_active = False
+        self.value_active = False
+        self.font = font
+        self.is_expanded = False
+
+    def handle_event(self, event,offset=None):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if offset:
+                if self.variable_input_rect.move(offset).collidepoint(event.pos):
+                    self.variable_active = True
+                else:
+                    self.variable_active = False
+                if self.value_input_rect.move(offset).collidepoint(event.pos):
+                    self.value_active = True
+                else:
+                    self.value_active = False
+
+                if self.rect.move(offset).collidepoint(event.pos):
+                    self.is_expanded = not self.is_expanded
+                    self.value_text_input = ""
+                    self.variable_text_input = ""
+                    return "TOGGLE"
+            else:
+
+                if self.variable_input_rect.collidepoint(event.pos):
+                    self.variable_active = True
+                else:
+                    self.variable_active = False
+                if self.value_input_rect.collidepoint(event.pos):
+                    self.value_active = True
+                else:
+                    self.value_active = False
+
+                if self.rect.collidepoint(event.pos):
+                    self.is_expanded = not self.is_expanded
+                    self.value_text_input = ""
+                    self.variable_text_input = ""
+                    return "TOGGLE"
+
+
+        if (self.variable_active or self.value_active) and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                if self.variable_active:
+                    self.variable_text_input = self.variable_text_input[:-1]
+                else:
+                    self.value_text_input = self.value_text_input[:-1]
+            elif event.unicode.isprintable():
+                if self.variable_active:
+                    self.variable_text_input += event.unicode
+                else:
+                    self.value_text_input += event.unicode
+    def draw(self, surface, x, y):
+        # Update position dynamically based on brother's index
+        self.rect.topleft = (x, y)
+        self.variable_input_rect.topleft = (x + self.rect.width * 1.3, y)
+        self.value_input_rect.topleft = (self.variable_input_rect.right + self.rect.width//2,y)
+
+        pygame.draw.rect(surface, COLOR_CHILD, self.rect)
+        symbole = "-" if self.is_expanded else "+"
+        lbl = self.font.render(symbole, True, (255, 255, 255))
+        surface.blit(lbl, lbl.get_rect(center=self.rect.center))
+        if self.is_expanded:
+            color = (255, 255, 255) if self.variable_active else COLOR_TEXT_BG
+            color2 = (255, 255, 255) if self.value_active else COLOR_TEXT_BG
+
+
+            pygame.draw.rect(surface, color, self.variable_input_rect)
+            txt_surf = self.font.render(self.variable_text_input, True, (0, 0, 0))
+            surface.blit(txt_surf, (self.variable_input_rect.x + 5, self.variable_input_rect.y + 5))
+            pygame.draw.rect(surface, color2,self.value_input_rect)
+            txt_surf = self.font.render(self.value_text_input, True, (0, 0, 0))
+            surface.blit(txt_surf,(self.value_input_rect.x + 5, self.value_input_rect.y + 5))
+
+    def reload(self,new_width,new_height,font):
+        self.font = font
+        self.rect.width = new_width
+        self.rect.height = new_height
+        self.variable_input_rect = pygame.Rect(self.rect.x + new_width, self.rect.y, new_width * 5, new_height)
+        self.value_input_rect = pygame.Rect(self.variable_input_rect.right + 20, self.rect.y, new_width * 5, new_height)
+
+
+
+
+class ParentButton:
+    """
+    Parent node. Closing it only hides/removes its own children list.
+    Brothers (other parents) remain untouched.
+    """
+
+    def __init__(self, x, y,width,height,font):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.input_rect = pygame.Rect(x + width, y, width * 5, height)
+        self.is_expanded = False
+        self.active = False
+        self.text_input = ""
+        self.children = []  # List of ChildButton objects
+        self.next_Parent = None
+        self.font = font
+
+    def handle_event(self, event,offset=None):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if offset:
+                # Toggle expansion
+                if self.rect.move(offset).collidepoint(event.pos):
+                    self.is_expanded = not self.is_expanded
+                    if self.is_expanded:
+                        if len(self.children) == 0:
+                            self.add_child()
+                    else:
+                        self.text_input = ""
+                        for _ in self.children:
+                            self.children = self.children[1:]
+
+                    return "TOGGLE"
+
+                # Focus text input
+                if self.input_rect.move(offset).collidepoint(event.pos):
+                    self.active = True
+                else:
+                    self.active = False
+            else:
+                # Toggle expansion
+                if self.rect.collidepoint(event.pos):
+                    self.is_expanded = not self.is_expanded
+                    if self.is_expanded:
+                        if len(self.children) == 0:
+                            self.add_child()
+                    else:
+                        self.text_input = ""
+                        for _ in self.children:
+                           self.children = self.children[1:]
+
+                    return "TOGGLE"
+
+                # Focus text input
+                if self.input_rect.collidepoint(event.pos):
+                    self.active = True
+                else:
+                    self.active = False
+
+
+
+        # Keyboard input
+        if self.active and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self.text_input = self.text_input[:-1]
+            elif event.unicode.isprintable():
+                self.text_input += event.unicode
+
+        # Propagate to children
+        if self.is_expanded:
+            for index,child in enumerate(self.children):
+                result = child.handle_event(event,offset)
+                if result == "TOGGLE" and not child.is_expanded:
+                    if index != 0 or len(self.children) > 2:
+                        self.children.remove(child)
+                    elif len(self.children) <= 2:
+                        self.children.remove(self.children[index + 1])
+                if self.children[-1].is_expanded:
+                    self.add_child()
+
+    def add_child(self):
+        """ Adds a new child to the internal list """
+        # Position will be calculated during draw
+        self.children.append(ChildButton(0, 0,self.rect.width,self.rect.height,self.font))
+
+    def get_total_height(self):
+        """ Returns the total height occupied by the parent and its expanded children """
+        if not self.is_expanded:
+            return self.rect.height
+        return self.rect.height*1.3 + (len(self.children) * self.rect.height*1.3)
+
+    def draw(self, surface, x, y):
+        self.rect.topleft = (x, y)
+        self.input_rect.topleft = (x + self.rect.width*1.5, y)
+
+        # Draw Parent
+        pygame.draw.rect(surface, COLOR_PARENT, self.rect)
+        symbol = "-" if self.is_expanded else "+"
+        lbl = self.font.render(symbol, True, (255, 255, 255))
+        surface.blit(lbl, lbl.get_rect(center=self.rect.center))
+
+        if self.is_expanded:
+            color = (255, 255, 255) if self.active else COLOR_TEXT_BG
+            pygame.draw.rect(surface, color, self.input_rect)
+            txt_surf = self.font.render(self.text_input, True, (0, 0, 0))
+            surface.blit(txt_surf, (self.input_rect.x + 5, self.input_rect.y + 5))
+
+        # Draw Children
+        if self.is_expanded:
+            for i, child in enumerate(self.children):
+                child_y = y + self.rect.height*1.3 + (i * self.rect.height*1.3)
+                child.draw(surface, self.input_rect.x, child_y)
+
+    def reload(self,new_width,new_height,font):
+        self.font = font
+        self.rect.width = new_width
+        self.rect.height = new_height
+        self.input_rect = pygame.Rect(self.rect.x + new_width, self.rect.y, new_width * 5, new_height)
+        for child in self.children:
+            child.reload(new_width,new_height,font)
+
 
 
 
