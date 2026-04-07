@@ -476,7 +476,7 @@ class Game:
 
     def main_game_logic(self):
         raw_dt = self.clock.tick(60)
-        dt = min(raw_dt / (1000.0 / 60.0), 3.0)
+        dt = 1#min(raw_dt / (1000.0 / 60.0), 3.0)
 
         self._update_world(dt)
         self._render_world()

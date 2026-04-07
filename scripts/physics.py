@@ -27,7 +27,7 @@ class PhysicsPlayer:
         self.game = game
         self.pos = list(pos)  # [x, y]
         self.size = size
-        self.velocity = [0, 0]  # [vel_x, vel_y]
+        self.velocity: list[int|float] = [0, 0]  # [vel_x, vel_y]
         self.acceleration = [0.0, 0.0]
         self.show_hitbox = False
 
@@ -435,7 +435,7 @@ class PhysicsPlayer:
     def gravity(self, dt):
         """Handles gravity. Gives downwards momentum (capped at 6) if in the air, negates momentum if on the ground.
         Stops movement if no input is given."""
-        if not self.is_on_floor() and not self.dashtime_cur > 0 and not self.dash_startup_cur:
+        if not self.is_on_floor() and not self.dashtime_cur > 0 and self.dash_startup_cur <= 0:
             # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
             if self.can_walljump["sliding"] and not self.wall_jumping:
                 if self.dashtime_cur == 0:
@@ -500,82 +500,80 @@ class PhysicsPlayer:
 
             self.collide_with_passable_blocks = False
             # Jumping
-            if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
 
-                self.jumptime_cur = self.JUMPTIME
-                # Jouer le son de saut
-                self.jumping = True
-                self.game.play_se('jump')
+            if self.dash_startup_cur <= 0:
+                if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
 
-                # Jumps on dash
-                if self.dashtime_cur != 0 and not self.buffering_jump:
-                    self.dashtime_cur = 0
-                    self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
+                    self.jumptime_cur = self.JUMPTIME
+                    self.jump_multiplier = 1
+                    # Jouer le son de saut
+                    self.jumping = True
+                    self.game.play_se('jump')
 
-                    # Bottom Jump
-                    if self.dash_direction[0] == 0:
-                        pass
+                    # Jumps on dash
+                    if self.dashtime_cur != 0 and not self.buffering_jump:
+                        self.dashtime_cur = 0
+                        self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
 
-                    # Superjumps
-                    else:
-
-                        # Angular input superjump
-                        if self.dash_started_in_air:
-                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
-                            self.velocity[1] = 1.4 * self.velocity[
-                                1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-
-                        # On floor mono superjump
-                        elif self.dash_direction[1] == 0:
-                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 3
-                            self.velocity[1] = self.velocity[
-                                                   1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-
-                        # Double input superjump (Bunny Jump)
+                        # Bottom Jump
+                        if self.dash_direction[0] == 0:
+                            pass
+                        # Superjumps
                         else:
-                            self.velocity[0] = self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult * 2.5
-                            self.velocity[1] = 1.1 * self.velocity[
-                                1] / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-                        self.superjump = True
 
-            # Walljump
-            elif not self.holding_jump and \
-                    self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
-                "allowed"]:
-                self.jumptime_cur = self.JUMPTIME
-                self.dashtime_cur = 0
-                self.jumping = True
-                self.wall_jumping = True
-                self.holding_walljump = True
-                if self.can_walljump["sliding"] and self.can_walljump["count"] < self.max_walljumps:
+                            # Angular input superjump
+                            if self.dash_started_in_air:
+                                self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
+                                self.jump_multiplier = 1.4 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
-                    # Jouer le son de wall jump
-                    self.game.play_se('wall_jump')
+                            # On floor mono superjump
+                            elif self.dash_direction[1] == 0:
+                                self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
+                                self.jump_multiplier = 1 * self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
-                    if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
-                        self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
-                        self.velocity[1] *= 1
-                    elif self.can_walljump["wall"] != 0:  # Jumping away from the wall
+                            # Double input superjump (Bunny Jump)
+                            else:
+                                self.velocity[0] = 2.5 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
+                                self.jump_multiplier = 1.1 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+                            self.superjump = True
+
+                # Walljump
+                elif not self.holding_jump and \
+                        self.can_walljump["blocks_around"] and self.can_walljump["cooldown"] < 1 and self.can_walljump[
+                    "allowed"]:
+                    self.jumptime_cur = self.JUMPTIME
+                    self.jump_multiplier = 1
+                    self.dashtime_cur = 0
+                    self.jumping = True
+                    self.wall_jumping = True
+                    self.holding_walljump = True
+                    if self.can_walljump["sliding"] and self.can_walljump["count"] < self.max_walljumps:
+
+                        # Jouer le son de wall jump
+                        self.game.play_se('wall_jump')
+
+                        if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
+                            self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
+                            self.velocity[1] *= 1
+                        elif self.can_walljump["wall"] != 0:  # Jumping away from the wall
+                            self.wall_jump_logic_helper()
+
+                        self.can_walljump["count"] += 1
+                        self.can_walljump["sliding"] = False
+
+                    elif self.dashtime_cur == 0:
+
+                        # Jouer le son de wall jump
+                        self.game.play_se("wall_jump")
+                        self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
                         self.wall_jump_logic_helper()
 
-                    self.can_walljump["count"] += 1
-                    self.can_walljump["sliding"] = False
-
-                elif self.dashtime_cur == 0:
-
-                    # Jouer le son de wall jump
-                    self.game.play_se("wall_jump")
-                    self.can_walljump["cooldown"] = self.WALLJUMP_COOLDOWN
-                    self.wall_jump_logic_helper()
-
-            self.buffering_jump = True
+                self.buffering_jump = True
 
         if self.superjump:
             if self.air_time < 10:
                 self.dash_ghost_trail()
                 self.update_ghost_trail()
-
-        #self.holding_jump_from_ground = self.holding_jump and not self.holding_walljump
 
     def jump_momentum(self, dt):
         if self.jumptime_cur > 0:
@@ -588,7 +586,7 @@ class PhysicsPlayer:
 
     def jump_logic_helper(self):
         """Avoid code redundancy"""
-        self.velocity[1] = self.JUMP_VELOCITY * self.GRAVITY_DIRECTION
+        self.velocity[1] = self.jump_multiplier * self.JUMP_VELOCITY * self.GRAVITY_DIRECTION
         self.holding_jump = True
 
     def wall_jump_logic_helper(self):
@@ -607,14 +605,11 @@ class PhysicsPlayer:
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - dt, 0)
         if not self.anti_dash_buffer:
             if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur <= 0:  # and self.dash_direction != [0, -1]
-                if self.game.player_grabbing:
-                    update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
                     self.game.camera.screen_shake(10)
                     self.dashtime_cur = self.DASHTIME
                     self.stop_dash_momentum["y"], self.stop_dash_momentum["x"] = False, False
                     self.dash_amt -= 1
-
                     self.velocity = [0, 0]
 
                     # Jouer le son de dash
@@ -626,11 +621,6 @@ class PhysicsPlayer:
                 self.anti_dash_buffer = True
                 self.dash_cooldown_cur = self.DASH_COOLDOWN
 
-            if (self.dashtime_cur != 0 and self.get_direction("x") == -self.dash_direction[0] and self.get_direction(
-                    "x") != 0 or
-                    (self.get_direction("y") == -self.dash_direction[1] and self.get_direction("y") != 0)):
-                self.dashtime_cur = 0
-
         else:
             if self.dict_kb["key_dash"] == 0:
                 self.anti_dash_buffer = False
@@ -638,16 +628,17 @@ class PhysicsPlayer:
     def dash_momentum(self, dt):
         """Applies momentum from dash. Manage momentum when dash ends."""
         if self.dash_startup_cur <= 0:
-            if self.dashtime_cur == self.DASHTIME:
-                self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
-                if self.dash_direction == [0, 0]:
-                    if self.get_block_on["left"]:
-                        self.dash_direction[0] = 1
-                    elif self.get_block_on["right"]:
-                        self.dash_direction[0] = -1
-                    else:
-                        self.dash_direction[0] = self.last_direction
             if self.dashtime_cur > 0:
+                if self.dashtime_cur == self.DASHTIME:
+                    self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
+                    if self.dash_direction == [0, 0]:
+                        if self.get_block_on["left"]:
+                            self.dash_direction[0] = 1
+                        elif self.get_block_on["right"]:
+                            self.dash_direction[0] = -1
+                        else:
+                            self.dash_direction[0] = self.last_direction
+
                 self.dash_ghost_trail()
                 self.dashtime_cur = max(0, self.dashtime_cur - dt)
                 move_x = self.dash_direction[0]
@@ -668,6 +659,12 @@ class PhysicsPlayer:
                     self.velocity[1] = (abs(self.velocity[1]) / self.velocity[1]) * mult if self.velocity[1] != 0 else 0
                     if self.collision["left"] or self.collision["right"]:
                         self.velocity[0] = 0
+
+                # When dash is canceled with opposite direction
+                if (self.get_direction("x") == -self.dash_direction[0] and self.get_direction("x") != 0 or
+                        (self.get_direction("y") == -self.dash_direction[1] and self.get_direction("y") != 0)):
+                    self.dashtime_cur = 0
+
 
             self.update_ghost_trail()
 
@@ -909,7 +906,7 @@ class PhysicsPlayer:
         self.collision_check("x", dt)
 
         move_y = self.velocity[1] * dt
-        move_y = max(-7, min(move_y, 7))
+        #move_y = max(-7, min(move_y, 7))
 
         self.pos[1] += move_y
         self.collision_check("y", dt)
