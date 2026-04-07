@@ -1057,6 +1057,7 @@ class EditorSimulation:
             self.tile_pos = (int((self.mpos_scaled[0] + self.scroll[0]) // self.tilemap.tile_size),
                              int((self.mpos_scaled[1] + self.scroll[1]) // self.tilemap.tile_size))
         else:
+
             # Default values if out of bounds to prevent crash
             self.tile_pos = (0, 0)
             self.mpos_scaled = (0, 0)
