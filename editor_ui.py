@@ -4,7 +4,7 @@ from io import TextIOWrapper
 from scripts.game import Game
 from scripts.physics import PhysicsPlayer
 
-from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton
+from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton, ParentButton
 from scripts.text import load_game_font
 from scripts.utils import *
 from scripts.tilemap import Tilemap
@@ -1465,172 +1465,173 @@ class EditorSimulation:
 
         if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
             self.clicking = False
-        if self.mpos_in_mainarea and not self.ui.in_group_selector :
-            match self.current_tool:
-                case "Brush":
-                    self.handle_brush_tool()
-                case "Eraser":
-                    self.handle_eraser_tool()
-                case "Selection":
-                    self.handle_selection_tool(event)
-                case "Move":
-                    self.handle_move_tool(event)
-                case "CameraSetup":
-                    self.camera_setup.handle_event(event)
 
-        if event.type == pygame.MOUSEWHEEL:
-            mods = pygame.key.get_mods()
-            if mods & pygame.KMOD_CTRL:
-                self.zoom -= 0.1 * event.y
-                self.zoom = max(0.2, min(self.zoom, 8))
-            else:
-                self.tile_variant = (self.tile_variant + event.y) % len(
-                    self.assets[self.tile_type])
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button in (1, 3):  # Left or Right click
-                self.temp_snapshot = self._create_snapshot()
+        if not self.ui.in_group_editor and not self.ui.in_group_selector:
+            if self.mpos_in_mainarea:
+                match self.current_tool:
+                    case "Brush":
+                        self.handle_brush_tool()
+                    case "Eraser":
+                        self.handle_eraser_tool()
+                    case "Selection":
+                        self.handle_selection_tool(event)
+                    case "Move":
+                        self.handle_move_tool(event)
+                    case "CameraSetup":
+                        self.camera_setup.handle_event(event)
 
-            if event.button == 1:
-                self.clicking = True
-                self.mpos_scaled_onclick = (self.mpos_scaled[0] + self.scroll[0], self.mpos_scaled[1] + self.scroll[1])
-            if event.button == 3:
-                self.right_clicking = True
-        if event.type == pygame.KEYDOWN:
-            mods = pygame.key.get_mods()
-            if mods & pygame.KMOD_CTRL:
-                if event.key == pygame.K_g:
-                    if self.shift:
-                        self.shift = False
-                        self.player_start = (self.tile_pos[0]*self.tile_size, self.tile_pos[1]*self.tile_size)
-                    self.state = "PlayTest"
-                    self.zoom = 1
-                    self.playtest.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
-                    self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
-                    self.playtest.load_settings()
-                    self.playtest.level_manager.load_level()
-
-                if event.key == pygame.K_c:
-                    self.selector.copy_link()
-                if event.key == pygame.K_v:
-                    self.selector.paste_link()
-                    self._save_action()
-
-                if event.key == pygame.K_z:
-                    self._undo()
-                if event.key == pygame.K_y:
-                    self._redo()
-                if event.key == pygame.K_DOWN:
-                    if self.current_layer == "0":
-                        print("Layer 0, can't go down")
-                    else:
-                        self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[
-                            str(int(self.current_layer) - 1)] \
-                            = self.tilemap.tilemap[str(int(self.current_layer) - 1)], \
-                            self.tilemap.tilemap[self.current_layer]
-                        self.current_layer = str(int(self.current_layer) - 1)
-                        print(f"Current layer moved to layer {self.current_layer}")
-                if event.key == pygame.K_UP:
-                    if self.tilemap.tilemap[self.current_layer] == {} and str(
-                            int(self.current_layer) + 1) not in self.tilemap.tilemap:
-                        print("This layer is the last layer, can't go up")
-                    else:
-                        self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[
-                            str(int(self.current_layer) + 1)] \
-                            = self.tilemap.tilemap[str(int(self.current_layer) + 1)], \
-                            self.tilemap.tilemap[self.current_layer]
-                        self.current_layer = str(int(self.current_layer) + 1)
-                        print(f"Current layer moved to layer {self.current_layer}")
-                if event.key == pygame.K_d:
-                    self.selector.link = []
-
-                if event.key == pygame.K_MINUS:
-                    self.zoom += 0.1
+            if event.type == pygame.MOUSEWHEEL:
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_CTRL:
+                    self.zoom -= 0.1 * event.y
                     self.zoom = max(0.2, min(self.zoom, 8))
-                if event.key == pygame.K_PLUS:
-                    self.zoom -= 0.1
-                    self.zoom = max(0.2, min(self.zoom, 8))
+                else:
+                    self.tile_variant = (self.tile_variant + event.y) % len(
+                        self.assets[self.tile_type])
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button in (1, 3):  # Left or Right click
+                    self.temp_snapshot = self._create_snapshot()
 
-            else:
-                if event.key == pygame.K_i and not self.holding_i:
-                    self.holding_i = True
-                if event.key == pygame.K_DOWN:
-                    if self.current_layer == "0":
-                        print("Layer 0, can't make any new layer under this one")
-                    else:
-                        self.current_layer = str(int(self.current_layer) - 1)
-                        self.selector.link = []
-                        print(f"Current layer : {self.current_layer}")
-                    if self.current_layer not in self.tilemap.tilemap:
-                        self.tilemap.tilemap[self.current_layer] = {}
-                if event.key == pygame.K_UP:
-                    if int(self.current_layer) + 1 == len(self.tilemap.tilemap.keys()) and \
-                            self.tilemap.tilemap[self.current_layer] == {}:
-                        print("This layer is empty, can't make any new layer")
-                    else:
-                        self.current_layer = str(int(self.current_layer) + 1)
-                        self.selector.link = []
-                        print(f"Current layer : {self.current_layer}")
+                if event.button == 1:
+                    self.clicking = True
+                    self.mpos_scaled_onclick = (self.mpos_scaled[0] + self.scroll[0], self.mpos_scaled[1] + self.scroll[1])
+                if event.button == 3:
+                    self.right_clicking = True
+            if event.type == pygame.KEYDOWN:
+                mods = pygame.key.get_mods()
+                if mods & pygame.KMOD_CTRL:
+                    if event.key == pygame.K_g:
+                        if self.shift:
+                            self.shift = False
+                            self.player_start = (self.tile_pos[0]*self.tile_size, self.tile_pos[1]*self.tile_size)
+                        self.state = "PlayTest"
+                        self.zoom = 1
+                        self.playtest.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
+                        self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
+                        self.playtest.load_settings()
+                        self.playtest.level_manager.load_level()
 
-                    if self.current_layer not in self.tilemap.tilemap:
-                        self.tilemap.tilemap[self.current_layer] = {}
-                if event.key == pygame.K_TAB and not self.holding_tab:
-                    self.holding_tab = True
-                # Show camera setup zones
-                if event.key == pygame.K_b and not self.holding_b:
-                    self.current_tool = "Brush"
-                    self.rotation = 0
-                    self.holding_b = True
-                if event.key == pygame.K_e:
-                    self.current_tool = "Eraser"
-                    self.rotation = 0
-
-                if event.scancode == 4:
-                    self.movement[0] = True
-                if event.key == pygame.K_d:
-                    self.movement[1] = True
-                if event.scancode == 26:
-                    self.movement[2] = True
-                if event.key == pygame.K_s:
-                    self.movement[3] = True
-
-                if event.key == pygame.K_g:
-                    self.ongrid = not self.ongrid
-                if event.key == pygame.K_t:
-                    self.tilemap.autotile(self.current_layer)
-                    self._save_action()
-                if event.key == pygame.K_o:
-                    self.level_manager.full_save()
-
-                if event.key == pygame.K_c:
-                    print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
-                if event.key == pygame.K_r:
-                    if self.selector.link and not self.clicking:
-                        self.selector.rotate_link_90()
+                    if event.key == pygame.K_c:
+                        self.selector.copy_link()
+                    if event.key == pygame.K_v:
+                        self.selector.paste_link()
                         self._save_action()
-                    else:
-                        self.rotation = (self.rotation + 1) % 4
 
+                    if event.key == pygame.K_z:
+                        self._undo()
+                    if event.key == pygame.K_y:
+                        self._redo()
+                    if event.key == pygame.K_DOWN:
+                        if self.current_layer == "0":
+                            print("Layer 0, can't go down")
+                        else:
+                            self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[
+                                str(int(self.current_layer) - 1)] \
+                                = self.tilemap.tilemap[str(int(self.current_layer) - 1)], \
+                                self.tilemap.tilemap[self.current_layer]
+                            self.current_layer = str(int(self.current_layer) - 1)
+                            print(f"Current layer moved to layer {self.current_layer}")
+                    if event.key == pygame.K_UP:
+                        if self.tilemap.tilemap[self.current_layer] == {} and str(
+                                int(self.current_layer) + 1) not in self.tilemap.tilemap:
+                            print("This layer is the last layer, can't go up")
+                        else:
+                            self.tilemap.tilemap[self.current_layer], self.tilemap.tilemap[
+                                str(int(self.current_layer) + 1)] \
+                                = self.tilemap.tilemap[str(int(self.current_layer) + 1)], \
+                                self.tilemap.tilemap[self.current_layer]
+                            self.current_layer = str(int(self.current_layer) + 1)
+                            print(f"Current layer moved to layer {self.current_layer}")
+                    if event.key == pygame.K_d:
+                        self.selector.link = []
 
-                if event.key == pygame.K_DELETE:
-                    self.selector.delete_link()
+                    if event.key == pygame.K_MINUS:
+                        self.zoom += 0.1
+                        self.zoom = max(0.2, min(self.zoom, 8))
+                    if event.key == pygame.K_PLUS:
+                        self.zoom -= 0.1
+                        self.zoom = max(0.2, min(self.zoom, 8))
 
-        if event.type == pygame.KEYUP:
-            if event.key == pygame.K_y:
-                self.holding_y = False
-            if event.key == pygame.K_b:
-                self.holding_b = False
-            if event.key == pygame.K_i:
-                self.holding_i = False
-            if event.scancode == 4:
-                self.movement[0] = False
-            if event.key == pygame.K_d:
-                self.movement[1] = False
-            if event.scancode == 26:
-                self.movement[2] = False
-            if event.key == pygame.K_s:
-                self.movement[3] = False
-            if event.key == pygame.K_TAB:
-                self.holding_tab = False
+                else:
+                    if event.key == pygame.K_i and not self.holding_i:
+                        self.holding_i = True
+                    if event.key == pygame.K_DOWN:
+                        if self.current_layer == "0":
+                            print("Layer 0, can't make any new layer under this one")
+                        else:
+                            self.current_layer = str(int(self.current_layer) - 1)
+                            self.selector.link = []
+                            print(f"Current layer : {self.current_layer}")
+                        if self.current_layer not in self.tilemap.tilemap:
+                            self.tilemap.tilemap[self.current_layer] = {}
+                    if event.key == pygame.K_UP:
+                        if int(self.current_layer) + 1 == len(self.tilemap.tilemap.keys()) and \
+                                self.tilemap.tilemap[self.current_layer] == {}:
+                            print("This layer is empty, can't make any new layer")
+                        else:
+                            self.current_layer = str(int(self.current_layer) + 1)
+                            self.selector.link = []
+                            print(f"Current layer : {self.current_layer}")
+
+                        if self.current_layer not in self.tilemap.tilemap:
+                            self.tilemap.tilemap[self.current_layer] = {}
+                    if event.key == pygame.K_TAB and not self.holding_tab:
+                        self.holding_tab = True
+                    # Show camera setup zones
+                    if event.key == pygame.K_b and not self.holding_b:
+                        self.current_tool = "Brush"
+                        self.rotation = 0
+                        self.holding_b = True
+                    if event.key == pygame.K_e:
+                        self.current_tool = "Eraser"
+                        self.rotation = 0
+
+                    if event.scancode == 4:
+                        self.movement[0] = True
+                    if event.key == pygame.K_d:
+                        self.movement[1] = True
+                    if event.scancode == 26:
+                        self.movement[2] = True
+                    if event.key == pygame.K_s:
+                        self.movement[3] = True
+
+                    if event.key == pygame.K_g:
+                        self.ongrid = not self.ongrid
+                    if event.key == pygame.K_t:
+                        self.tilemap.autotile(self.current_layer)
+                        self._save_action()
+                    if event.key == pygame.K_o:
+                        self.level_manager.full_save()
+
+                    if event.key == pygame.K_c:
+                        print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
+                    if event.key == pygame.K_r:
+                        if self.selector.link and not self.clicking:
+                            self.selector.rotate_link_90()
+                            self._save_action()
+                        else:
+                            self.rotation = (self.rotation + 1) % 4
+
+                    if event.key == pygame.K_DELETE:
+                        self.selector.delete_link()
+
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_y:
+                    self.holding_y = False
+                if event.key == pygame.K_b:
+                    self.holding_b = False
+                if event.key == pygame.K_i:
+                    self.holding_i = False
+                if event.scancode == 4:
+                    self.movement[0] = False
+                if event.key == pygame.K_d:
+                    self.movement[1] = False
+                if event.scancode == 26:
+                    self.movement[2] = False
+                if event.key == pygame.K_s:
+                    self.movement[3] = False
+                if event.key == pygame.K_TAB:
+                    self.holding_tab = False
 
 
     def render_brush_tool(self):
@@ -1695,7 +1696,6 @@ class EditorSimulation:
         self.scroll[1] += (self.movement[3] - self.movement[2]) * 8
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
-
         self.tilemap.set_render_filter(self.selector.link, (152, 242, 255, 50))
 
         self.tilemap.render(self.display, offset=render_scroll,
@@ -1718,6 +1718,7 @@ class EditorSimulation:
 
         if changing_size:
             self.screen.blit(screenshot, (0, 0))
+
 
     def run(self):
         while True:
@@ -1799,22 +1800,14 @@ class UI:
         self.in_group_selector = False
         self.group_selector_buttons = []
         self.group_selector_labels = ["Next","Left","Right","Add"]
-        self.group_selector_images = {"Next":load_image("ui/skull.png"),
-                                      "Left":pygame.transform.flip(load_image("ui/next.png"), True, False),
-                                      "Right":load_image("ui/next.png"),
-                                      "Add":load_image("ui/skull.png"),
-                                      "Close":load_image("ui/skull.png")}
+        self.group_selector_images = {"Next":load_image("ui/next.png"),
+                                      "Left":pygame.transform.flip(load_image("ui/right.png"), True, False),
+                                      "Right":load_image("ui/right.png"),
+                                      "Add":load_image("ui/plus.png"),
+                                      "Close":load_image("ui/close.png")}
         self.current_group_id = 0
         self.group_list = {"common":[], "uncommon":[]}
         self.group_buttons_list = {"common":[], "uncommon":[]}
-
-        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.85, self.screen_height * 0.85)
-        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
-        self.in_group_editor = False
-        self.group_editor_buttons = []
-        self.group_editor_labels = []
-        self.edited_group_id = 0
-
 
         self.tools_buttons = []
         self.tools_buttons_labels = ["Brush", "Eraser", "Selection", "Move", "Groups", "CameraSetup", "LevelSelector"]
@@ -1860,21 +1853,21 @@ class UI:
         self.assets_section_buttons_height = self.assets_section_rect.width * (1 / 8)
         self.assets_section_buttons = []
         self.assets_section_buttons_labels = ["Previous", "Next"]
-        self.assets_section_buttons_images = {"Previous": pygame.transform.flip(load_image("ui/next.png"), True, False),
-                                              "Next": load_image("ui/next.png")}
+        self.assets_section_buttons_images = {"Previous": pygame.transform.flip(load_image("ui/right.png"), True, False),
+                                              "Next": load_image("ui/right.png")}
         self.assets_button_width = self.assets_section_rect.width * (1 / 10)
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
         self.assets_buttons = []
 
-        self.properties_section_default_width = self.screen_width * 20 / 96
-        self.properties_section_rect = pygame.Rect(
-            self.screen_width - self.toolbar_rect.width - self.properties_section_default_width,
-            self.screen_height - self.screen_width * 25 / 96,
-            self.screen_width * 20 / 96, self.screen_width * 25 / 96)
+        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
+        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
 
-        self.properties_section_buttons_width = self.properties_section_rect.width * (1 / 8)
-        self.properties_section_buttons_height = self.properties_section_rect.width * (1 / 8)
-        self.properties_section_buttons = []
+        self.group_editor_buttons_width = self.group_editor_rect.width * (1 / 8)
+        self.group_editor_buttons_height = self.group_editor_rect.width * (1 / 8)
+        self.group_editor_buttons = []
+        self.group_editor_buttons_parents = []
+        self.in_group_editor = False
+
 
 
         self.init_buttons()
@@ -1886,6 +1879,7 @@ class UI:
         self.check_buttons = []
         self.on_selection_buttons = []
         self.group_selector_buttons = []
+        self.group_editor_buttons = []
 
         button_x, button_y = self.toolbar_rect.width/2, self.toolbar_rect.width/2
         for label in self.tools_buttons_labels:
@@ -1947,23 +1941,48 @@ class UI:
                 button_y -= self.toolbar_buttons_height + 5*(self.PADDING/self.editor.SH)*self.screen_height
                 self.on_selection_buttons.append(button)
 
-        button_x,button_y = self.group_selector_rect.width/2.65, self.group_selector_rect.height/4
+        button_y = int(self.group_selector_rect.height/4)
         for label in self.group_selector_labels:
-            color = (42, 90, 57)
-            if label == "Next" or label == "Add" :
-                button = IconButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,
+            button = None
+            match label:
+                case "Next":
+                    color = (98, 171, 212)
+                    button_x = int(self.group_selector_rect.width/3)
+                    button = IconButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,
                            self.toolbar_buttons_height,color,resize=0.8)
-                button.activated = True
-            else:
-                if label == "Right":
-                    button_x += self.group_selector_rect.width/15 + 4*(self.PADDING/self.editor.SW)*self.screen_width
-
-                button = EditorButton(label,self.group_selector_images[label],(button_x, button_y),self.toolbar_buttons_width,self.toolbar_buttons_height,self.TOOLBAR_COLOR,resize=0.8)
-            button_x += self.toolbar_buttons_width + (self.PADDING/self.editor.SW)*self.screen_width
+                    button.activated = True
+                case "Left":
+                    button_x += 2*self.toolbar_buttons_width + (self.PADDING/self.editor.SW)*self.screen_width
+                    button = EditorButton(label, self.group_selector_images[label], (button_x, button_y),
+                                          self.toolbar_buttons_width, self.toolbar_buttons_height, self.TOOLBAR_COLOR,
+                                          resize=0.8)
+                case "Right":
+                    button_x += self.group_selector_rect.width/8+ 4*(self.PADDING/self.editor.SW)*self.screen_width
+                    button = EditorButton(label, self.group_selector_images[label], (button_x, button_y),
+                                          self.toolbar_buttons_width, self.toolbar_buttons_height, self.TOOLBAR_COLOR,
+                                          resize=0.8)
+                case "Add":
+                    color = (98, 171, 212)
+                    button_x += 2*self.toolbar_buttons_width + (self.PADDING/self.editor.SW)*self.screen_width
+                    button = IconButton(label, self.group_selector_images[label], (button_x, button_y),
+                               self.toolbar_buttons_width,
+                               self.toolbar_buttons_height, color, resize=0.8)
+                    button.activated = True
             self.group_selector_buttons.append(button)
-        close_button = IconButton("Close",self.group_selector_images["Close"],(self.group_selector_rect.x,self.group_selector_rect.y),
-                                            self.toolbar_buttons_width,self.toolbar_buttons_height,(200,50,50),resize=0.8)
-        self.group_selector_buttons.append(close_button)
+            close_button = IconButton("Close", self.group_selector_images["Close"],
+                                      (self.group_selector_rect.x, self.group_selector_rect.y),
+                                      self.toolbar_buttons_width, self.toolbar_buttons_height, (200, 50, 50),
+                                      resize=0.8)
+            self.group_selector_buttons.append(close_button)
+
+        if len(self.group_editor_buttons_parents) == 0:
+            button = ParentButton(self.group_editor_rect.x + 50, self.group_editor_rect.y + 50, self.screen_height / 20, self.screen_height / 20, self.buttons_font)
+            self.group_editor_buttons_parents.append(button)
+        else:
+            for parent in self.group_editor_buttons_parents:
+                parent.reload(self.screen_height/20,self.screen_height/20,self.buttons_font)
+
+
 
     def init_assets_buttons(self, categories):
         self.assets_buttons = []
@@ -2114,8 +2133,9 @@ class UI:
         self.render_group_button(overlay,big_rect)
 
         self.screen.blit(overlay, (self.group_selector_rect.x, self.group_selector_rect.y))
-
-        self.group_selector_buttons[-1].draw(self.screen)
+        close_button = self.group_selector_buttons[-1]
+        close_button.rect.center = (self.group_selector_rect.x,self.group_selector_rect.y)
+        close_button.draw(self.screen)
 
     def render_group_button(self,surface,rect):
         self.group_buttons_list = {"common":[], "uncommon":[]}
@@ -2165,6 +2185,22 @@ class UI:
             for button in self.group_buttons_list[c]:
                 button.draw(surface)
 
+    def render_group_editor(self):
+        # Update rect
+        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+
+        # Creating the Overlay where everything will be blit
+        overlay = pygame.Surface((self.group_editor_rect.width, self.group_editor_rect.height))
+        overlay.fill(self.TOOLBAR_COLOR)
+
+        current_y = 50
+        for p in self.group_editor_buttons_parents:
+            p.draw(overlay, p.rect.x, current_y)
+            current_y += p.get_total_height()
+        self.screen.blit(overlay, self.group_editor_rect)
+
+
+
     def check_closed(self):
         if self.closing:
             self.toolbar_rect.width = max(0, self.toolbar_rect.width - 5)
@@ -2202,6 +2238,9 @@ class UI:
         self.group_selector_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
         self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
 
+        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
+        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+
         self.init_buttons()
 
     def reload_assets_section_rect(self):
@@ -2232,8 +2271,8 @@ class UI:
                                    self.screen_height - self.assets_section_rect.height)
             case "LevelSelector":
                     self.render_level_selector()
-            case "Properties":
-                pass
+            case "Groups":
+                self.render_group_editor()
             case "Selection" | "Move":
                 self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
         if self.in_group_selector:
@@ -2259,12 +2298,16 @@ class UI:
                 self.handle_assets_section_event(event)
             case "LevelSelector":
                 self.handle_level_selector_event(event)
-            case "Properties":
-                pass
+            case "Groups":
+                self.handle_properties_section_event(event)
             case "Selection"|"Move":
                 self.handle_on_selection_event(event)
         if self.in_group_selector:
             self.handle_group_selector_event(event)
+        if self.editor.current_tool == "Groups":
+            self.in_group_editor = True
+        else:
+            self.in_group_editor = False
 
     def handle_toolbar_event(self, event):
         for button in self.tools_buttons:
@@ -2373,9 +2416,10 @@ class UI:
                             self.current_group_id += 1
                     case "Next":
                         new_id = 0
-                        while new_id in self.group_list["common"]:
+                        while str(new_id) in self.group_list["common"] or str(new_id) in self.group_list["uncommon"]:
                             new_id += 1
                         self.current_group_id = new_id
+                        print(new_id)
                     case "Left":
                         if self.current_group_id > 0:
                             self.current_group_id -= 1
@@ -2396,6 +2440,19 @@ class UI:
                         if button.label in self.group_list[c]:
                             self.group_list[c].remove(button.label)
                             self.editor.selector.remove_link_from_group(button.label)
+
+    def handle_properties_section_event(self,event):
+        for i,p in enumerate(self.group_editor_buttons_parents):
+            result = p.handle_event(event, self.group_editor_rect.topleft)
+            if result == "TOGGLE" and not p.is_expanded:
+                if len(self.group_editor_buttons_parents) > 2:
+                    self.group_editor_buttons_parents.remove(p)
+                else:
+                    self.group_editor_buttons_parents.remove(self.group_editor_buttons_parents[i + 1])
+        if self.group_editor_buttons_parents[-1].is_expanded:
+            new_y = self.group_editor_buttons_parents[-1].rect.y + self.group_editor_buttons_parents[-1].rect.width * 1.2
+            new_parent = ParentButton(self.group_editor_buttons_parents[-1].rect.x, new_y, self.screen_height / 20, self.screen_height / 20, self.buttons_font)
+            self.group_editor_buttons_parents.append(new_parent)
 
 
 if __name__ == "__main__":
