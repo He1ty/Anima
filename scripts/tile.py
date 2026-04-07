@@ -84,7 +84,14 @@ class TileManager:
         return value
 
     def unpack_tile(self, value):
-        """Extrait les propriétés d'un entier."""
+        """Returns:
+        tuple: A collection of extracted properties in the following order:
+            * tile_id (int): The unique identifier for the tile type.
+            * variant (int): The specific visual variation of the tile (0-15).
+            * rotation (int): Rotation index (0: 0°, 1: 90°, 2: 180°, 3: 270°).
+            * flip_h (bool): True if the tile is mirrored horizontally.
+            * flip_v (bool): True if the tile is mirrored vertically.
+    """
         tile_id = value & self.ID_MASK
         variant = (value >> self.VAR_OFFSET) & 0xF
         rotation = (value >> self.ROT_OFFSET) & 0x3

@@ -611,14 +611,6 @@ class PhysicsPlayer:
                     update_throwable_objects_action(self.game)
                 if self.dash_amt > 0:
                     self.game.camera.screen_shake(10)
-                    self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
-                    if self.dash_direction == [0, 0]:
-                        if self.get_block_on["left"]:
-                            self.dash_direction[0] = 1
-                        elif self.get_block_on["right"]:
-                            self.dash_direction[0] = -1
-                        else:
-                            self.dash_direction[0] = self.last_direction
                     self.dashtime_cur = self.DASHTIME
                     self.stop_dash_momentum["y"], self.stop_dash_momentum["x"] = False, False
                     self.dash_amt -= 1
@@ -645,7 +637,16 @@ class PhysicsPlayer:
 
     def dash_momentum(self, dt):
         """Applies momentum from dash. Manage momentum when dash ends."""
-        if self.dash_startup_cur == 0:
+        if self.dash_startup_cur <= 0:
+            if self.dashtime_cur == self.DASHTIME:
+                self.dash_direction = [self.get_direction("x"), self.get_direction("y")]
+                if self.dash_direction == [0, 0]:
+                    if self.get_block_on["left"]:
+                        self.dash_direction[0] = 1
+                    elif self.get_block_on["right"]:
+                        self.dash_direction[0] = -1
+                    else:
+                        self.dash_direction[0] = self.last_direction
             if self.dashtime_cur > 0:
                 self.dash_ghost_trail()
                 self.dashtime_cur = max(0, self.dashtime_cur - dt)

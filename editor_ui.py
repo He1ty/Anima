@@ -1,18 +1,9 @@
 import sys
 
-from PIL.Image import SupportsGetData
-
-from scripts.activators import Activator
-from scripts.camera import Camera
-from scripts.display import Shader
-from scripts.entities import DamageBlock, Throwable, Enemy, DistanceEnemy
+from io import TextIOWrapper
 from scripts.game import Game
 from scripts.physics import PhysicsPlayer
-from scripts.pickup import Pickup
-from scripts.saving import Save
-from scripts.sound import Sound
-from scripts.tile import TileManager
-from scripts.user_interface import Menu
+
 from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton
 from scripts.text import load_game_font
 from scripts.utils import *
@@ -258,6 +249,14 @@ class EditorCameraSetup:
                         self.editor.tilemap.camera_zones.remove(deleted_zone)
 
 class Selector:
+    BASE_GROUP = {"tiles": [],
+                  "tags": {},
+                  "flags":{
+                      "AutoTile": True,
+                      "Matched": False,
+                      "Global": False},
+                  "matches":{}
+                  }
     def __init__(self, editor_instance):
         self.editor = editor_instance
         self.pos = self.editor.mpos_scaled
@@ -290,7 +289,6 @@ class Selector:
                 bottom = pos[1]
 
         return [(right+left)/2, (top+bottom)/2]
-
 
     def draw(self, surface):
         if self.rect_displayed:
@@ -388,27 +386,213 @@ class Selector:
         self.editor.tilemap.links[current_layer].append(self.link.copy())
 
     def add_link_to_group(self, group_id:str):
-        for tile_loc in self.editor.selector.link:
+        for tile_loc in self.link:
             if group_id not in self.editor.tilemap.tag_groups:
-                self.editor.tilemap.tag_groups[group_id] = {"tiles": [],
-                                                            "tags": {},
-                                                            "flags":{"AutoTile": True,
-                                                                     "Matched": False,
-                                                                     "Global": False}
-                                                            }
+                self.editor.tilemap.tag_groups[group_id] = self.BASE_GROUP
             self.editor.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.editor.current_layer])
 
+    def rotate_link_90(self):
+        """Rotate selector.link 90° clockwise around its centroid, in-place."""
+        if not self.link:
+            return
+
+        pivot = self.get_link_pivot(self.link)
+        cx, cy = pivot  # these are always in tile units from get_link_pivot
+
+        tilemap_tmp = {}
+        offgrid_tmp = {}
+
+        # 0. Check if no block will be overlapped
+        for loc in self.link:
+            pos = [float(v) for v in loc.split(";")]
+            space = self.editor.check_tile_space(loc)
+
+            if space == "tilemap":
+                cx = round(cx)
+                cy = round(cy)
+                dx = pos[0] - cx
+                dy = pos[1] - cy
+                new_x = int(cx - dy)
+                new_y = int(cy + dx)
+                new_loc = f"{new_x};{new_y}"
+                if new_loc in self.editor.tilemap.tilemap[self.editor.current_layer] and new_loc not in self.link:
+                    print("Rotation blocked: collision on grid.")
+                    return
+
+            elif space == "offgrid":
+                pcx = cx
+                pcy = cy
+                dx = pos[0] - pcx
+                dy = pos[1] - pcy
+                new_x = pcx - dy
+                new_y = pcy + dx
+                new_loc = f"{new_x};{new_y}"
+                if new_loc in self.editor.tilemap.offgrid_tiles[self.editor.current_layer] and new_loc not in self.link:
+                    print("Rotation blocked: collision off grid.")
+                    return
+
+        # 1. Pull all tiles out
+        for loc in self.link:
+
+            space = self.editor.check_tile_space(loc)
+            if space == "tilemap":
+                tilemap_tmp[loc] = self.editor.tilemap.tilemap[self.editor.current_layer].pop(loc)
+            elif space == "offgrid":
+                offgrid_tmp[loc] = self.editor.tilemap.offgrid_tiles[self.editor.current_layer].pop(loc)
+
+        new_link = []
+        old_to_new = {}
+
+        # 2. Compute rotated positions and write back
+        for loc in self.link:
+            pos = [float(v) for v in loc.split(";")]
+
+            if loc in tilemap_tmp:
+                # Tile coords: rotate 90° clockwise around pivot
+                cx = round(cx)
+                cy = round(cy)
+                dx = pos[0] - cx
+                dy = pos[1] - cy
+                new_x = int(cx - dy)
+                new_y = int(cy + dx)
+                new_loc = f"{new_x};{new_y}"
+                packed = tilemap_tmp[loc]
+                tile_id, variant, rot, flip_h, flip_v = self.editor.tilemap.tile_manager.unpack_tile(packed)
+                new_rot = (rot + 1) % 4
+                self.editor.tilemap.tilemap[self.editor.current_layer][new_loc] = \
+                    self.editor.tilemap.tile_manager.pack_tile(tile_id, variant, new_rot, flip_h, flip_v)
+                self.editor.update_group_tile(loc, new_loc, self.editor.current_layer)
+
+            else:  # offgrid — pixel coords
+                # Pivot is in tile units, convert to pixels for the rotation
+                pcx = cx
+                pcy = cy
+                dx = pos[0] - pcx
+                dy = pos[1] - pcy
+                new_x = pcx - dy
+                new_y = pcy + dx
+                new_loc = f"{new_x};{new_y}"
+                packed = offgrid_tmp[loc]
+                tile_id, variant, rot, flip_h, flip_v = self.editor.tilemap.tile_manager.unpack_tile(packed)
+                new_rot = (rot + 1) % 4
+                if self.editor.current_layer not in self.editor.tilemap.offgrid_tiles:
+                    self.editor.tilemap.offgrid_tiles[self.editor.current_layer] = {}
+                self.editor.tilemap.offgrid_tiles[self.editor.current_layer][new_loc] = \
+                    self.editor.tilemap.tile_manager.pack_tile(tile_id, variant, new_rot, flip_h, flip_v)
+                self.editor.update_group_tile(loc, new_loc, self.editor.current_layer)
+
+            old_to_new[loc] = new_loc
+            new_link.append(new_loc)
+
+        # 3. Update links groups
+        if self.editor.current_layer in self.editor.tilemap.links:
+            updated_groups = []
+            for group in self.editor.tilemap.links[self.editor.current_layer]:
+                updated_groups.append([old_to_new.get(t, t) for t in group])
+            self.editor.tilemap.links[self.editor.current_layer] = updated_groups
+
+        self.link = new_link
+        self.link_pivot = self.get_link_pivot(new_link)
+
+    def copy_link(self):
+        """Copy the current selector.link into the clipboard."""
+        if not self.link:
+            return
+
+        clipboard_ongrid = {}
+        clipboard_offgrid = {}
+        pivot = self.get_link_pivot(self.link)
+
+        for loc in self.link:
+            space = self.editor.check_tile_space(loc)
+            if space == "tilemap":
+                clipboard_ongrid[loc] = self.editor.tilemap.tilemap[self.editor.current_layer][loc]
+            elif space == "offgrid":
+                clipboard_offgrid[loc] = self.editor.tilemap.offgrid_tiles[self.editor.current_layer][loc]
+
+        self.clipboard = {
+            "ongrid": copy.deepcopy(clipboard_ongrid),
+            "offgrid": copy.deepcopy(clipboard_offgrid),
+            "pivot": pivot,  # tile-unit centroid of the original group
+        }
+        print(f"Copied {len(self.link)} tiles to clipboard.")
+
+    def paste_link(self):
+        """Paste the clipboard at the current mouse position."""
+        if not self.clipboard:
+            return
+
+        pivot = self.clipboard["pivot"]  # [cx, cy] in tile units
+
+        if self.editor.ongrid:
+            # Target anchor = current tile_pos
+            target_cx = self.editor.tile_pos[0]
+            target_cy = self.editor.tile_pos[1]
+            dx = target_cx - pivot[0]
+            dy = target_cy - pivot[1]
+
+            new_locs = []
+            for loc, packed in self.clipboard["ongrid"].items():
+                pos = [float(v) for v in loc.split(";")]
+                new_x = int(pos[0] + dx)
+                new_y = int(pos[1] + dy)
+                new_loc = f"{new_x};{new_y}"
+                # Collision check
+                if new_loc in self.editor.tilemap.tilemap[self.editor.current_layer]:
+                    print("Paste blocked: collision on grid.")
+                    return
+                new_locs.append((new_loc, packed))
+
+            for loc, packed in self.clipboard["offgrid"].items():
+                pos = [float(v) for v in loc.split(";")]
+                new_x = int(pos[0] + dx * self.editor.tile_size)
+                new_y = int(pos[1] + dy * self.editor.tile_size)
+                new_loc = f"{new_x};{new_y}"
+                new_locs.append((new_loc, packed))
+
+            pasted_link = []
+            for new_loc, packed in new_locs:
+                self.editor.tilemap.tilemap[self.editor.current_layer][new_loc] = packed
+                pasted_link.append(new_loc)
+
+        else:
+            # Off-grid paste: anchor to pixel mouse position
+            target_px = self.editor.mpos_scaled[0] + self.editor.scroll[0]
+            target_py = self.editor.mpos_scaled[1] + self.editor.scroll[1]
+            pivot_px = pivot[0] * self.editor.tile_size
+            pivot_py = pivot[1] * self.editor.tile_size
+            dx_px = target_px - pivot_px
+            dy_px = target_py - pivot_py
+
+            pasted_link = []
+            if self.editor.current_layer not in self.editor.tilemap.offgrid_tiles:
+                self.editor.tilemap.offgrid_tiles[self.editor.current_layer] = {}
+
+            for loc, packed in self.clipboard["ongrid"].items():
+                pos = [float(v) for v in loc.split(";")]
+                new_x = pos[0] * self.editor.tile_size + dx_px
+                new_y = pos[1] * self.editor.tile_size + dy_px
+                new_loc = f"{new_x};{new_y}"
+                self.editor.tilemap.offgrid_tiles[self.editor.current_layer][new_loc] = packed
+                pasted_link.append(new_loc)
+
+            for loc, packed in self.clipboard["offgrid"].items():
+                pos = [float(v) for v in loc.split(";")]
+                new_x = pos[0] + dx_px
+                new_y = pos[1] + dy_px
+                new_loc = f"{new_x};{new_y}"
+                self.editor.tilemap.offgrid_tiles[self.editor.current_layer][new_loc] = packed
+                pasted_link.append(new_loc)
+
+        self.link = pasted_link
+        self.link_pivot = self.get_link_pivot(pasted_link)
+        print(f"Pasted {len(pasted_link)} tiles.")
+
     def remove_link_from_group(self, group_id:str):
-        for tile_loc in self.editor.selector.link:
+        for tile_loc in self.link:
             if [tile_loc, self.editor.current_layer] in self.editor.tilemap.tag_groups[group_id]["tiles"]:
                 self.editor.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, self.editor.current_layer])
-            if self.editor.tilemap.tag_groups[group_id] == {"tiles": [],
-                                                            "tags": {},
-                                                            "flags":{
-                                                                     "AutoTile": True,
-                                                                     "Matched": False,
-                                                                     "Global": False}
-                                                            }:
+            if self.editor.tilemap.tag_groups[group_id]["tiles"] == self.BASE_GROUP["tiles"] and self.editor.tilemap.tag_groups[group_id]["tags"] == self.BASE_GROUP["tags"]:
                 del self.editor.tilemap.tag_groups[group_id]
                 break
 
@@ -425,8 +609,6 @@ class Selector:
                 groups["uncommon"].append(group_id)
 
         return groups
-
-
 
     def handle_selection_rect(self, event):
         if not(self.editor.ui.toolbar_rect.collidepoint(self.editor.mpos)
@@ -504,6 +686,7 @@ class EditorLevelManager:
             if not os.path.exists('data/maps/'):
                 os.makedirs('data/maps/')
             with open(filepath, 'w') as f:
+                f: TextIOWrapper
                 json.dump({'tilemap': {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}},
                            'tilesize': 16, 'offgrid': {}}, f)
             self.editor.tilemap.load(filepath)
@@ -775,210 +958,11 @@ class EditorSimulation:
 
         self._save_action()
 
-    def _update_group_tile(self, old_loc, new_loc, layer):
+    def update_group_tile(self, old_loc, new_loc, layer):
         for group_id in self.tilemap.tag_groups:
-            if (old_loc, layer) in self.tilemap.tag_groups[group_id]["tiles"]:
-                self.tilemap.tag_groups[group_id]["tiles"].remove((old_loc, layer))
-                self.tilemap.tag_groups[group_id]["tiles"].append((new_loc, layer))
-
-    def _rotate_link_90(self):
-        """Rotate selector.link 90° clockwise around its centroid, in-place."""
-        if not self.selector.link:
-            return
-
-        pivot = self.selector.get_link_pivot(self.selector.link)
-        cx, cy = pivot  # these are always in tile units from get_link_pivot
-
-        tilemap_tmp = {}
-        offgrid_tmp = {}
-
-        # 0. Check if no block will be overlapped
-        for loc in self.selector.link:
-            pos = [float(v) for v in loc.split(";")]
-            space = self.check_tile_space(loc)
-
-            if space == "tilemap":
-                cx = round(cx)
-                cy = round(cy)
-                dx = pos[0] - cx
-                dy = pos[1] - cy
-                new_x = int(cx - dy)
-                new_y = int(cy + dx)
-                new_loc = f"{new_x};{new_y}"
-                if new_loc in self.tilemap.tilemap[self.current_layer] and new_loc not in self.selector.link:
-                    print("Rotation blocked: collision on grid.")
-                    return
-
-            elif space == "offgrid":
-                pcx = cx
-                pcy = cy
-                dx = pos[0] - pcx
-                dy = pos[1] - pcy
-                new_x = pcx - dy
-                new_y = pcy + dx
-                new_loc = f"{new_x};{new_y}"
-                if new_loc in self.tilemap.offgrid_tiles[self.current_layer] and new_loc not in self.selector.link:
-                    print("Rotation blocked: collision off grid.")
-                    return
-
-        # 1. Pull all tiles out
-        for loc in self.selector.link:
-
-            space = self.check_tile_space(loc)
-            if space == "tilemap":
-                tilemap_tmp[loc] = self.tilemap.tilemap[self.current_layer].pop(loc)
-            elif space == "offgrid":
-                offgrid_tmp[loc] = self.tilemap.offgrid_tiles[self.current_layer].pop(loc)
-
-        new_link = []
-        old_to_new = {}
-
-        # 2. Compute rotated positions and write back
-        for loc in self.selector.link:
-            pos = [float(v) for v in loc.split(";")]
-
-            if loc in tilemap_tmp:
-                # Tile coords: rotate 90° clockwise around pivot
-                cx = round(cx)
-                cy = round(cy)
-                dx = pos[0] - cx
-                dy = pos[1] - cy
-                new_x = int(cx - dy)
-                new_y = int(cy + dx)
-                new_loc = f"{new_x};{new_y}"
-                packed = tilemap_tmp[loc]
-                tile_id, variant, rot, flip_h, flip_v = self.tilemap.tile_manager.unpack_tile(packed)
-                new_rot = (rot + 1) % 4
-                self.tilemap.tilemap[self.current_layer][new_loc] = \
-                    self.tilemap.tile_manager.pack_tile(tile_id, variant, new_rot, flip_h, flip_v)
-                self._update_group_tile(loc, new_loc, self.current_layer)
-
-            else:  # offgrid — pixel coords
-                # Pivot is in tile units, convert to pixels for the rotation
-                pcx = cx
-                pcy = cy
-                dx = pos[0] - pcx
-                dy = pos[1] - pcy
-                new_x = pcx - dy
-                new_y = pcy + dx
-                new_loc = f"{new_x};{new_y}"
-                packed = offgrid_tmp[loc]
-                tile_id, variant, rot, flip_h, flip_v = self.tilemap.tile_manager.unpack_tile(packed)
-                new_rot = (rot + 1) % 4
-                if self.current_layer not in self.tilemap.offgrid_tiles:
-                    self.tilemap.offgrid_tiles[self.current_layer] = {}
-                self.tilemap.offgrid_tiles[self.current_layer][new_loc] = \
-                    self.tilemap.tile_manager.pack_tile(tile_id, variant, new_rot, flip_h, flip_v)
-                self._update_group_tile(loc, new_loc, self.current_layer)
-
-            old_to_new[loc] = new_loc
-            new_link.append(new_loc)
-
-        # 3. Update links groups
-        if self.current_layer in self.tilemap.links:
-            updated_groups = []
-            for group in self.tilemap.links[self.current_layer]:
-                updated_groups.append([old_to_new.get(t, t) for t in group])
-            self.tilemap.links[self.current_layer] = updated_groups
-
-        self.selector.link = new_link
-        self.selector.link_pivot = self.selector.get_link_pivot(new_link)
-        self._save_action()
-
-    def _copy_link(self):
-        """Copy the current selector.link into the clipboard."""
-        if not self.selector.link:
-            return
-
-        clipboard_ongrid = {}
-        clipboard_offgrid = {}
-        pivot = self.selector.get_link_pivot(self.selector.link)
-
-        for loc in self.selector.link:
-            space = self.check_tile_space(loc)
-            if space == "tilemap":
-                clipboard_ongrid[loc] = self.tilemap.tilemap[self.current_layer][loc]
-            elif space == "offgrid":
-                clipboard_offgrid[loc] = self.tilemap.offgrid_tiles[self.current_layer][loc]
-
-        self.clipboard = {
-            "ongrid": copy.deepcopy(clipboard_ongrid),
-            "offgrid": copy.deepcopy(clipboard_offgrid),
-            "pivot": pivot,  # tile-unit centroid of the original group
-        }
-        print(f"Copied {len(self.selector.link)} tiles to clipboard.")
-
-    def _paste_link(self):
-        """Paste the clipboard at the current mouse position."""
-        if not self.clipboard:
-            return
-
-        pivot = self.clipboard["pivot"]  # [cx, cy] in tile units
-
-        if self.ongrid:
-            # Target anchor = current tile_pos
-            target_cx = self.tile_pos[0]
-            target_cy = self.tile_pos[1]
-            dx = target_cx - pivot[0]
-            dy = target_cy - pivot[1]
-
-            new_locs = []
-            for loc, packed in self.clipboard["ongrid"].items():
-                pos = [float(v) for v in loc.split(";")]
-                new_x = int(pos[0] + dx)
-                new_y = int(pos[1] + dy)
-                new_loc = f"{new_x};{new_y}"
-                # Collision check
-                if new_loc in self.tilemap.tilemap[self.current_layer]:
-                    print("Paste blocked: collision on grid.")
-                    return
-                new_locs.append((new_loc, packed))
-
-            for loc, packed in self.clipboard["offgrid"].items():
-                pos = [float(v) for v in loc.split(";")]
-                new_x = int(pos[0] + dx * self.tile_size)
-                new_y = int(pos[1] + dy * self.tile_size)
-                new_loc = f"{new_x};{new_y}"
-                new_locs.append((new_loc, packed))
-
-            pasted_link = []
-            for new_loc, packed in new_locs:
-                self.tilemap.tilemap[self.current_layer][new_loc] = packed
-                pasted_link.append(new_loc)
-
-        else:
-            # Off-grid paste: anchor to pixel mouse position
-            target_px = self.mpos_scaled[0] + self.scroll[0]
-            target_py = self.mpos_scaled[1] + self.scroll[1]
-            pivot_px = pivot[0] * self.tile_size
-            pivot_py = pivot[1] * self.tile_size
-            dx_px = target_px - pivot_px
-            dy_px = target_py - pivot_py
-
-            pasted_link = []
-            if self.current_layer not in self.tilemap.offgrid_tiles:
-                self.tilemap.offgrid_tiles[self.current_layer] = {}
-
-            for loc, packed in self.clipboard["ongrid"].items():
-                pos = [float(v) for v in loc.split(";")]
-                new_x = pos[0] * self.tile_size + dx_px
-                new_y = pos[1] * self.tile_size + dy_px
-                new_loc = f"{new_x};{new_y}"
-                self.tilemap.offgrid_tiles[self.current_layer][new_loc] = packed
-                pasted_link.append(new_loc)
-
-            for loc, packed in self.clipboard["offgrid"].items():
-                pos = [float(v) for v in loc.split(";")]
-                new_x = pos[0] + dx_px
-                new_y = pos[1] + dy_px
-                new_loc = f"{new_x};{new_y}"
-                self.tilemap.offgrid_tiles[self.current_layer][new_loc] = packed
-                pasted_link.append(new_loc)
-
-        self.selector.link = pasted_link
-        self.selector.link_pivot = self.selector.get_link_pivot(pasted_link)
-        self._save_action()
-        print(f"Pasted {len(pasted_link)} tiles.")
+            if [old_loc, layer] in self.tilemap.tag_groups[group_id]["tiles"]:
+                self.tilemap.tag_groups[group_id]["tiles"].remove([old_loc, layer])
+                self.tilemap.tag_groups[group_id]["tiles"].append([new_loc, layer])
 
     def _create_snapshot(self):
         # Creates a deep copy of the current map state
@@ -989,23 +973,6 @@ class EditorSimulation:
             'selected_link': copy.deepcopy(self.selector.link),
             'links': copy.deepcopy(self.tilemap.links),
         }
-
-    def _save_action(self):
-        # 1. Create snapshot
-        snapshot = self._create_snapshot()
-
-        # 2. If we aren't at the end of history (because we undid), cut the future
-        if self.history_index < len(self.history) - 1:
-            self.history = self.history[:self.history_index + 1]
-
-        # 3. Add new state
-        self.history.append(snapshot)
-        self.history_index += 1
-
-        # 4. Limit history size
-        if len(self.history) > self.max_history:
-            self.history.pop(0)
-            self.history_index -= 1
 
     def _restore_snapshot(self, snapshot):
         # 1. Load data
@@ -1026,6 +993,23 @@ class EditorSimulation:
             self.history_index += 1
             self._restore_snapshot(self.history[self.history_index])
             print(f"Redo: Step {self.history_index}")
+
+    def _save_action(self):
+        # 1. Create snapshot
+        snapshot = self._create_snapshot()
+
+        # 2. If we aren't at the end of history (because we undid), cut the future
+        if self.history_index < len(self.history) - 1:
+            self.history = self.history[:self.history_index + 1]
+
+        # 3. Add new state
+        self.history.append(snapshot)
+        self.history_index += 1
+
+        # 4. Limit history size
+        if len(self.history) > self.max_history:
+            self.history.pop(0)
+            self.history_index -= 1
 
     def get_categories(self):
         self.current_category = 0
@@ -1098,6 +1082,182 @@ class EditorSimulation:
                 2 * int(2 * self.zoom))
         self.scroll[1] = pos[1] * 16 - self.screen_height * scale_y // (2 * int(2 * self.zoom))
 
+    #TODO: group removed from global_groups when global is unchecked
+    def create_tag(self, tag: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {}  # Handle missing file case
+
+        # 2. Modify the data in memory
+        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
+        tags[tag] = {}
+
+        # 3. Save the data back
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+    def delete_tag(self, tag: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {tag:{}}  # Handle missing file case
+
+        # 2. Modify the data in memory
+        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
+        del tags[tag]
+
+        # 3. Save the data back
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+    def set_info_value(self, group_id: str, tag: str, info: str, value: str):
+        self.tilemap.tag_groups[group_id]["tags"][tag][info] = value
+
+    def get_tag_and_infos(self, tag: str) -> dict | bool:
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+                if tag in tags:
+                    return tags[tag]
+                else:
+                    self.create_tag(tag)
+                    return {tag:{}}
+        else:
+            print(f"filepath: {filepath} not found")
+        return False
+
+    def add_tag_to_group(self, group_id: str, tag: dict):
+        self.tilemap.tag_groups[group_id]["tags"].update(tag)
+        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    def remove_tag_from_group(self, group_id: str, tag_name: str):
+        del self.tilemap.tag_groups[group_id]["tags"][tag_name]
+        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    def update_group_tags(self, group_id: str):
+        with open("data/tags.json", "r") as f:
+            tags = json.load(f)
+            for tag_name in self.tilemap.tag_groups[group_id]["tags"]:
+                tag = self.tilemap.tag_groups[group_id]["tags"][tag_name]
+                if tag.keys() != tags[tag_name].keys():
+                    tag.update({info:"" for info in tags[tag_name].keys() if info not in tag.keys()})
+        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    #Tu dois appeller les parents "tags" et les fils "infos"
+
+    '''WHEN PARENT PLUS IS PRESSED
+        add_tag_to_group(group_id, get_tag_and_infos(parent_label))'''
+
+    '''WHEN PARENT MINUS IS PRESSED
+        remove_tag_from_group(group_id, parent_label)'''
+
+    '''WHEN CHILD PLUS IS PRESSED
+        create_info(parent_label, child_label)'''
+
+    '''WHEN CHILD MINUS IS PRESSED
+        delete_info(parent_label, child_label)'''
+
+
+
+    def create_info(self, tag: str, info: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {}  # Handle missing file case
+
+        # 2. Modify the data in memory
+        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
+        tags[tag][info] = ""
+
+        # 3. Save the data back
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+    def delete_info(self, tag: str, info: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {tag:{info:""}}  # Handle missing file case
+
+        # 2. Modify the data in memory
+        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
+        del tags[tag][info]
+
+        # 3. Save the data back
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+        for group_id in self.tilemap.tag_groups:
+            self.update_group_tags(group_id)
+
+    def update_global_group(self, group_id):
+        # GLOBAL GROUPS SAVE
+        filepath = "data/global_groups.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                global_groups = json.load(f)
+        else:
+            global_groups = {}  # Handle missing file case
+
+
+        global_groups[group_id] = self.tilemap.tag_groups[group_id].copy()
+        global_groups[group_id]["tiles"] = []
+
+        # 3. Save the data back
+        with open(filepath, "w") as g:
+            g: TextIOWrapper
+            json.dump(global_groups, g, indent=4)  # indent=4 makes it human-readable
+
+    def remove_global_group(self, group_id):
+        # GLOBAL GROUPS SAVE
+        filepath = "data/global_groups.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                global_groups = json.load(f)
+        else:
+            global_groups = {}  # Handle missing file case
+
+        if group_id in global_groups:
+            del global_groups[group_id]
+
+        # 3. Save the data back
+        with open(filepath, "w") as g:
+            g: TextIOWrapper
+            json.dump(global_groups, g, indent=4)  # indent=4 makes it human-readable
+
+    def toggle_group_global(self, group_id):
+        self.tilemap.tag_groups[group_id]["flags"]["Global"] = not self.tilemap.tag_groups[group_id]["flags"]["Global"]
+        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+        else:
+            self.remove_global_group(group_id)
+
+
+
     def handle_brush_tool(self):
         self.selector.link = []
         self.moved_link = {"ongrid":{}, "offgrid":{}}
@@ -1117,11 +1277,10 @@ class EditorSimulation:
                 self.tilemap.offgrid_tiles[self.current_layer][tile_loc] = (
                     self.tilemap.tile_manager.pack_tile(t_id, self.tile_variant, self.rotation))
 
-
-
             if t_groups:
                 for group_id in t_groups:
-                    self.tilemap.tag_groups[group_id]["tiles"].append((tile_loc, self.current_layer))
+                    if [tile_loc, self.current_layer] not in self.tilemap.tag_groups[group_id]["tiles"]:
+                        self.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.current_layer])
 
     def handle_eraser_tool(self):
         self.selector.link = []
@@ -1152,6 +1311,10 @@ class EditorSimulation:
                 self.tilemap.links[self.current_layer].remove(tile_link)
                 tile_link.remove(tile_loc)
                 self.tilemap.links[self.current_layer].append(tile_link)
+
+            for group_id in self.tilemap.tag_groups:
+                if [tile_loc, self.current_layer] in self.tilemap.tag_groups[group_id]["tiles"]:
+                    self.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, self.current_layer])
 
     def handle_move_tool(self, event):
         if self.clicking:
@@ -1240,7 +1403,7 @@ class EditorSimulation:
                                     self.tilemap.tilemap[self.current_layer] = {}
 
                                 self.tilemap.tilemap[self.current_layer][new_loc] = tmp
-                                self._update_group_tile(tile_loc, new_loc, self.current_layer)
+                                self.update_group_tile(tile_loc, new_loc, self.current_layer)
 
                             if self.current_layer in self.tilemap.links:
                                 for link in self.tilemap.links[self.current_layer]:
@@ -1276,7 +1439,7 @@ class EditorSimulation:
                                 if self.current_layer not in self.tilemap.offgrid_tiles:
                                     self.tilemap.offgrid_tiles[self.current_layer] = {}
                                 self.tilemap.offgrid_tiles[self.current_layer][new_loc] = tmp
-                                self._update_group_tile(tile_loc, new_loc, self.current_layer)
+                                self.update_group_tile(tile_loc, new_loc, self.current_layer)
 
                             if self.current_layer in self.tilemap.links:
                                 for link in self.tilemap.links[self.current_layer]:
@@ -1337,6 +1500,7 @@ class EditorSimulation:
             if mods & pygame.KMOD_CTRL:
                 if event.key == pygame.K_g:
                     if self.shift:
+                        self.shift = False
                         self.player_start = (self.tile_pos[0]*self.tile_size, self.tile_pos[1]*self.tile_size)
                     self.state = "PlayTest"
                     self.zoom = 1
@@ -1346,9 +1510,10 @@ class EditorSimulation:
                     self.playtest.level_manager.load_level()
 
                 if event.key == pygame.K_c:
-                    self._copy_link()
+                    self.selector.copy_link()
                 if event.key == pygame.K_v:
-                    self._paste_link()
+                    self.selector.paste_link()
+                    self._save_action()
 
                 if event.key == pygame.K_z:
                     self._undo()
@@ -1384,6 +1549,7 @@ class EditorSimulation:
                 if event.key == pygame.K_PLUS:
                     self.zoom -= 0.1
                     self.zoom = max(0.2, min(self.zoom, 8))
+
             else:
                 if event.key == pygame.K_i and not self.holding_i:
                     self.holding_i = True
@@ -1439,7 +1605,8 @@ class EditorSimulation:
                     print((self.tile_pos[0] * 16, self.tile_pos[1] * 16))
                 if event.key == pygame.K_r:
                     if self.selector.link and not self.clicking:
-                        self._rotate_link_90()
+                        self.selector.rotate_link_90()
+                        self._save_action()
                     else:
                         self.rotation = (self.rotation + 1) % 4
 
@@ -1464,6 +1631,7 @@ class EditorSimulation:
                 self.movement[3] = False
             if event.key == pygame.K_TAB:
                 self.holding_tab = False
+
 
     def render_brush_tool(self):
         current_tile_img = self.assets[self.tile_type][self.tile_variant].copy()
@@ -1550,7 +1718,6 @@ class EditorSimulation:
 
         if changing_size:
             self.screen.blit(screenshot, (0, 0))
-
 
     def run(self):
         while True:

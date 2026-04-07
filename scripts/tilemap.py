@@ -1,3 +1,6 @@
+import os
+from io import TextIOWrapper
+
 import pygame
 
 import json
@@ -34,7 +37,6 @@ class Tilemap:
         self.offgrid_tiles = {}
         self.links = {}
         self.tag_groups = {}
-        self.matches = {}
         self.camera_zones = []
         self.show_collisions = False
         self.render_filters = {}
@@ -132,10 +134,10 @@ class Tilemap:
                         'offgrid': self.offgrid_tiles,
                    'tag_groups': self.tag_groups,
                    'links': self.links,
-                   'matches': self.matches,
                    "camera_zones": self.camera_zones,
                    'tilesize': self.tile_size},
                   f, indent=1)
+
         f.close()
 
     def convert_on_load(self, map_data):
@@ -161,22 +163,28 @@ class Tilemap:
         if "offgrid" in map_data:
             self.offgrid_tiles = map_data["offgrid"]
 
+        #Load Groups
         if "tag_groups" in map_data:
             self.tag_groups = map_data["tag_groups"]
 
+        #Update Groups with global groups
         g = open("data/global_groups.json", 'r')
         global_groups = json.load(g)
         for group_id, group_infos in global_groups.items():
-            if group_id not in self.tag_groups:
-                self.tag_groups[group_id] = group_infos
+            tmp_tiles = []
+            if group_id in self.tag_groups:
+                tmp_tiles = self.tag_groups[group_id]["tiles"]
+            self.tag_groups[group_id] = group_infos
+            self.tag_groups[group_id]["tiles"] = tmp_tiles
 
-        if "matches" in map_data:
-            self.matches = map_data["matches"]
+        #Update Matches
+        for tile_infos in self.tag_groups.values():
+            if "matches" in tile_infos:
+                for tile_type in tile_infos["matches"]:
+                    for group_id in tile_infos["matches"][tile_type]:
+                        tile_id = self.tile_manager.get_id(tile_type)
+                        self.tile_manager.tiles[tile_id].groups.append(group_id)
 
-        for group_id in self.matches:
-            for tile_type in self.matches[group_id]:
-                tile_id = self.tile_manager.get_id(tile_type)
-                self.tile_manager.tiles[tile_id].groups.append(group_id)
 
         if "links" in map_data:
             self.links = map_data['links']
@@ -265,7 +273,6 @@ class Tilemap:
         tilemap_copy.tilemap = copy.deepcopy(self.tilemap)
         tilemap_copy.offgrid_tiles = copy.deepcopy(self.offgrid_tiles)
         tilemap_copy.links = copy.deepcopy(self.links)
-        tilemap_copy.matches = copy.deepcopy(self.matches)
         tilemap_copy.camera_zones = copy.deepcopy(self.camera_zones)
         tilemap_copy.tag_groups = copy.deepcopy(self.tag_groups)
 
@@ -290,7 +297,7 @@ class Tilemap:
         tile_type = self.tile_manager.tiles[tile_id].type
         if tile_type in set(PASSABLE_TILES.keys()) and variant in PASSABLE_TILES[tile_type]:
             if not self.game.player.collide_with_passable_blocks:  # System in order to make collision with passable blocks more clean (bigger vertical collision offset)
-                if pos[1] + size[1] <= tile.pos[1] * self.tile_size:
+                if pos[1] + size[1] <= tile_pos[1] * self.tile_size:
                     self.game.player.collide_with_passable_blocks = True
             if gravity_dir == 1 and self.game.player.collide_with_passable_blocks:
                 u_rects.append(

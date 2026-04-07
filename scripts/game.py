@@ -191,6 +191,7 @@ class Game:
         self.scroll_limits = {}
         self.screenshake = 0
         self.scroll = [0.0, 0.0]
+        self.scroll_limits = {"x": [-5000, 5000], "y": [-5000, 5000]}
 
         # Player
         self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
@@ -331,7 +332,6 @@ class Game:
             if left <= self.player.pos[0] < right and top <= self.player.pos[1] < bottom:
                 self.scroll_limits = {"x": [left, right], "y": [top, bottom]}
                 return
-        self.scroll_limits = {"x": [-5000, 5000], "y" : [-5000, 5000]}
 
 
 
