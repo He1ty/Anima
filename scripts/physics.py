@@ -3,7 +3,8 @@ import math
 import time
 
 from scripts.sound import *
-from scripts.entities import deal_knockback, update_throwable_objects_action
+from scripts.entities import deal_knockback
+
 
 class PhysicsPlayer:
 
@@ -49,10 +50,11 @@ class PhysicsPlayer:
 
         # Vars related to constants
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
-        self.dash_end_movement = False
+        self.up_dash_end_movement = False
 
         #self.dash_cooldown = 0
 
+        self.dashing = False
         self.dash_amt = self.dash_max_amt
         self.dash_started_in_air = False
         self.tech_momentum_mult = 0
@@ -75,6 +77,7 @@ class PhysicsPlayer:
         self.stop_dash_momentum = {"y": False, "x": False}
         self.can_walljump = {"sliding": False, "wall": 0, "buffer": False, "timer": 0, "blocks_around": False,
                              "cooldown": 0, "allowed": True, "available": False, "count": 0}
+        self.wall_slide_acceleration_stabilized = False
         self.max_walljumps = 3
         self.force_movement_direction = {"r": [False, 0], "l": [False, 0]}
         self.force_movement = ""
@@ -111,7 +114,7 @@ class PhysicsPlayer:
         self.action = "idle"
         self.animation = self.game.assets['player/idle'].copy()
         self.collision = {'left': False, 'right': False, 'bottom': False, 'top': False}
-        self.get_block_on = {'left': False, 'right': False, 'top': False, 'bottom': False}
+        self.get_block_on: dict[str, bool] = {'left': False, 'right': False, 'top': False, 'bottom': False}
         self.air_time = 0
         self.disablePlayerInput = False
         self.collide_with_passable_blocks = True
@@ -198,21 +201,33 @@ class PhysicsPlayer:
                 self.is_stunned = False
                 self.knockback_dir = [0, 0]
 
-        if self.is_on_floor():
+        if self.is_on_floor() or self.can_walljump["sliding"]:
+            self.air_time = 0
             self.jumping = False
             self.wall_jumping = False
-            self.was_on_floor = True
             self.superjump = False
+            if self.dashtime_cur == 0:
+                self.dash_started_in_air = False
+
+        if self.is_on_floor():
+            self.was_on_floor = True
             # Resets dash amount and walljump count
             if self.dashtime_cur < 5 and self.dash_amt == 0:
                 self.dash_amt = self.dash_max_amt
 
             self.can_walljump["count"] = 0
 
-            if self.dashtime_cur == 0:
-                self.dash_started_in_air = False
         else:
             self.was_on_floor = False
+
+        if self.collision["right"] or self.collision["left"]:
+            if self.superjump:
+                self.velocity[0] = 0
+            self.wall_jumping = False
+            self.superjump = False
+
+        if int(self.velocity[1]) >= 0:
+            self.up_dash_end_movement = False
 
 
         rotation_speed = 4.5
@@ -229,7 +244,6 @@ class PhysicsPlayer:
 
             # Keep angle within 0-360 for cleanliness (optional)
             self.rotation_angle %= 360
-
         else:
             # Snap back to 0 when on the ground
             # You can also use a 'lerp' here if you want a smooth landing animation
@@ -248,8 +262,8 @@ class PhysicsPlayer:
             if direction != 0:
                 self.last_direction = direction
 
-            if (not self.dashtime_cur > 0 or self.can_walljump["blocks_around"]) and not self.prevent_walking:
-                self.walk(direction, dt)
+
+            self.walk(direction, dt)
 
             self.jump(dt)
             self.jump_momentum(dt)
@@ -257,6 +271,7 @@ class PhysicsPlayer:
             self.dash_momentum(dt)
 
             self.gravity(dt)
+            self.x_friction(dt)
             self.apply_momentum(dt)
 
             self.apply_animations()
@@ -293,26 +308,28 @@ class PhysicsPlayer:
 
     def walk(self, direction, dt, mult=1):
         """Changes x velocity with gradual acceleration and deceleration."""
-        target_speed = direction * self.SPEED * mult
 
-        # Acceleration factor: how fast we reach target speed
-        # Lower = more slippery/weighty, Higher = snappier
-        accel = 0.15 if self.is_on_floor() else 0.1
+        if (not self.dashtime_cur > 0 or self.can_walljump["blocks_around"]) and not self.prevent_walking:
+            target_speed = direction * self.SPEED * mult
 
-        # Deceleration in case speed in higher than self.SPEED (dash for example)
-        if abs(self.velocity[0]) > self.SPEED:
-            accel = 0.2
+            # Acceleration factor: how fast we reach target speed
+            # Lower = more slippery/weighty, Higher = snappier
+            accel = 0.15 if self.is_on_floor() else 0.1
 
-        if self.can_walljump["cooldown"] != 0:
-            accel = 0.001
+            # Deceleration in case speed in higher than self.SPEED (dash for example)
+            if abs(self.velocity[0]) > self.SPEED:
+                accel = 0.2
 
-        if direction != 0 or self.dash_direction[0] != 0:
-            # Gradually move current velocity toward target speed
-            self.velocity[0] += (target_speed - self.velocity[0]) * min(accel * dt, 1.0)
-        else:
-            # This handles the 'active' release of keys (handled in apply_momentum usually,
-            # but kept here for logic consistency)
-            pass
+            if self.can_walljump["cooldown"] != 0:
+                accel = 0.001
+
+            if direction != 0 or self.dash_direction[0] != 0:
+                # Gradually move current velocity toward target speed
+                self.velocity[0] += (target_speed - self.velocity[0]) * min(accel * dt, 1.0)
+            else:
+                # This handles the 'active' release of keys (handled in apply_momentum usually,
+                # but kept here for logic consistency)
+                pass
 
     def set_action(self, action):
         if action != self.action:
@@ -440,51 +457,72 @@ class PhysicsPlayer:
                     return self.rect().top == rect.bottom and self.velocity[1] <= 0
         return False
 
+
     def gravity(self, dt):
         """Handles gravity. Gives downwards momentum (capped at 6) if in the air, negates momentum if on the ground.
         Stops movement if no input is given."""
-        if not self.is_on_floor() and not self.dashtime_cur > 0 and self.dash_startup_cur <= 0:
-            # Reset vertical velocity if we just started sliding to prevent 'falling up' too fast
-            if self.can_walljump["sliding"] and not self.wall_jumping:
+
+        self.acceleration[1] = self.GRAVITY_ACCELERATION
+        if not self.dashtime_cur > 0 and self.dash_startup_cur <= 0:
+            self.y_friction()
+
+        if self.is_on_floor():
+            self.velocity[1] = 0
+
+        else:
+            if self.GRAVITY_DIRECTION == 1:
+                self.velocity[1] = min(6.0, self.velocity[1] + (self.acceleration[1] * self.GRAVITY_DIRECTION * dt))
+            else:
+                self.velocity[1] = max(-6.0, self.velocity[1] + (self.acceleration[1] * self.GRAVITY_DIRECTION * dt))
+
+    def y_friction(self):
+        if self.can_walljump["sliding"]:
+            if self.wall_slide_acceleration_stabilized:
+
+                if self.can_walljump["count"] < self.max_walljumps - 1:
+                    self.acceleration[1] = 0.05  # gravity acceleration while sliding
+
+                elif self.can_walljump["count"] == self.max_walljumps - 1:
+                    self.acceleration[
+                        1] = 0.008  # gravity acceleration while sliding (last jump)
+
+                else:
+                    self.acceleration[
+                        1] = self.GRAVITY_ACCELERATION  # gravity acceleration while sliding (no more jumps left, walljump fatigue)
+
+            else:
+                self.velocity[1] = max(0, self.velocity[1] - 2)
+                if self.velocity[1] == 0:
+                    self.wall_slide_acceleration_stabilized = True
+
+        else:
+            self.wall_slide_acceleration_stabilized = False
+
+    def x_friction(self, dt):
+        if not self.is_stunned:
+            if self.is_on_floor():
+
                 if self.dashtime_cur == 0:
                     self.dash_direction = [0, 0]
 
-                # Initial deceleration when player try to slide on a block with an initial vertical speed (usually falling speed)
-                if abs(self.acceleration[1]) == self.GRAVITY_ACCELERATION and self.can_walljump["count"] < self.max_walljumps:
-                    if self.GRAVITY_DIRECTION == 1:
-                        self.velocity[1] = max(0, self.velocity[1] - 2)
-                    else:
-                        self.velocity[1] = min(0, self.velocity[1] + 2)
-
-                # Sliding gravity accelerations
-                if self.velocity[1] == 0 or abs(self.acceleration[1]) != self.GRAVITY_ACCELERATION:
-                    if self.can_walljump["count"] < self.max_walljumps - 1:
-                        if self.velocity[1] == 0:
-                            self.acceleration[1] = 0.05 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding
-                    elif self.can_walljump["count"] == self.max_walljumps - 1:
-                        self.acceleration[
-                            1] = 0.008 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding (last jump)
-                    else:
-                        self.acceleration[
-                            1] = 0.3 * self.GRAVITY_DIRECTION  # gravity acceleration while sliding (no more jumps left, walljump fatigue)
+                # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)
+                if self.get_direction("x") == 0 and self.dashtime_cur == 0:
+                    self.velocity[0] = 0
             else:
-                self.acceleration[1] = self.GRAVITY_ACCELERATION * self.GRAVITY_DIRECTION  # Normal gravity acceleration
+                # Air resistance/deceleration when not pressing anything in air
+                if self.get_direction("x") == 0:
+                    # If player is colliding on a block
+                    if self.collision["right"] or self.collision["left"]:
+                        self.velocity[0] = 0
+                    # If player is slow-walking
+                    elif abs(self.velocity[0]) < 2 and not self.jumping:
+                        self.velocity[0] *= math.pow(0.1, dt)
+                    # Normal air resistance
+                    else:
+                        self.velocity[0] *= math.pow(0.98, dt)
+        else:
+            self.velocity[0] *= math.pow(0.95, dt)
 
-            # Cap terminal velocity based on direction
-            if self.GRAVITY_DIRECTION == 1:
-                self.velocity[1] = min(6.0, self.velocity[1] + (self.acceleration[1] * dt))
-            else:
-                self.velocity[1] = max(-6.0, self.velocity[1] + (self.acceleration[1] * dt))
-
-        elif self.is_on_floor():
-            # (for example when we jump, if player stops at 80.399999, we make sure that player coordinate is at 80 before setting vertical velocity to 0)
-            if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or \
-                    (self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
-                self.velocity[1] = 0
-
-            # Stop unintended horizontal movement if no input is given
-            if self.get_direction("x") == 0 and not self.is_stunned and self.dashtime_cur == 0:
-                self.velocity[0] = 0
 
     def disallow_movement(self, boolean):
         """allows to disable or re-enable player movement. Bool as parameter, True to disable, False to enable movement."""
@@ -492,10 +530,9 @@ class PhysicsPlayer:
 
     def jump(self, dt):
         """Handles player jump and super/hyperdash tech"""
-
-        if self.jumping and (self.collision["left"] or self.collision["right"]):
-            self.jumping = False
-            self.wall_jumping = False
+        if not (not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
+            "blocks_around"]):
+            self.can_walljump["sliding"] = False
 
         if self.dict_kb["key_jump"] == 0:
             self.holding_jump = False
@@ -509,7 +546,9 @@ class PhysicsPlayer:
             self.collide_with_passable_blocks = False
             # Jumping
 
+
             if self.dash_startup_cur <= 0:
+
                 if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
 
                     self.jumptime_cur = self.JUMPTIME
@@ -530,7 +569,7 @@ class PhysicsPlayer:
                         else:
 
                             # Angular input superjump
-                            if self.dash_started_in_air:
+                            if self.dash_direction[1] == -1:
                                 self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
                                 self.jump_multiplier = 1.4 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
@@ -539,10 +578,6 @@ class PhysicsPlayer:
                                 self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
                                 self.jump_multiplier = 1 * self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
 
-                            # Double input superjump (Bunny Jump)
-                            else:
-                                self.velocity[0] = 2.5 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
-                                self.jump_multiplier = 1.1 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
                             self.superjump = True
 
                 # Walljump
@@ -612,10 +647,12 @@ class PhysicsPlayer:
         self.dash_startup_cur = max(self.dash_startup_cur - dt, 0)
         self.dash_cooldown_cur = max(self.dash_cooldown_cur - dt, 0)
         if not self.anti_dash_buffer:
-            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur <= 0:  # and self.dash_direction != [0, -1]
+            if self.dict_kb["key_dash"] == 1 and self.dash_cooldown_cur <= 0:
                 if self.dash_amt > 0:
                     self.game.camera.screen_shake(10)
                     self.dashtime_cur = self.DASHTIME
+                    self.dash_startup_cur = self.DASH_STARTUP_FRAMES
+                    self.dash_cooldown_cur = self.DASH_COOLDOWN
                     self.stop_dash_momentum["y"], self.stop_dash_momentum["x"] = False, False
                     self.dash_amt -= 1
                     self.velocity = [0, 0]
@@ -625,9 +662,7 @@ class PhysicsPlayer:
                     # self.play_sound('dash', force=True)
                 if not self.is_on_floor():
                     self.dash_started_in_air = True
-                self.dash_startup_cur = self.DASH_STARTUP_FRAMES
                 self.anti_dash_buffer = True
-                self.dash_cooldown_cur = self.DASH_COOLDOWN
 
         else:
             if self.dict_kb["key_dash"] == 0:
@@ -655,14 +690,14 @@ class PhysicsPlayer:
                 # Calculate the magnitude (length) of the direction
                 magnitude = math.sqrt(move_x ** 2 + move_y ** 2)
 
-                if magnitude > 0:
+                if magnitude > 0.0:
                     # Divide by magnitude to "normalize" the vector to a length of 1
                     self.velocity[1] = (move_y / magnitude) * self.DASH_SPEED
                     if not self.velocity[1] or not self.can_walljump["blocks_around"]:
                         self.velocity[0] = (move_x / magnitude) * self.DASH_SPEED
 
                 if self.dashtime_cur <= 0:
-                    self.dash_end_movement = True
+                    self.up_dash_end_movement = True
                     mult = 2
                     self.velocity[1] = (abs(self.velocity[1]) / self.velocity[1]) * mult if self.velocity[1] != 0 else 0
                     if self.collision["left"] or self.collision["right"]:
@@ -688,6 +723,12 @@ class PhysicsPlayer:
 
         # Handle Vertical Collision First
         if axe == "y":
+
+            if self.velocity[1] > 0 or not self.get_block_on["bottom"]:
+                self.collision["bottom"] = False
+            if self.velocity[1] < 0 or not self.get_block_on["top"]:
+                self.collision["top"] = False
+
             backup_velo = self.velocity[1]
 
             self.can_walljump["buffer"] = False
@@ -695,6 +736,7 @@ class PhysicsPlayer:
 
             if self.can_walljump["timer"] <= 0:
                 self.can_walljump["sliding"] = False
+
             for rect in tilemap.physics_rects_under(self.rect(),
                                                     self.GRAVITY_DIRECTION) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
@@ -798,8 +840,14 @@ class PhysicsPlayer:
             entity_rect.y -= backup_velo
 
         if axe == "x":
+            if int(self.velocity[0]) > 0 or not self.get_block_on["left"] or self.velocity[0] == 0:
+                self.collision["left"] = False
+            if int(self.velocity[0]) < 0 or not self.get_block_on["right"] or self.velocity[0] == 0:
+                self.collision["right"] = False
+
             if self.can_walljump["cooldown"]:
                 self.can_walljump["cooldown"] = max(self.can_walljump["cooldown"] - dt, 0)
+
             for rect in tilemap.physics_rects_around(self.rect()) + self.game.doors_rects:
                 if entity_rect.colliderect(rect):
                     # --- HORIZONTAL CORNER CORRECTION ---
@@ -857,24 +905,37 @@ class PhysicsPlayer:
             self.get_block_on["left"] = bool(b_l)
             self.get_block_on["right"] = bool(b_r)
 
-    def collision_check_walljump_helper(self, axis):
+        self.wall_jump_blocks_around_check()
+        if self.get_block_on["left"] or self.get_block_on["right"]:
+            if self.get_block_on["right"] and (not self.get_block_on["left"] or self.collision["right"]):
+                self.collision_check_wall_jump_helper(1)
+
+            if self.get_block_on["left"] and (not self.get_block_on["right"] or self.collision["left"]):
+                self.collision_check_wall_jump_helper(-1)
+
+        else:
+            if self.can_walljump["wall"] != 0:
+                self.can_walljump["wall"] = 0
+
+    def collision_check_wall_jump_helper(self, axis):
         """Avoids redundancy"""
         # The condition checks if there is no buffer, if they are not on floor, if there are blocks around, if key corresponding to the axis is pressed and if count < max_walljumps
-        if (not self.can_walljump["buffer"] and not self.dash_end_movement and not self.holding_jump_from_ground and
+        if (not self.can_walljump["buffer"] and not self.up_dash_end_movement and not (self.holding_jump_from_ground and self.velocity[1] <= 0) and
                 not self.is_on_floor() and self.can_walljump["blocks_around"] and (
                 self.dict_kb["key_left"] if axis == -1 else self.dict_kb["key_right"])):
             if not self.can_walljump["sliding"]:
                 self.can_walljump["cooldown"] = self.FIRST_JUMP_WALLJUMP_COOLDOWN
             self.can_walljump["sliding"] = True
-            if self.can_walljump["wall"] != axis:
+            '''if self.can_walljump["wall"] != axis:
                 if self.get_block_on["left"] and self.get_block_on["right"]:
-                    self.acceleration[1] = self.GRAVITY_ACCELERATION
+                    self.acceleration[1] = self.GRAVITY_ACCELERATION'''
             self.can_walljump["wall"] = axis
             self.can_walljump["timer"] = 2
             self.jumptime_cur = 0
 
         elif self.can_walljump["wall"] != axis:
             self.can_walljump["wall"] = axis
+
 
     def wall_jump_blocks_around_check(self):
         vertical_offset = 2
@@ -900,72 +961,13 @@ class PhysicsPlayer:
 
     def apply_momentum(self, dt):
         """Applies velocity to the coords of the object. Slows down movement depending on environment"""
-        self.wall_jump_blocks_around_check()
-        if int(self.velocity[0]) > 0 or not self.get_block_on["left"] or self.velocity[0] == 0:
-            self.collision["left"] = False
-        if int(self.velocity[0]) < 0 or not self.get_block_on["right"] or self.velocity[0] == 0:
-            self.collision["right"] = False
-        if self.velocity[1] > 0 or not self.get_block_on["bottom"]:
-            self.collision["bottom"] = False
-        if self.velocity[1] < 0 or not self.get_block_on["top"]:
-            self.collision["top"] = False
 
         self.pos[0] += self.velocity[0] * dt
         self.collision_check("x", dt)
-
-        move_y = self.velocity[1] * dt
-        #move_y = max(-7, min(move_y, 7))
-
-        self.pos[1] += move_y
+        self.pos[1] += self.velocity[1] * dt
         self.collision_check("y", dt)
 
-        if abs(int(self.velocity[1])) == 0:
-            self.dash_end_movement = False
 
-        if self.collision["right"] or self.collision["left"]:
-            if self.superjump:
-                self.velocity[0] = 0
-            self.wall_jumping = False
-            self.superjump = False
-
-        if self.get_block_on["left"] or self.get_block_on["right"]:
-            if self.get_block_on["right"] and (not self.get_block_on["left"] or self.collision["right"]):
-                self.collision_check_walljump_helper(1)
-
-            if self.get_block_on["left"] and (not self.get_block_on["right"] or self.collision["left"]):
-                self.collision_check_walljump_helper(-1)
-
-        else:
-            if self.can_walljump["wall"] != 0:
-                self.can_walljump["wall"] = 0
-
-        if not (not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
-            "blocks_around"]):
-            self.can_walljump["sliding"] = False
-
-        if not self.is_stunned:
-            if self.is_on_floor():
-                self.air_time = 0
-
-                if self.dashtime_cur == 0:
-                    self.dash_direction = [0, 0]
-                # If no input, apply floor friction (0.85 = slide a bit, 0.1 = stop instantly)'
-                if self.get_direction("x") == 0 and self.dashtime_cur == 0:
-                    self.velocity[0] *= math.pow(0.8, dt)
-            else:
-                # Air resistance/deceleration when not pressing anything in air
-                if self.get_direction("x") == 0:
-                    # If player is colliding on a block
-                    if self.collision["right"] or self.collision["left"]:
-                        self.velocity[0] = 0
-                    # If player is slow-walking
-                    elif abs(self.velocity[0]) < 2 and not self.jumping:
-                        self.velocity[0] *= math.pow(0.1, dt)
-                    # Normal air resistance
-                    else:
-                        self.velocity[0] *= math.pow(0.98, dt)
-        else:
-            self.velocity[0] *= math.pow(0.95, dt)
 
     def get_direction(self, axis):
         """Gets the current direction the player is holding towards. Takes an axis as argument ('x' or 'y')

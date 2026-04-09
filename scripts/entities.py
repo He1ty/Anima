@@ -544,14 +544,15 @@ def deal_knockback(entity, target, strenght, knockback=None, stun_duration=0.5):
 
 def update_throwable_objects_action(game):
     # Handle interaction with throwable objects
-    for o in game.throwable:
+    '''for o in game.throwable:
         if not o.grabbed and not game.player_grabbing:
             if o.can_interact(game.player.rect()):
                 o.grab(game.player)
                 return
         elif o.grabbed:
             o.launch([game.player.last_direction, -1], 3.2)
-            return
+            return'''
+    return
 
 
 def attacking_update(game):

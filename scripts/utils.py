@@ -172,6 +172,9 @@ def random_color():
             random.randrange(0, 255, 1),
             random.randrange(0, 255, 1))
 
+def sign(n):
+    return n/abs(n)
+
 class Animation:
     def __init__(self, images, img_dur = 5, loop = -1):
         self.images = images
