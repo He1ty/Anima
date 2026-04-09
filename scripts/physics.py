@@ -69,6 +69,8 @@ class PhysicsPlayer:
         # Keyboard and movement exceptions utils
         self.dict_kb = {"key_right": 0, "key_left": 0, "key_up": 0, "key_down": 0, "key_jump": 0, "key_dash": 0,
                         "key_noclip": 0}  # Used for reference
+        self.last_pressed_x = 0
+        self.prev_kb_x = {"key_right": 0, "key_left": 0}
         self.anti_dash_buffer = False
         self.stop_dash_momentum = {"y": False, "x": False}
         self.can_walljump = {"sliding": False, "wall": 0, "buffer": False, "timer": 0, "blocks_around": False,
@@ -158,6 +160,12 @@ class PhysicsPlayer:
         """Input : tilemap (map), dict_kb (dict)
         output : sends new coords for the PC to move to in accordance with player input and stage data (tilemap)"""
         self.dict_kb = dict_kb
+        if dict_kb["key_right"] and not self.prev_kb_x["key_right"]:
+            self.last_pressed_x = 1
+        if dict_kb["key_left"] and not self.prev_kb_x["key_left"]:
+            self.last_pressed_x = -1
+        self.prev_kb_x["key_right"] = dict_kb["key_right"]
+        self.prev_kb_x["key_left"] = dict_kb["key_left"]
         # self.force_player_movement_direction()
         self.force_player_movement()
 
@@ -963,8 +971,12 @@ class PhysicsPlayer:
         """Gets the current direction the player is holding towards. Takes an axis as argument ('x' or 'y')
         returns : -1 if left/down, 1 if right/up. 0 if bad arguments"""
         if axis == "x":
+            right = self.dict_kb["key_right"]
+            left = self.dict_kb["key_left"]
+            if right and left:
+                return self.last_pressed_x
+            return right - left
 
-            return self.dict_kb["key_right"] - self.dict_kb["key_left"]
         elif axis == "y":
             return self.dict_kb["key_up"] - self.dict_kb["key_down"]
 
