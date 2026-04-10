@@ -828,8 +828,6 @@ class PlayTest(Game):
     def leave(self):
         self.editor.state = "MapEditor"
         self.state = self.PLAYING_STATE
-        self.editor.screen = self.screen
-        self.editor.screen_width, self.editor.screen_height = self.screen.get_size()
         self.editor.screen = pygame.display.set_mode((self.editor.screen_width, self.editor.screen_height), pygame.RESIZABLE)
         self.editor.ui.reload()
         self.music_sound_manager.stop('title_screen')
