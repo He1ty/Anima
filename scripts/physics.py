@@ -455,6 +455,18 @@ class PhysicsPlayer:
         Stops movement if no input is given."""
 
         self.acceleration[1] = self.GRAVITY_ACCELERATION
+
+        if self.jumping:
+
+            if self.holding_jump:
+                if (self.velocity[1] < 1 and self.GRAVITY_DIRECTION == 1 or
+                                      self.velocity[1] > 1 and self.GRAVITY_DIRECTION == -1):
+                    self.acceleration[1] /= 1.5
+
+            else:
+                self.acceleration[1] *= 1.5
+
+
         self.y_friction()
 
         if self.is_on_floor():
@@ -502,7 +514,7 @@ class PhysicsPlayer:
                 # Air resistance/deceleration when not pressing anything in air
                 if self.get_direction("x") == 0:
                     # If player is colliding on a block
-                    if self.collision["right"] or self.collision["left"]:
+                    if (self.collision["right"] and self.velocity[0] > 0) or (self.collision["left"] and self.velocity[0] < 0):
                         self.velocity[0] = 0
                     # If player is slow-walking
                     elif abs(self.velocity[0]) < 2 and not self.jumping:
@@ -589,6 +601,7 @@ class PhysicsPlayer:
     def jump_setup_helper(self):
         self.jumptime_cur = self.JUMPTIME
         self.jumping = True
+        self.jump_multiplier = 1
 
     def jump_momentum(self, dt):
         if self.jumptime_cur > 0:
@@ -630,9 +643,13 @@ class PhysicsPlayer:
             # Super Walljump
             if self.dashtime_cur:
                 self.super_walljump_logic_helper()
+                tmp = self.jump_multiplier
                 self.walljump_setup_helper()
+                self.jumptime_cur += 4
+                self.jump_multiplier = tmp
 
-            elif not self.climbing_walljump and self.get_direction("x") != self.can_walljump["wall"]:
+
+            elif not self.climbing_walljump and (self.can_walljump["count"] >= self.max_walljumps or self.get_direction("x") != self.can_walljump["wall"]):
                 #Leaving Walljump
                 self.walljump_setup_helper()
                 self.velocity[0] = -self.can_walljump["wall"] * horizontal_boost_walljump
@@ -673,7 +690,7 @@ class PhysicsPlayer:
 
     def walljump_collision_check(self):
         vertical_offset = 2
-        horizontal_offset = 3 + 8.5
+        horizontal_offset = 2 + 8.5
 
         check_right = (self.tilemap.solid_check((self.rect().centerx + horizontal_offset * 1, self.rect().y + vertical_offset),
                                                 transparent_check=False) or
@@ -710,11 +727,14 @@ class PhysicsPlayer:
         self.can_walljump["sliding"] = False
 
     def super_walljump_logic_helper(self):
+        max_y_boost = 1.3
+        min_y_boost = 1.1
+
 
         # Super walljump
         if self.dash_direction[1] == 1:
-            self.velocity[0] = 3 * -self.can_walljump["wall"]
-            self.jump_multiplier = 1 + 2.2/self.dashtime_cur
+            self.velocity[0] = 2.5 * -self.can_walljump["wall"] + (1.5/self.DASHTIME)*(self.dashtime_cur-self.DASHTIME)
+            self.jump_multiplier = min_y_boost -((max_y_boost-min_y_boost)/self.DASHTIME)*(self.dashtime_cur-self.DASHTIME)
             self.superjump = True
 
 
@@ -1038,9 +1058,9 @@ class PhysicsPlayer:
         # 1. Friction/Spring Physics: Move scale back to 1.0 like a spring
 
         # Stabilizes the spring effect in order to low its duration (so it doesn't spring during 80000 years)
-        if 1 <= self.visual_scale[0] <= 1.2:
+        if 0.95 <= self.visual_scale[0] <= 1.2:
             self.visual_scale[0] = 1
-        if 1 <= self.visual_scale[1] <= 1.2:
+        if 0.95 <= self.visual_scale[1] <= 1.2:
             self.visual_scale[1] = 1
 
         # Force = -k * x
@@ -1053,6 +1073,7 @@ class PhysicsPlayer:
 
         self.visual_scale[0] += self.spring_velocity[0] * dt
         self.visual_scale[1] += self.spring_velocity[1] * dt
+
 
         # 2. Impact Detection (The "Splash")
         # Landing on Floor
@@ -1150,8 +1171,8 @@ class PhysicsPlayer:
         img = self.animation.img().convert_alpha()
 
         # Apply current slime scaling
-        new_w = int(self.size[0] * self.visual_scale[0])
-        new_h = int(self.size[1] * self.visual_scale[1])
+        new_w = round(self.size[0] * self.visual_scale[0])
+        new_h = round(self.size[1] * self.visual_scale[1])
         scaled_img = pygame.transform.smoothscale(img, (new_w, new_h))
 
         # Calculate base position (centered horizontally, bottom-aligned)
