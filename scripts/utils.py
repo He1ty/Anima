@@ -173,6 +173,8 @@ def random_color():
             random.randrange(0, 255, 1))
 
 def sign(n):
+    if n == 0:
+        return 0
     return n/abs(n)
 
 class Animation:

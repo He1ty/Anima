@@ -11,11 +11,14 @@ class PhysicsPlayer:
     # Constants for movement
     GRAVITY_ACCELERATION = 0.35
     GRAVITY_DIRECTION = 1
+    AIR_RESISTANCE = 0.05
     SPEED = 2.3
     DASH_SPEED = 6
     JUMP_VELOCITY = -6
     DASHTIME = 10
     JUMPTIME = 8
+    MIN_JUMPTIME = 2
+    WALLJUMP_PUSHAWAY_TIME = 10
     DASH_COOLDOWN = 18
     DASH_STARTUP_FRAMES = 3
     COLLISION_DODGED_PIXELS = 4  # Number of pixels collision can dodge (ledge snapping/corner correction)
@@ -57,7 +60,7 @@ class PhysicsPlayer:
         self.tech_momentum_mult = 0
 
         self.superjump = False
-        self.jump_multiplier = 0
+        self.jump_multiplier = 1
 
         self.last_on_floor_velocity = [0, 0]
 
@@ -74,6 +77,9 @@ class PhysicsPlayer:
         self.stop_dash_momentum = {"y": False, "x": False}
         self.can_walljump = {"sliding": False, "wall": 0, "buffer": False, "timer": 0, "blocks_around": False,
                              "allowed": True, "count": 0}
+        self.climbing_walljump = False
+
+        self.walljump_push_away_cur = 0
         self.wall_slide_acceleration_stabilized = False
         self.max_walljumps = 3
         self.force_movement_direction = {"r": [False, 0], "l": [False, 0]}
@@ -197,8 +203,10 @@ class PhysicsPlayer:
 
         if self.is_on_floor() or self.can_walljump["sliding"]:
             self.air_time = 0
+            self.climbing_walljump = False
             self.jumping = False
             self.superjump = False
+            self.jump_multiplier = 1
             if self.dashtime_cur == 0:
                 self.dash_started_in_air = False
 
@@ -273,6 +281,7 @@ class PhysicsPlayer:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
 
+
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
         if self.force_movement_direction["r"][0] or self.force_movement_direction["l"][0]:
@@ -301,7 +310,10 @@ class PhysicsPlayer:
 
             # Acceleration factor: how fast we reach target speed
             # Lower = more slippery/weighty, Higher = snappier
-            accel = 0.15 if self.is_on_floor() else 0.1
+            accel = 0.15 if self.is_on_floor() else 0.15
+
+            if self.walljump_push_away_cur > 0:
+                accel = 0.001
 
             # Deceleration in case speed in higher than self.SPEED (dash for example)
             if abs(self.velocity[0]) > self.SPEED:
@@ -310,10 +322,6 @@ class PhysicsPlayer:
             if direction != 0 or self.dash_direction[0] != 0:
                 # Gradually move current velocity toward target speed
                 self.velocity[0] += (target_speed - self.velocity[0]) * min(accel * dt, 1.0)
-            else:
-                # This handles the 'active' release of keys (handled in apply_momentum usually,
-                # but kept here for logic consistency)
-                pass
 
     def set_action(self, action):
         if action != self.action:
@@ -447,12 +455,10 @@ class PhysicsPlayer:
         Stops movement if no input is given."""
 
         self.acceleration[1] = self.GRAVITY_ACCELERATION
-        if not self.dashtime_cur > 0 and self.dash_startup_cur <= 0:
-            self.y_friction()
+        self.y_friction()
 
         if self.is_on_floor():
             self.velocity[1] = 0
-
         else:
             if self.GRAVITY_DIRECTION == 1:
                 self.velocity[1] = min(6.0, self.velocity[1] + (self.acceleration[1] * self.GRAVITY_DIRECTION * dt))
@@ -460,27 +466,27 @@ class PhysicsPlayer:
                 self.velocity[1] = max(-6.0, self.velocity[1] + (self.acceleration[1] * self.GRAVITY_DIRECTION * dt))
 
     def y_friction(self):
-        if self.can_walljump["sliding"]:
-            if self.wall_slide_acceleration_stabilized:
+        if not self.dashtime_cur > 0 and self.dash_startup_cur <= 0:
+            if self.can_walljump["sliding"]:
+                if self.wall_slide_acceleration_stabilized:
 
-                if self.can_walljump["count"] < self.max_walljumps - 1:
-                    self.acceleration[1] = 0.05  # gravity acceleration while sliding
+                    if self.can_walljump["count"] < self.max_walljumps - 1:
+                        self.acceleration[1] = 0.05  # gravity acceleration while sliding
 
-                elif self.can_walljump["count"] == self.max_walljumps - 1:
-                    self.acceleration[
-                        1] = 0.008  # gravity acceleration while sliding (last jump)
+                    elif self.can_walljump["count"] == self.max_walljumps - 1:
+                        self.acceleration[
+                            1] = 0.008  # gravity acceleration while sliding (last jump)
+
+                    else:
+                        self.acceleration[
+                            1] = self.GRAVITY_ACCELERATION  # gravity acceleration while sliding (no more jumps left, walljump fatigue)
 
                 else:
-                    self.acceleration[
-                        1] = self.GRAVITY_ACCELERATION  # gravity acceleration while sliding (no more jumps left, walljump fatigue)
-
+                    self.velocity[1] = max(0, self.velocity[1] - 2)
+                    if self.velocity[1] == 0:
+                        self.wall_slide_acceleration_stabilized = True
             else:
-                self.velocity[1] = max(0, self.velocity[1] - 2)
-                if self.velocity[1] == 0:
-                    self.wall_slide_acceleration_stabilized = True
-
-        else:
-            self.wall_slide_acceleration_stabilized = False
+                self.wall_slide_acceleration_stabilized = False
 
     def x_friction(self, dt):
         if not self.is_stunned:
@@ -515,15 +521,22 @@ class PhysicsPlayer:
 
     def jump(self, dt):
         """Handles player jump and super/hyperdash tech"""
+        self.walljump_push_away_cur =  max(self.walljump_push_away_cur - dt, 0)
+
         if not (not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
             "blocks_around"]):
             self.can_walljump["sliding"] = False
 
         if self.dict_kb["key_jump"] == 0:
+            if self.jumptime_cur and self.holding_jump:
+                if self.JUMPTIME - self.jumptime_cur < self.MIN_JUMPTIME:
+                    self.jumptime_cur = self.MIN_JUMPTIME
+                else:
+                    self.jumptime_cur = dt
+
             self.holding_jump = False
             self.buffering_jump = False
-            if self.jumptime_cur:
-                self.jumptime_cur = dt
+
 
         if self.dict_kb["key_jump"] == 1:
 
@@ -531,7 +544,8 @@ class PhysicsPlayer:
 
             # Jumping
             if self.dash_startup_cur <= 0:
-                if self.is_on_floor() and not self.holding_jump:  # Jump on the ground
+                # Jump on the ground
+                if self.is_on_floor() and not self.holding_jump:
                     self.jump_setup_helper()
                     self.game.play_se('jump')
 
@@ -559,47 +573,13 @@ class PhysicsPlayer:
                             self.superjump = True
 
                 # Walljump
-                elif not self.holding_jump and \
-                        ((self.can_walljump["blocks_around"] and not self.buffering_jump) or self.can_walljump["sliding"])and self.can_walljump[
-                    "allowed"] and self.can_walljump["count"] < self.max_walljumps:
-
-                    self.jump_setup_helper()
-                    # Jumps on dash
-
-                    if self.can_walljump["sliding"]:
-                        # Jouer le son de wall jump
-                        self.game.play_se('wall_jump')
-
-                        if self.can_walljump["wall"] == self.get_direction("x"):  # Jumping into the wall direction
-                            self.velocity[0] = -self.can_walljump["wall"] * self.SPEED
-                            self.velocity[1] *= 1
-                        elif self.can_walljump["wall"] != 0:  # Jumping away from the wall
-                            self.wall_jump_logic_helper()
-
-                        self.can_walljump["count"] += 1
-
-                    elif not self.buffering_jump:
-                        self.air_time = 0
-                        # Jouer le son de wall jump
-                        self.game.play_se("wall_jump")
-
-                        self.wall_jump_logic_helper()
-
-
-                    if self.dashtime_cur != 0 and not self.buffering_jump:
-                        self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]),
-                                                      0.5)
-
-                        # Super walljump
-                        if self.dash_direction[1] == 1:
-                            self.velocity[0] = 2 * -self.can_walljump["wall"]
-                            self.jump_multiplier = 1.6 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-                            self.superjump = True
-
-
-                    self.dashtime_cur = 0
+                elif not self.holding_jump and self.can_walljump["allowed"]:
+                    self.walljump()
 
                 self.buffering_jump = True
+
+                if self.jumptime_cur:
+                    self.holding_jump = True
 
         if self.superjump:
             if self.air_time < 10:
@@ -607,77 +587,69 @@ class PhysicsPlayer:
                 self.update_ghost_trail()
 
     def jump_setup_helper(self):
-        self.jump_multiplier = 1
         self.jumptime_cur = self.JUMPTIME
         self.jumping = True
 
     def jump_momentum(self, dt):
         if self.jumptime_cur > 0:
             self.jumptime_cur = max(0, self.jumptime_cur - dt)
-            self.jump_logic_helper()
+            self.velocity[1] = self.jump_multiplier * self.JUMP_VELOCITY * self.GRAVITY_DIRECTION
             if self.jumptime_cur <= 0:
                 mult = 2
                 self.velocity[1] = (abs(self.velocity[1]) / self.velocity[1]) * mult if self.velocity[1] != 0 else 0
 
-    def jump_logic_helper(self):
-        """Avoid code redundancy"""
-        self.velocity[1] = self.jump_multiplier * self.JUMP_VELOCITY * self.GRAVITY_DIRECTION
-        self.holding_jump = True
 
-
-    def wall_jump_logic_helper(self):
-        h_jump_speed = 1.5
-        v_boost = 0.5
-        self.velocity[0] = 0
-        self.velocity[0] += -self.can_walljump["wall"] * h_jump_speed
+    def wall_jump_animation_helper(self):
         self.visual_scale = [0.6, 1.4]
         self.spring_velocity = [0.2, -0.1]  # Add some outward jiggle
-        self.last_direction = -self.last_direction
-        self.velocity[1] -= v_boost
 
-    def walljump(self, dt):
+    def walljump(self):
+        horizontal_boost_climbing_walljump = 2.5
+        horizontal_boost_walljump = 2
 
+        if self.can_walljump["sliding"] and self.can_walljump["count"] < self.max_walljumps:
+            self.walljump_setup_helper()
+            self.can_walljump["count"] += 1
 
-        """
-        if not holding jump AND walljump count < max walljump:
+            #Climbing WallJump
+            if self.get_direction("x") == self.can_walljump["wall"]:
+                self.climbing_walljump = True
+                self.velocity[0] = -self.can_walljump["wall"] * horizontal_boost_climbing_walljump
 
-            if sliding:
-                Setta il jumping
-                Resetta air time
-                dashing = FALSE
-                count += 1
-                if direction verso il wall:
-                    walljump verso wall (spintarella opposta)
-
-                else if direction opposta:
-                    walljump opposto (spintarella opposta un po' piu forte)
-
-
-
-            elif block around (collision considering offset) AND not buffering jump:
-                if dashing:
-                    SuperWallJump
-                    Resetta air time
-                    dashing = FALSE
-
-                else:
-                    Setta il jumping
-                    Resetta air time
-                    dashing = FALSE
-                    count += 1
-                    walljump opposto
-
+            #Leaving Walljump
             else:
-                PASS
+                self.velocity[0] = -self.can_walljump["wall"] * horizontal_boost_walljump
+                self.last_direction = -self.last_direction
+                self.walljump_push_away_cur = self.WALLJUMP_PUSHAWAY_TIME
 
+            self.wall_jump_animation_helper()
 
-        """
+        # This walljump is triggered considering the blocks_around offset
+        elif self.can_walljump["blocks_around"] and not self.buffering_jump:
+
+            # Super Walljump
+            if self.dashtime_cur:
+                self.super_walljump_logic_helper()
+                self.walljump_setup_helper()
+
+            elif not self.climbing_walljump and self.get_direction("x") != self.can_walljump["wall"]:
+                #Leaving Walljump
+                self.walljump_setup_helper()
+                self.velocity[0] = -self.can_walljump["wall"] * horizontal_boost_walljump
+                self.last_direction = -self.last_direction
+                self.walljump_push_away_cur = self.WALLJUMP_PUSHAWAY_TIME
+
+            self.wall_jump_animation_helper()
+
+        else:
+            pass
 
     def walljump_sliding_check(self, axis):
         # The condition checks if there is no buffer,
         # if they are not on floor,
         # if there are blocks around,
         # if key corresponding to the axis is pressed and
+
         conditions = (not self.can_walljump["buffer"]
                       and
                       not ((self.holding_jump
@@ -729,6 +701,21 @@ class PhysicsPlayer:
                 self.can_walljump["wall"] = -1
             else:
                 self.can_walljump["wall"] = 0
+
+    def walljump_setup_helper(self):
+        self.jump_setup_helper()
+        self.air_time = 0
+        self.dashtime_cur = 0
+        # Needed, since in next frame, u need to wait collisions to be checked in order to get your sliding value updated
+        self.can_walljump["sliding"] = False
+
+    def super_walljump_logic_helper(self):
+
+        # Super walljump
+        if self.dash_direction[1] == 1:
+            self.velocity[0] = 3 * -self.can_walljump["wall"]
+            self.jump_multiplier = 1 + 2.2/self.dashtime_cur
+            self.superjump = True
 
 
     def dash(self, dt):
