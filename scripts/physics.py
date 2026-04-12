@@ -36,7 +36,7 @@ class PhysicsPlayer:
 
         self.dash_startup_cur = 0
 
-        self.buffering_jump = False
+        self.jump_buffering_cur = 0
 
         self.dash_max_amt = 1
 
@@ -283,7 +283,6 @@ class PhysicsPlayer:
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
-
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -550,7 +549,7 @@ class PhysicsPlayer:
                     self.jumptime_cur = dt
 
             self.holding_jump = False
-            self.buffering_jump = False
+            self.jump_buffering_cur = 0
 
 
         if self.dict_kb["key_jump"] == 1:
@@ -565,7 +564,7 @@ class PhysicsPlayer:
                     self.game.play_se('jump')
 
                     # Jumps on dash
-                    if self.dashtime_cur != 0 and not self.buffering_jump:
+                    if self.dashtime_cur != 0 and self.jump_buffering_cur <= 3:
                         self.dashtime_cur = 0
                         self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
 
@@ -587,11 +586,16 @@ class PhysicsPlayer:
 
                             self.superjump = True
 
+                    elif self.jump_buffering_cur > 3:
+                        self.jumptime_cur = 0
+                        self.jumping = False
+                        self.holding_jump = True
+
                 # Walljump
                 elif not self.holding_jump and self.can_walljump["allowed"]:
                     self.walljump()
 
-                self.buffering_jump = True
+                self.jump_buffering_cur += dt
 
                 if self.jumptime_cur:
                     self.holding_jump = True
@@ -641,7 +645,7 @@ class PhysicsPlayer:
             self.wall_jump_animation_helper()
 
         # This walljump is triggered considering the blocks_around offset
-        elif self.can_walljump["blocks_around"] and not self.buffering_jump:
+        elif self.can_walljump["blocks_around"] and self.jump_buffering_cur <= 3:
 
             # Super Walljump
             if self.dashtime_cur:
@@ -1101,7 +1105,7 @@ class PhysicsPlayer:
     def update_wall_trails(self, dt):
         """Spawn and age wall trail segments when the player is sliding on a wall."""
         TRAIL_LIFETIME       = 50   # frames a segment lives
-        TRAIL_SPAWN_INTERVAL = 2    # continuous: one segment every N frames
+        TRAIL_SPAWN_INTERVAL = 1    # continuous: one segment every N frames
         TRAIL_WIDTH          = 5    # pixel width of each segment
         TRAIL_COLOR          = (86, 245, 211)
 
@@ -1112,25 +1116,31 @@ class PhysicsPlayer:
 
         is_wall_sliding = (
             self.can_walljump["sliding"]
-            and not self.is_on_floor()
             and (self.collision["left"] or self.collision["right"])
         )
 
-        if is_wall_sliding:
+        is_splatting = (self.dashtime_cur
+            and (self.collision["left"] or self.collision["right"]))
+
+
+        if is_wall_sliding or is_splatting:
+
             wall_side = "right" if self.collision["right"] else "left"
+
+
             seg_x = float(self.pos[0] + self.size[0]) if wall_side == "right" else float(self.pos[0])
 
             ts = self.tilemap.tile_size
 
             # Tile column the wall is in
             if wall_side == "right":
-                wall_tile_x = int((self.pos[0] + self.size[0]) // ts)
+                wall_tile_x = round((self.pos[0] + self.size[0]) // ts)
             else:
-                wall_tile_x = int((self.pos[0] - 1) // ts)
+                wall_tile_x = round((self.pos[0] - 1) // ts)
 
             # Player occupies these tile rows
-            player_tile_top    = int(self.pos[1] // ts)
-            player_tile_bottom = int((self.pos[1] + self.size[1] - 1) // ts)
+            player_tile_top    = round(self.pos[1] // ts)
+            player_tile_bottom = round((self.pos[1] + self.size[1] - 1) // ts)
 
             # Scan the wall column: find the topmost and bottommost solid tile
             # that overlaps with the player's vertical span
@@ -1158,7 +1168,7 @@ class PhysicsPlayer:
             if block_top is not None:
                 # Clamp trail to intersection of player and block span
                 trail_top    = max(int(self.pos[1]),                block_top)
-                trail_bottom = min(int(self.pos[1]) + self.size[1], block_bottom)
+                trail_bottom = min(int(self.pos[1] + self.size[1]), block_bottom)
             else:
                 # No block found in column — skip spawning entirely
                 trail_top    = 0
@@ -1188,6 +1198,7 @@ class PhysicsPlayer:
                     self._trail_timer = 0
                     mid_y = self.pos[1] + self.size[1] // 2
                     self.wall_trails.append(_seg(max(trail_top, min(trail_bottom, mid_y))))
+
         else:
             self._trail_timer = 0
 
