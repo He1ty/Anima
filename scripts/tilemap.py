@@ -393,9 +393,7 @@ class Tilemap:
                 if layer == "4":
                     pickups_render_and_update(self.game, offset=offset)
                     self.game.player.render(surf, offset=offset)
-                '''if layer in self.layers["fake_tiles"]:
-                    self.game.fake_tiles_render(offset=offset)
-                    continue'''
+                    self.game.player.render_wall_trails(surf, offset=offset)
 
             for x in range(offset[0] // self.tile_size, (offset[0] + surf.get_width()) // self.tile_size + 1):
                 for y in range(offset[1] // self.tile_size, (offset[1] + surf.get_height()) // self.tile_size + 1):

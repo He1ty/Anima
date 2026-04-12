@@ -1,6 +1,7 @@
 #Heavily upgraded basic godot physics code that I then converted to Python --Aymeric
 import math
 import time
+import random
 
 from scripts.sound import *
 from scripts.entities import deal_knockback
@@ -44,6 +45,7 @@ class PhysicsPlayer:
         self.spring_velocity = [0.0, 0.0]  # Internal "jiggle" velocity
         self.stiffness = 0.15  # How fast it snaps back
         self.damping = 0.8  # How much it wobbles (lower = more wobbly)
+        self.wall_trails = []
         self.last_velocity = [0, 0]  # To catch velocity right before collision
 
         self.walljump_fatigue_frame_count = 0
@@ -273,6 +275,7 @@ class PhysicsPlayer:
             self.apply_animations()
             self.apply_particle()
             self.update_slime_deformation(dt)
+            self.update_wall_trails(dt)
 
             # Mise à jour des sons
             self.update_sounds()
@@ -1094,6 +1097,131 @@ class PhysicsPlayer:
         # Capture velocity for the next frame's impact calculation
         self.last_velocity = list(self.velocity)
 
+
+    def update_wall_trails(self, dt):
+        """Spawn and age wall trail segments when the player is sliding on a wall."""
+        TRAIL_LIFETIME       = 50   # frames a segment lives
+        TRAIL_SPAWN_INTERVAL = 2    # continuous: one segment every N frames
+        TRAIL_WIDTH          = 5    # pixel width of each segment
+        TRAIL_COLOR          = (86, 245, 211)
+
+        if not hasattr(self, '_trail_timer'):
+            self._trail_timer = 0
+        if not hasattr(self, '_was_wall_sliding'):
+            self._was_wall_sliding = False
+
+        is_wall_sliding = (
+            self.can_walljump["sliding"]
+            and not self.is_on_floor()
+            and (self.collision["left"] or self.collision["right"])
+        )
+
+        if is_wall_sliding:
+            wall_side = "right" if self.collision["right"] else "left"
+            seg_x = float(self.pos[0] + self.size[0]) if wall_side == "right" else float(self.pos[0])
+
+            ts = self.tilemap.tile_size
+
+            # Tile column the wall is in
+            if wall_side == "right":
+                wall_tile_x = int((self.pos[0] + self.size[0]) // ts)
+            else:
+                wall_tile_x = int((self.pos[0] - 1) // ts)
+
+            # Player occupies these tile rows
+            player_tile_top    = int(self.pos[1] // ts)
+            player_tile_bottom = int((self.pos[1] + self.size[1] - 1) // ts)
+
+            # Scan the wall column: find the topmost and bottommost solid tile
+            # that overlaps with the player's vertical span
+            block_top    = None
+            block_bottom = None
+            for tile_row in range(player_tile_top, player_tile_bottom + 1):
+                loc = f"{wall_tile_x};{tile_row}"
+                is_solid = False
+                for layer in self.tilemap.tilemap:
+                    if loc in self.tilemap.tilemap[layer]:
+                        tile_id = self.tilemap.tile_manager.unpack_tile(
+                            self.tilemap.tilemap[layer][loc]
+                        )[0]
+                        tile_type = self.tilemap.tile_manager.tiles[tile_id].type
+                        from scripts.tilemap import PHYSICS_TILES
+                        if tile_type in PHYSICS_TILES:
+                            is_solid = True
+                            break
+                if is_solid:
+                    tile_top    = tile_row * ts
+                    tile_bottom = tile_top + ts
+                    if block_top    is None or tile_top    < block_top:    block_top    = tile_top
+                    if block_bottom is None or tile_bottom > block_bottom: block_bottom = tile_bottom
+
+            if block_top is not None:
+                # Clamp trail to intersection of player and block span
+                trail_top    = max(int(self.pos[1]),                block_top)
+                trail_bottom = min(int(self.pos[1]) + self.size[1], block_bottom)
+            else:
+                # No block found in column — skip spawning entirely
+                trail_top    = 0
+                trail_bottom = 0
+
+            def _seg(y):
+                return {
+                    "x": seg_x,
+                    "y": float(y),
+                    "wall": wall_side,
+                    "lifetime": TRAIL_LIFETIME,
+                    "max_lifetime": TRAIL_LIFETIME,
+                    "width": TRAIL_WIDTH,
+                    "color": TRAIL_COLOR,
+                }
+
+            just_hit_wall = not self._was_wall_sliding
+            if just_hit_wall:
+                if trail_bottom > trail_top:
+                    step = max(2, (trail_bottom - trail_top) // 8)
+                    for row in range(trail_top, trail_bottom + step, step):
+                        self.wall_trails.append(_seg(min(row, trail_bottom)))
+                self._trail_timer = 0
+            else:
+                self._trail_timer += 1
+                if self._trail_timer >= TRAIL_SPAWN_INTERVAL and trail_bottom > trail_top:
+                    self._trail_timer = 0
+                    mid_y = self.pos[1] + self.size[1] // 2
+                    self.wall_trails.append(_seg(max(trail_top, min(trail_bottom, mid_y))))
+        else:
+            self._trail_timer = 0
+
+        self._was_wall_sliding = is_wall_sliding
+
+        # Age — positions stay frozen, only lifetime changes
+        for seg in self.wall_trails:
+            seg["lifetime"] -= dt
+        self.wall_trails = [s for s in self.wall_trails if s["lifetime"] > 0]
+
+    def render_wall_trails(self, surf, offset=(0, 0)):
+        """Draw wall trail segments with alpha fade. Positions are frozen world coords."""
+        for seg in self.wall_trails:
+            t = seg["lifetime"] / seg["max_lifetime"]   # 1.0 → 0.0
+
+            alpha = int(220 * t)
+            if alpha <= 0:
+                continue
+
+            height = max(2, int(8 * t))
+            width  = max(1, int(seg["width"] * t))
+
+            # Convert frozen world position to screen coords — offset only, no drift added
+            x = int(seg["x"]) - offset[0]
+            y = int(seg["y"]) - offset[1]
+
+            if seg["wall"] == "left":
+                x -= width
+
+            seg_surf = pygame.Surface((width, height), pygame.SRCALPHA)
+            r, g, b = seg["color"]
+            seg_surf.fill((r, g, b, alpha))
+            surf.blit(seg_surf, (x, y))
+
     def collide_with(self, rect, static_rect=False, rotating_rect=True):
         if static_rect and not rotating_rect:
             return self.rect().colliderect(rect)
@@ -1143,26 +1271,17 @@ class PhysicsPlayer:
             alpha = int(255 * (ghost["lifetime"] / 20) ** 2)
             ghost_surf = ghost["img"].copy()
 
-            # Apply transparency
             ghost_surf.fill((255, 255, 255, 0), special_flags=pygame.BLEND_RGBA_MAX)
             ghost_surf.fill((109, 156, 159, 70) if "color" not in ghost else ghost["color"],
                             special_flags=pygame.BLEND_RGBA_MIN)
             ghost_surf.set_alpha(alpha)
 
-            # Rotate Ghost
             if ghost["angle"] != 0:
                 ghost_surf = pygame.transform.rotate(ghost_surf, ghost["angle"])
 
-            # Calculate Ghost Center
-            # Note: We use the ghost's original position + half size to find the center
             ghost_center_x = ghost["pos"][0] - offset[0] + self.size[0] // 2
             ghost_center_y = ghost["pos"][1] - offset[1] + self.size[1] // 2
-
-            # Get the new rect centered on that point
             ghost_rect = ghost_surf.get_rect(center=(ghost_center_x, ghost_center_y))
-
-            # Apply your manual offsets (-8, -5/-12) if they were for visual alignment
-            # (You might need to tweak these depending on your sprite art)
             ghost_rect.x -= 8
             ghost_rect.y -= 5 if self.GRAVITY_DIRECTION == 1 else 10 if self.GRAVITY_DIRECTION == -1 else 0
 
@@ -1170,108 +1289,91 @@ class PhysicsPlayer:
 
         img = self.animation.img().convert_alpha()
 
-        # Apply current slime scaling
         new_w = round(self.size[0] * self.visual_scale[0])
         new_h = round(self.size[1] * self.visual_scale[1])
         scaled_img = pygame.transform.smoothscale(img, (new_w, new_h))
 
-        # Calculate base position (centered horizontally, bottom-aligned)
         render_x = pos[0] - offset[0] - (new_w - self.size[0]) // 2
         render_y = pos[1] - offset[1] - (new_h - self.size[1])
 
-        # Adjust anchor if touching a wall to make it look like it's splashing AGAINST it
         if self.collision['left']:
-            render_x = pos[0] - offset[0]  # Pin to left side
+            render_x = pos[0] - offset[0]
         elif self.collision['right']:
-            render_x = pos[0] - offset[0] - (new_w - self.size[0])  # Pin to right side
+            render_x = pos[0] - offset[0] - (new_w - self.size[0])
 
-        # Invert for Ceiling gravity
         if self.GRAVITY_DIRECTION == -1:
             scaled_img = pygame.transform.flip(scaled_img, False, True)
             render_y = pos[1] - offset[1]
 
-        # Create a surface the same size as the image
         color_mask = pygame.Surface(scaled_img.get_size()).convert_alpha()
 
         if self.dash_amt == 0:
             scaled_img = pygame.transform.grayscale(scaled_img)
             color = (0, self.dashtime_cur * 6, self.dashtime_cur * 8, 0)
             color_mask.fill(color)
-
             scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
 
         if self.dashtime_cur != 0:
             scaled_img = pygame.transform.grayscale(scaled_img)
             color = (0, self.DASHTIME * 6, self.DASHTIME * 8, 0)
             color_mask.fill(color)
-
             scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
 
         if self.max_walljumps - self.can_walljump['count'] <= 1:
             self.walljump_fatigue_frame_count += 1
-            # Update color depending on fatigue level (based on walljump count)
             removal_factor = 255
             color = (80, removal_factor, removal_factor, 0)
             color_mask.fill(color)
-
-            # It keeps the alpha channel of the original sprite so only the player turns red.
             if self.walljump_fatigue_frame_count > (25 if self.can_walljump['count'] == self.max_walljumps - 1 else 5):
                 scaled_img = pygame.transform.grayscale(scaled_img)
                 scaled_img.blit(color_mask, (0, 0), special_flags=pygame.BLEND_RGBA_SUB)
-
             if self.walljump_fatigue_frame_count > (30 if self.can_walljump['count'] == self.max_walljumps - 1 else 10):
                 self.walljump_fatigue_frame_count = 0
 
         if self.rotation_angle != 0:
-            # Rotate the image
-            rotated_img = pygame.transform.rotate(scaled_img, self.rotation_angle)
-
-            # Calculate the center of the hitbox relative to the screen
+            final_img = pygame.transform.rotate(scaled_img, self.rotation_angle)
             center_x = pos[0] - offset[0] + self.size[0] // 2
             center_y = pos[1] - offset[1] + self.size[1] // 2
-
-            # Get a new rectangle for the rotated image, centered on the hitbox center
-            new_rect = rotated_img.get_rect(center=(center_x, center_y))
-
-            # Blit at the calculated coordinates
-            surf.blit(rotated_img, new_rect)
+            blit_rect = final_img.get_rect(center=(center_x, center_y))
         else:
-            # Standard drawing if no rotation
-            surf.blit(scaled_img, (render_x, render_y))
+            final_img = scaled_img
+            blit_rect = pygame.Rect(render_x, render_y, final_img.get_width(), final_img.get_height())
+
+        # --- TILE CLIPPING (always applied) ---
+        solid_rects = self.game.tilemap.physics_rects_around(self.rect())
+        if solid_rects:
+            keep_mask = pygame.Surface(final_img.get_size(), pygame.SRCALPHA)
+            keep_mask.fill((255, 255, 255, 255))
+            for tile_rect in solid_rects:
+                local_x = tile_rect.x - offset[0] - blit_rect.x
+                local_y = tile_rect.y - offset[1] - blit_rect.y
+                pygame.draw.rect(keep_mask, (255, 255, 255, 0),
+                                 (local_x, local_y, tile_rect.width, tile_rect.height))
+            final_img.blit(keep_mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+        surf.blit(final_img, blit_rect)
 
         if self.show_hitbox:
-            # 2. Draw the true outer hitbox in green
             base_rect = self.rect()
-
             if self.rotation_angle % 360 != 0:
-                # Recreate the surface and mask logic from collide_with
                 hitbox_surf = pygame.Surface(self.size, pygame.SRCALPHA)
                 hitbox_surf.fill((255, 255, 255, 255))
                 rotated_surf = pygame.transform.rotate(hitbox_surf, self.rotation_angle)
-
                 player_mask = pygame.mask.from_surface(rotated_surf)
                 rotated_rect = rotated_surf.get_rect(center=base_rect.center)
-
-                # Extract the points that make up the outer edge of the mask
                 outline = player_mask.outline()
-
-                # Shift all points to match world position minus the camera offset
                 shifted_outline = [
                     (p[0] + rotated_rect.x - offset[0], p[1] + rotated_rect.y - offset[1])
                     for p in outline
                 ]
-
-                # Draw the connected lines using the shifted points
                 if len(shifted_outline) > 2:
                     pygame.draw.lines(surf, (0, 255, 0), True, shifted_outline, 1)
             else:
-                # If not rotated, draw the standard rect
                 standard_rect = base_rect.copy()
                 standard_rect.x -= offset[0]
                 standard_rect.y -= offset[1]
                 pygame.draw.rect(surf, (0, 255, 0), standard_rect, 1)
 
-            # 1. Draw your original inner_rect in red
             debug_rect = self.rect().copy()
             debug_rect.x -= offset[0]
             debug_rect.y -= offset[1]
