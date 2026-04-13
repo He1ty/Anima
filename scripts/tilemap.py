@@ -37,6 +37,7 @@ class Tilemap:
         self.tilemap = {}
         self.offgrid_tiles = {}
         self.links = {}
+        self.player_layer = "0"
         self.tag_groups = {}
         self.camera_zones = []
         self.show_collisions = False
@@ -459,8 +460,7 @@ class Tilemap:
                               (pos[0] - offset[0], pos[1] - offset[1]))
 
             if with_player:
-                if layer == "5":
-                    pickups_render_and_update(self.game, offset=offset)
+                if layer == self.player_layer:
                     self.game.player.render(surf, offset=offset)
                     self.game.player.render_wall_trails(surf, offset=offset)
 

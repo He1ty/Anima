@@ -13,7 +13,7 @@ class PhysicsPlayer:
     GRAVITY_ACCELERATION = 0.35
     GRAVITY_DIRECTION = 1
     AIR_RESISTANCE = 0.05
-    SPEED = 2.3
+    SPEED = 2.1
     DASH_SPEED = 6
     JUMP_VELOCITY = -6
     DASHTIME = 10
@@ -564,32 +564,33 @@ class PhysicsPlayer:
                     self.game.play_se('jump')
 
                     # Jumps on dash
-                    if self.dashtime_cur != 0 and self.jump_buffering_cur <= 3:
-                        self.dashtime_cur = 0
-                        self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
+                    if self.dashtime_cur != 0:
+                        if self.jump_buffering_cur <= 3:
+                            self.dashtime_cur = 0
+                            self.tech_momentum_mult = pow(abs(self.dash_direction[0]) + abs(self.dash_direction[1]), 0.5)
 
-                        # Bottom Jump
-                        if self.dash_direction[0] == 0:
-                            pass
-                        # Superjumps
+                            # Bottom Jump
+                            if self.dash_direction[0] == 0:
+                                pass
+                            # Superjumps
+                            else:
+
+                                # Angular input superjump
+                                if self.dash_direction[1] == -1:
+                                    self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
+                                    self.jump_multiplier = 1.4 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+
+                                # On floor mono superjump
+                                elif self.dash_direction[1] == 0:
+                                    self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
+                                    self.jump_multiplier = 1 * self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
+
+                                self.superjump = True
+
                         else:
-
-                            # Angular input superjump
-                            if self.dash_direction[1] == -1:
-                                self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
-                                self.jump_multiplier = 1.4 / self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-
-                            # On floor mono superjump
-                            elif self.dash_direction[1] == 0:
-                                self.velocity[0] = 3 * self.get_direction("x") * self.DASH_SPEED * self.tech_momentum_mult
-                                self.jump_multiplier = 1 * self.tech_momentum_mult if self.tech_momentum_mult != 0 else 0
-
-                            self.superjump = True
-
-                    elif self.jump_buffering_cur > 3:
-                        self.jumptime_cur = 0
-                        self.jumping = False
-                        self.holding_jump = True
+                            self.jumptime_cur = 0
+                            self.jumping = False
+                            self.holding_jump = True
 
                 # Walljump
                 elif not self.holding_jump and self.can_walljump["allowed"]:
@@ -1107,7 +1108,11 @@ class PhysicsPlayer:
         TRAIL_LIFETIME       = 50   # frames a segment lives
         TRAIL_SPAWN_INTERVAL = 1    # continuous: one segment every N frames
         TRAIL_WIDTH          = 5    # pixel width of each segment
-        TRAIL_COLOR          = (86, 245, 211)
+
+
+        trail_color          = self.animation.img().convert_alpha().get_at((5, 10))[:-1]
+        if self.dash_amt == 0:
+            trail_color = (180, 180, 180)
 
         if not hasattr(self, '_trail_timer'):
             self._trail_timer = 0
@@ -1182,7 +1187,7 @@ class PhysicsPlayer:
                     "lifetime": TRAIL_LIFETIME,
                     "max_lifetime": TRAIL_LIFETIME,
                     "width": TRAIL_WIDTH,
-                    "color": TRAIL_COLOR,
+                    "color": trail_color,
                 }
 
             just_hit_wall = not self._was_wall_sliding
@@ -1193,7 +1198,7 @@ class PhysicsPlayer:
                         self.wall_trails.append(_seg(min(row, trail_bottom)))
                 self._trail_timer = 0
             else:
-                self._trail_timer += 1
+                self._trail_timer += dt
                 if self._trail_timer >= TRAIL_SPAWN_INTERVAL and trail_bottom > trail_top:
                     self._trail_timer = 0
                     mid_y = self.pos[1] + self.size[1] // 2
