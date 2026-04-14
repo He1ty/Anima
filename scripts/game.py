@@ -5,7 +5,7 @@ import sys
 from scripts.entities import *
 from scripts.utils import *
 from scripts.tilemap import Tilemap
-from scripts.physics import PhysicsPlayer
+from scripts.physics import Player
 from scripts.particle import update_particles, particle_render
 from scripts.activators import *
 from scripts.user_interface import Menu
@@ -56,8 +56,8 @@ class LevelManager:
         for zone in self.game.tilemap.camera_zones:
             self.game.camera_zones.append([int(val) for val in zone.split(";")])
 
-        target_x = self.game.player.rect().centerx  - self.game.display.get_width() / 2
-        target_y = self.game.player.rect().centery  - self.game.display.get_height() / 2
+        target_x = self.game.player.rect.centerx  - self.game.display.get_width() / 2
+        target_y = self.game.player.rect.centery  - self.game.display.get_height() / 2
 
         self.game.scroll = [target_x, target_y]
 
@@ -194,7 +194,7 @@ class Game:
         self.scroll_limits = {"x": [-5000, 5000], "y": [-5000, 5000]}
 
         # Player
-        self.player = PhysicsPlayer(self, self.tilemap, (100, 0), (16, 16))
+        self.player = Player(self, self.tilemap, (100, 0), (16, 16))
         self.player_dead = False
         self.death_counter = 0
         self.collected_souls = []
@@ -372,8 +372,8 @@ class Game:
 
     def update_transitions(self):
         for transition in self.transitions:
-            if (self.player.rect().left <= transition.pos[0] <= self.player.rect().right <= transition.pos[0] + self.tile_size and
-                    self.player.rect().bottom >= transition.pos[1] >= self.player.rect().top):
+            if (self.player.rect.left <= transition.pos[0] <= self.player.rect.right <= transition.pos[0] + self.tile_size and
+                    self.player.rect.bottom >= transition.pos[1] >= self.player.rect.top):
                 self.level_id = 2
                 self.level = f"{self.level_id:03d}"
                 self.scroll_limits = self.scroll_limits_per_level[str(self.level_id)]

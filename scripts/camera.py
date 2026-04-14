@@ -25,8 +25,8 @@ class Camera:
                 self.game.moving_visual = False
 
         else:
-            target_x = self.game.player.rect().centerx - self.game.display.get_width() / 2
-            target_y = self.game.player.rect().centery - self.game.display.get_height() / 2
+            target_x = self.game.player.rect.centerx - self.game.display.get_width() / 2
+            target_y = self.game.player.rect.centery - self.game.display.get_height() / 2
 
             level_limits = self.game.scroll_limits
 

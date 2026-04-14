@@ -369,7 +369,7 @@ class Tilemap:
 
     def fake_tile_colliding_with_player(self, tile):
         r = pygame.Rect(tile.pos[0]*self.tile_size, tile.pos[1]*self.tile_size, self.tile_size, self.tile_size)
-        return self.game.player.rect().colliderect(r)
+        return self.game.player.rect.colliderect(r)
 
     def set_render_filter(self, tiles, filter_instance : int|tuple[int, int, int]|tuple[int, int, int, int]):
         for tile in tiles:

@@ -2,7 +2,7 @@ import sys
 
 from io import TextIOWrapper
 from scripts.game import Game
-from scripts.physics import PhysicsPlayer
+from scripts.physics import Player
 
 from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton, ParentButton
 from scripts.text import load_game_font
@@ -708,7 +708,7 @@ class EditorLevelManager:
         self.editor.playtest.level_id = self.editor.level_id
         self.editor.playtest.level = f"{self.editor.level_id:03d}"
         self.editor.playtest.tilemap = self.editor.tilemap.copy(self.editor.playtest)
-        self.editor.playtest.player = PhysicsPlayer(self.editor.playtest, self.editor.playtest.tilemap, self.editor.player_start, (16, 16))
+        self.editor.playtest.player = Player(self.editor.playtest, self.editor.playtest.tilemap, self.editor.player_start, (16, 16))
 
         self.editor.playtest.levers = []
         self.editor.playtest.doors = []
@@ -739,8 +739,8 @@ class EditorLevelManager:
         for zone in self.editor.playtest.tilemap.camera_zones:
             self.editor.playtest.camera_zones.append([int(val) for val in zone.split(";")])
 
-        target_x = self.editor.playtest.player.rect().centerx - self.editor.playtest.display.get_width() / 2
-        target_y = self.editor.playtest.player.rect().centery - self.editor.playtest.display.get_height() / 2
+        target_x = self.editor.playtest.player.rect.centerx - self.editor.playtest.display.get_width() / 2
+        target_y = self.editor.playtest.player.rect.centery - self.editor.playtest.display.get_height() / 2
 
         self.editor.playtest.scroll = [target_x, target_y]
 
@@ -805,7 +805,7 @@ class PlayTest(Game):
         super().__init__()
         self.level_manager = editor_instance.level_manager
         self.tilemap = editor_instance.tilemap.copy(self)
-        self.player = PhysicsPlayer(self, self.tilemap, editor_instance.player_start, (16, 16))
+        self.player = Player(self, self.tilemap, editor_instance.player_start, (16, 16))
 
         # ── 5. Level & map data ────────────────────────────────────────────────
         self.level_id = editor_instance.level_id
