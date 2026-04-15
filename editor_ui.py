@@ -4,7 +4,7 @@ from io import TextIOWrapper
 from scripts.game import Game
 from scripts.physics import Player
 
-from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton, ParentButton
+from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton, ParentButton,NumberStepper
 from scripts.text import load_game_font
 from scripts.utils import *
 from scripts.tilemap import Tilemap
@@ -1878,7 +1878,6 @@ class UI:
         self.check_buttons = []
         self.on_selection_buttons = []
         self.group_selector_buttons = []
-        self.group_editor_buttons = []
 
         button_x, button_y = self.toolbar_rect.width/2, self.toolbar_rect.width/2
         for label in self.tools_buttons_labels:
@@ -1975,12 +1974,20 @@ class UI:
             self.group_selector_buttons.append(close_button)
 
         if len(self.group_editor_buttons_parents) == 0:
-            button = ParentButton(self.group_editor_rect.x + 50, self.group_editor_rect.y + 50, self.screen_height / 20, self.screen_height / 20, self.buttons_font)
+            button = ParentButton(self.group_editor_rect.width//10, self.group_editor_rect.height//4, self.screen_height / 20, self.screen_height / 20, self.buttons_font)
             self.group_editor_buttons_parents.append(button)
         else:
             for parent in self.group_editor_buttons_parents:
                 parent.reload(self.screen_height/20,self.screen_height/20,self.buttons_font)
 
+        if len(self.group_editor_buttons) == 0:
+            button = NumberStepper(int(self.group_editor_rect.width/2 - self.group_editor_rect.width/8),
+                                   self.group_editor_rect.height//10,int(self.group_editor_rect.width/4),
+                                   int(self.group_editor_rect.height*0.1),font = self.buttons_font)
+            self.group_editor_buttons.append(button)
+        else:
+            for button in self.group_editor_buttons:
+                button.reload(int(self.group_editor_rect.width/2 - self.group_editor_rect.width/8),50,int(self.group_editor_rect.width/4),int(self.group_editor_rect.height*0.1),self.buttons_font)
 
 
     def init_assets_buttons(self, categories):
@@ -2192,12 +2199,14 @@ class UI:
         overlay = pygame.Surface((self.group_editor_rect.width, self.group_editor_rect.height))
         overlay.fill(self.TOOLBAR_COLOR)
 
-        current_y = 50
+        current_y = self.group_editor_rect.height//4
         for p in self.group_editor_buttons_parents:
             p.draw(overlay, p.rect.x, current_y)
             current_y += p.get_total_height()
-        self.screen.blit(overlay, self.group_editor_rect)
 
+        for button in self.group_editor_buttons:
+            button.draw(overlay)
+        self.screen.blit(overlay, self.group_editor_rect)
 
 
     def check_closed(self):
@@ -2298,7 +2307,7 @@ class UI:
             case "LevelSelector":
                 self.handle_level_selector_event(event)
             case "Groups":
-                self.handle_properties_section_event(event)
+                self.handle_group_editor_event(event)
             case "Selection"|"Move":
                 self.handle_on_selection_event(event)
         if self.in_group_selector:
@@ -2440,7 +2449,9 @@ class UI:
                             self.group_list[c].remove(button.label)
                             self.editor.selector.remove_link_from_group(button.label)
 
-    def handle_properties_section_event(self,event):
+    def handle_group_editor_event(self, event):
+        for button in self.group_editor_buttons:
+            button.handle_event(event,self.group_editor_rect.topleft)
         for i,p in enumerate(self.group_editor_buttons_parents):
             result = p.handle_event(event, self.group_editor_rect.topleft)
             if result == "TOGGLE" and not p.is_expanded:
