@@ -1,5 +1,6 @@
 import sys
 
+from scripts.checkpoint import CheckPoint
 # --- Game Script Imports ---
 # These modules handle specific game logic like physics, entities, and UI.
 from scripts.entities import *
@@ -23,9 +24,12 @@ class LevelManager:
         self.first_level_id = 1
         game.level_id = self.first_level_id
 
-    def load_level(self, level_id):
+    def update_map(self, level_id):
         self.game.tilemap.load(f"data/maps/{level_id:03d}.json")
         self.game.tilemap.tile_size = self.game.tile_size
+
+    def load_level(self, level_id):
+        self.update_map(level_id)
 
         self.game.levers = []
         self.game.doors = []
@@ -47,9 +51,22 @@ class LevelManager:
                 case _ if "door" in group_tags:
                     pass
                 case _ if "spike" in group_tags:
-                    pass
+                    for tile_loc, tile_layer in group["tiles"]:
+                        tile = self.game.tilemap.extract(tile_loc, tile_layer)
+                        tile_id, variant, rotation, flip_x, flip_y = self.game.tilemap.tile_manager.unpack_tile(tile)
+                        image = self.game.tilemap.tile_manager.tiles[tile_id].images[variant]
+                        pos = [float(val)*self.game.tile_size for val in tile_loc.split(";")]
+                        self.game.spikes.append(Spike(self.game, pos, image, rotation))
                 case _ if "fake_tile" in group_tags:
                     pass
+                case _ if "checkpoint" in group_tags:
+                    for tile_loc, tile_layer in group["tiles"]:
+                        tile = self.game.tilemap.extract(tile_loc, tile_layer)
+                        tile_id, variant, rotation, flip_x, flip_y = self.game.tilemap.tile_manager.unpack_tile(tile)
+                        animation = self.game.tilemap.tile_manager.tiles[tile_id].images
+                        pos = [float(val) * self.game.tile_size for val in tile_loc.split(";")]
+                        self.game.checkpoints.append(CheckPoint(self.game, pos, animation))
+
 
             # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
 
@@ -206,9 +223,6 @@ class Game:
         self.spawn_point = {
             "pos": [100, 0],
             "level": self.level,
-            "scroll_limits": {"x": (0, 0), "y": (-1230, 1233)},
-            "camera_center": None,
-            "cameras": {}
         }
 
         # Activators / interactables
@@ -381,70 +395,29 @@ class Game:
                 self.level_manager.load_level(self.level_id)
                 self.player.pos = [8 * self.tile_size, 5 * self.tile_size]
 
-    def checkpoints_render_and_update(self, render_scroll):
+    def _render_checkpoints(self, render_scroll):
         for checkpoint in self.checkpoints:
-            if not self.tilemap.pos_visible(self.display, checkpoint.pos, render_scroll, additional_offset=(16, 16)):
-                continue
-            pos = checkpoint.pos
-
-            if self.current_checkpoint == checkpoint:
-                checkpoint["state"] = 1
-
-                # 1. Only create the animation object if we haven't already!
-                if self.active_checkpoint_anim is None:
-                    self.active_checkpoint_anim = self.assets['simple_campfire/activated'].copy()
-                    # Restore the frame from data if it exists (for loading saves)
-                    if "frame" in checkpoint:
-                        self.active_checkpoint_anim.frame = checkpoint["frame"]
-
-                # 2. Update the PERSISTENT animation object
-                self.active_checkpoint_anim.update()
-
-                # 3. Sync the frame number back to the dict (so saving still works)
-                checkpoint["frame"] = self.active_checkpoint_anim.frame
-
-                # 4. Render using the persistent object
-                self.display.blit(self.active_checkpoint_anim.img(),
-                                  (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
-                continue
-
-            checkpoint["state"] = 0
-            img = self.assets['simple_campfire/deactivated'].img()
-            self.display.blit(img, (pos[0] - render_scroll[0], pos[1] - render_scroll[1]))
-            if ((pos[0] <= self.player.pos[0] <= pos[0] + self.tile_size or pos[0] <= self.player.pos[0] + 16 <= pos[0] + self.tile_size) and
-                    pos[1] >= self.player.pos[1] >= pos[1] - 16 and
-                    self.current_checkpoint != checkpoint):
-
-                self.current_checkpoint = checkpoint
-
-                if self.spawn_point["pos"] == self.current_checkpoint.pos :
-                    continue
-                self.spawn_point = {"pos": self.current_checkpoint.pos, "level": self.level, "scroll_limits": self.scroll_limits, "camera_center": self.camera_center, "cameras": {}}
-                for camera in self.camera_setup:
-                    if camera.initial_state != camera.scroll_limits:
-                        self.spawn_point["cameras"][str(camera.initial_state)] = {}
-                        self.spawn_point["cameras"][str(camera.initial_state)][
-                            "scroll_limits"] = camera.scroll_limits
-                        if hasattr(camera, "center"):
-                            self.spawn_point["cameras"][str(camera.initial_state)]["center"] = camera.center
-                self.save_game(self.current_slot)
-
-    def spike_hitbox_update(self, render_scroll):
-        for spike_hitbox in self.spikes:
-            if not self.player.noclip:
-                if not spike_hitbox.circle_hitbox:
-                    if self.player.collide_with(spike_hitbox.rect(), static_rect=True):
-                        kill_player(self)
-                else:
-                    dx = self.player.pos[0] - spike_hitbox.pos[0]
-                    dy = self.player.pos[1] - spike_hitbox.pos[1]
-                    distance = math.sqrt(dx ** 2 + dy ** 2)
-                    if distance < (self.player.size[0]/2 + spike_hitbox.size.get_width()/2) and self.player.collide_with(spike_hitbox.rect(), static_rect=True):
-                        kill_player(self)
+            checkpoint.render(render_scroll)
 
 
-            if self.show_spikes_hitboxes:
-                spike_hitbox.render(self.display, spike_hitbox.circle_hitbox, offset=render_scroll)
+
+    def _update_spikes(self):
+        if hasattr(self, "spikes"):
+            for spike in self.spikes:
+                spike.update()
+
+    def _update_checkpoints(self):
+        for checkpoint in self.checkpoints:
+            checkpoint.update()
+
+
+
+    def _render_spikes(self, render_scroll):
+        if hasattr(self, "spikes"):
+            for spike in self.spikes:
+                spike.render(self.display, render_scroll)
+
+
 
     def fake_tiles_render(self, offset=(0, 0)):
         group_to_remove = None
@@ -503,10 +476,21 @@ class Game:
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
         display_level_bg(self, self.level_id)
         self.tilemap.render(self.display, offset=render_scroll)
-        self.checkpoints_render_and_update(render_scroll)
+
+        self._update_spikes()
+        self._update_checkpoints()
+
+
+        self._render_spikes(render_scroll)
+        self._render_checkpoints(render_scroll)
+
+
+
+
+
         doors_render_and_update(self, render_scroll)
         render_activators(self, render_scroll)
-        self.spike_hitbox_update(render_scroll)
+        #self.spike_hitbox_update(render_scroll)
         update_particles(self, render_scroll)
         particle_render(self, render_scroll)
         self.shader.display_level_fg(self.level)

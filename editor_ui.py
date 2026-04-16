@@ -1,10 +1,13 @@
 import sys
 
 from io import TextIOWrapper
-from scripts.game import Game
+from typing import override
+
+from scripts.game import Game, LevelManager
 from scripts.physics import Player
 
-from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton, ParentButton,NumberStepper
+from scripts.button import EditorButton, LevelCarousel, IconButton, TextButton,NumberStepper
+from scripts.tags_manager import TagsManager
 from scripts.text import load_game_font
 from scripts.utils import *
 from scripts.tilemap import Tilemap
@@ -15,6 +18,15 @@ import copy
 import json
 import shutil
 import re
+
+BASE_GROUP = {"tiles": [],
+                  "tags": {},
+                  "flags":{
+                      "AutoTile": True,
+                      "Matched": False,
+                      "Global": False},
+                  "matches":{}
+                  }
 
 class EditorCameraSetup:
 
@@ -249,14 +261,6 @@ class EditorCameraSetup:
                         self.editor.tilemap.camera_zones.remove(deleted_zone)
 
 class Selector:
-    BASE_GROUP = {"tiles": [],
-                  "tags": {},
-                  "flags":{
-                      "AutoTile": True,
-                      "Matched": False,
-                      "Global": False},
-                  "matches":{}
-                  }
     def __init__(self, editor_instance):
         self.editor = editor_instance
         self.pos = self.editor.mpos_scaled
@@ -388,7 +392,7 @@ class Selector:
     def add_link_to_group(self, group_id:str):
         for tile_loc in self.link:
             if group_id not in self.editor.tilemap.tag_groups:
-                self.editor.tilemap.tag_groups[group_id] = self.BASE_GROUP
+                self.editor.tilemap.tag_groups[group_id] = BASE_GROUP
             self.editor.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.editor.current_layer])
 
     def rotate_link_90(self):
@@ -592,7 +596,7 @@ class Selector:
         for tile_loc in self.link:
             if [tile_loc, self.editor.current_layer] in self.editor.tilemap.tag_groups[group_id]["tiles"]:
                 self.editor.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, self.editor.current_layer])
-            if self.editor.tilemap.tag_groups[group_id]["tiles"] == self.BASE_GROUP["tiles"] and self.editor.tilemap.tag_groups[group_id]["tags"] == self.BASE_GROUP["tags"]:
+            if self.editor.tilemap.tag_groups[group_id]["tiles"] == BASE_GROUP["tiles"] and self.editor.tilemap.tag_groups[group_id]["tags"] == BASE_GROUP["tags"]:
                 del self.editor.tilemap.tag_groups[group_id]
                 break
 
@@ -704,54 +708,6 @@ class EditorLevelManager:
         self.editor.level_id = new_level_id
         self.map_data_reset()
 
-    def load_level(self):
-        self.editor.playtest.level_id = self.editor.level_id
-        self.editor.playtest.level = f"{self.editor.level_id:03d}"
-        self.editor.playtest.tilemap = self.editor.tilemap.copy(self.editor.playtest)
-        self.editor.playtest.player = Player(self.editor.playtest, self.editor.playtest.tilemap, self.editor.player_start, (16, 16))
-
-        self.editor.playtest.levers = []
-        self.editor.playtest.doors = []
-        self.editor.playtest.spikes = []
-        self.editor.playtest.fake_tiles = []
-        self.editor.playtest.pickups = []
-        self.editor.playtest.leaf_spawners = []
-        self.editor.playtest.camera_zones = []
-        for group_id in self.editor.playtest.tilemap.tag_groups:
-            group = self.editor.playtest.tilemap.tag_groups[group_id]
-            group_tags = group["tags"]
-            match group_tags:
-                case _ if "lever" in group_tags:
-                    tag = group_tags["lever"]
-                    for tile_loc, tile_layer in group["tiles"]:
-                        self.editor.playtest.tilemap.extract(tile_loc, tile_layer)
-                        #self.editor.playtest.levers.append(Lever(group_id, tile_pos, tag["target_group"]))
-                        pass
-                case _ if "door" in group_tags:
-                    pass
-                case _ if "spike" in group_tags:
-                    pass
-                case _ if "fake_tile" in group_tags:
-                    pass
-
-            # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
-
-        for zone in self.editor.playtest.tilemap.camera_zones:
-            self.editor.playtest.camera_zones.append([int(val) for val in zone.split(";")])
-
-        target_x = self.editor.playtest.player.rect.centerx - self.editor.playtest.display.get_width() / 2
-        target_y = self.editor.playtest.player.rect.centery - self.editor.playtest.display.get_height() / 2
-
-        self.editor.playtest.scroll = [target_x, target_y]
-
-        # Reset VFX and interaction pools
-        self.editor.playtest.cutscene = False
-        self.editor.playtest.particles = []
-        self.editor.playtest.sparks = []
-        self.editor.playtest.transition = -30
-        self.editor.playtest.max_falling_depth = 50000000000
-        self.editor.playtest.shader.update_light()
-
     def full_save(self):
         # 1. Save current map to disk
         if self.editor.level_id in self.editor.active_maps:
@@ -794,6 +750,21 @@ class EditorLevelManager:
 
         print("Full Save Complete: Maps reordered and deleted files removed.")
 
+class PlayTestLevelManager(LevelManager):
+    def __init__(self, playtest):
+        super().__init__(playtest)
+
+    @override
+    def update_map(self, level_id):
+        self.game.level_id = self.game.level_id
+        self.game.level = f"{self.game.level_id:03d}"
+        self.game.tilemap = self.game.editor.tilemap.copy(self.game)
+        self.game.player = Player(self.game, self.game.tilemap,
+                                             self.game.editor.player_start, (16, 16))
+        self.game.spawn_point = {"pos" : list(self.game.editor.player_start),
+                                "level": self.game.level}
+
+
 class PlayTest(Game):
     MENU_STATE = "MENU"
     PLAYING_STATE = "PLAYING"
@@ -803,7 +774,7 @@ class PlayTest(Game):
         # ── 1. Window & display ────────────────────────────────────────────────
         self.editor = editor_instance
         super().__init__()
-        self.level_manager = editor_instance.level_manager
+        self.level_manager = PlayTestLevelManager(self)
         self.tilemap = editor_instance.tilemap.copy(self)
         self.player = Player(self, self.tilemap, editor_instance.player_start, (16, 16))
 
@@ -823,6 +794,7 @@ class PlayTest(Game):
         return False
 
     def load_game(self, slot=1):
+        self.player.pos = self.spawn_point["pos"].copy()
         return False
 
     def leave(self):
@@ -954,6 +926,8 @@ class EditorSimulation:
         self.ignore_links = False
         self.clipboard = None
 
+        self.groups_manager = GroupsManager(self)
+
         self._save_action()
 
     def update_group_tile(self, old_loc, new_loc, layer):
@@ -1080,181 +1054,6 @@ class EditorSimulation:
         self.scroll[0] = (pos[0] * 16 - self.screen_width * scale_x) // (
                 2 * int(2 * self.zoom))
         self.scroll[1] = pos[1] * 16 - self.screen_height * scale_y // (2 * int(2 * self.zoom))
-
-    #TODO: group removed from global_groups when global is unchecked
-    def create_tag(self, tag: str):
-        filepath = "data/tags.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                tags = json.load(f)
-        else:
-            tags = {}  # Handle missing file case
-
-        # 2. Modify the data in memory
-        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
-        tags[tag] = {}
-
-        # 3. Save the data back
-        with open(filepath, "w") as f:
-            f: TextIOWrapper
-            json.dump(tags, f, indent=4)
-
-    def delete_tag(self, tag: str):
-        filepath = "data/tags.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                tags = json.load(f)
-        else:
-            tags = {tag:{}}  # Handle missing file case
-
-        # 2. Modify the data in memory
-        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
-        del tags[tag]
-
-        # 3. Save the data back
-        with open(filepath, "w") as f:
-            f: TextIOWrapper
-            json.dump(tags, f, indent=4)
-
-    def set_info_value(self, group_id: str, tag: str, info: str, value: str):
-        self.tilemap.tag_groups[group_id]["tags"][tag][info] = value
-
-    def get_tag_and_infos(self, tag: str) -> dict | bool:
-        filepath = "data/tags.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                tags = json.load(f)
-                if tag in tags:
-                    return tags[tag]
-                else:
-                    self.create_tag(tag)
-                    return {tag:{}}
-        else:
-            print(f"filepath: {filepath} not found")
-        return False
-
-    def add_tag_to_group(self, group_id: str, tag: dict):
-        self.tilemap.tag_groups[group_id]["tags"].update(tag)
-        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
-            self.update_global_group(group_id)
-
-    def remove_tag_from_group(self, group_id: str, tag_name: str):
-        del self.tilemap.tag_groups[group_id]["tags"][tag_name]
-        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
-            self.update_global_group(group_id)
-
-    def update_group_tags(self, group_id: str):
-        with open("data/tags.json", "r") as f:
-            tags = json.load(f)
-            for tag_name in self.tilemap.tag_groups[group_id]["tags"]:
-                tag = self.tilemap.tag_groups[group_id]["tags"][tag_name]
-                if tag.keys() != tags[tag_name].keys():
-                    tag.update({info:"" for info in tags[tag_name].keys() if info not in tag.keys()})
-        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
-            self.update_global_group(group_id)
-
-    #Tu dois appeller les parents "tags" et les fils "infos"
-
-    '''WHEN PARENT PLUS IS PRESSED
-        add_tag_to_group(group_id, get_tag_and_infos(parent_label))'''
-
-    '''WHEN PARENT MINUS IS PRESSED
-        remove_tag_from_group(group_id, parent_label)'''
-
-    '''WHEN CHILD PLUS IS PRESSED
-        create_info(parent_label, child_label)'''
-
-    '''WHEN CHILD MINUS IS PRESSED
-        delete_info(parent_label, child_label)'''
-
-
-
-    def create_info(self, tag: str, info: str):
-        filepath = "data/tags.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                tags = json.load(f)
-        else:
-            tags = {}  # Handle missing file case
-
-        # 2. Modify the data in memory
-        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
-        tags[tag][info] = ""
-
-        # 3. Save the data back
-        with open(filepath, "w") as f:
-            f: TextIOWrapper
-            json.dump(tags, f, indent=4)
-
-    def delete_info(self, tag: str, info: str):
-        filepath = "data/tags.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                tags = json.load(f)
-        else:
-            tags = {tag:{info:""}}  # Handle missing file case
-
-        # 2. Modify the data in memory
-        # Use .setdefault() to avoid KeyErrors if tile_type doesn't exist yet
-        del tags[tag][info]
-
-        # 3. Save the data back
-        with open(filepath, "w") as f:
-            f: TextIOWrapper
-            json.dump(tags, f, indent=4)
-
-        for group_id in self.tilemap.tag_groups:
-            self.update_group_tags(group_id)
-
-    def update_global_group(self, group_id):
-        # GLOBAL GROUPS SAVE
-        filepath = "data/global_groups.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                global_groups = json.load(f)
-        else:
-            global_groups = {}  # Handle missing file case
-
-
-        global_groups[group_id] = self.tilemap.tag_groups[group_id].copy()
-        global_groups[group_id]["tiles"] = []
-
-        # 3. Save the data back
-        with open(filepath, "w") as g:
-            g: TextIOWrapper
-            json.dump(global_groups, g, indent=4)  # indent=4 makes it human-readable
-
-    def remove_global_group(self, group_id):
-        # GLOBAL GROUPS SAVE
-        filepath = "data/global_groups.json"
-
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                global_groups = json.load(f)
-        else:
-            global_groups = {}  # Handle missing file case
-
-        if group_id in global_groups:
-            del global_groups[group_id]
-
-        # 3. Save the data back
-        with open(filepath, "w") as g:
-            g: TextIOWrapper
-            json.dump(global_groups, g, indent=4)  # indent=4 makes it human-readable
-
-    def toggle_group_global(self, group_id):
-        self.tilemap.tag_groups[group_id]["flags"]["Global"] = not self.tilemap.tag_groups[group_id]["flags"]["Global"]
-        if self.tilemap.tag_groups[group_id]["flags"]["Global"]:
-            self.update_global_group(group_id)
-        else:
-            self.remove_global_group(group_id)
-
 
 
     def handle_brush_tool(self):
@@ -1465,7 +1264,7 @@ class EditorSimulation:
         if self.ui.toolbar_rect.collidepoint(self.mpos) or self.ui.assets_section_rect.collidepoint(self.mpos):
             self.clicking = False
 
-        if not self.ui.in_group_editor and not self.ui.in_group_selector:
+        if not self.current_tool == "Groups" and not self.ui.in_group_selector:
             if self.mpos_in_mainarea:
                 match self.current_tool:
                     case "Brush":
@@ -1508,7 +1307,7 @@ class EditorSimulation:
                         self.playtest.display = pygame.Surface((480 * self.zoom, 300 * self.zoom))
                         self.playtest.SCREEN_WIDTH, self.playtest.SCREEN_HEIGHT = self.screen.get_size()
                         self.playtest.load_settings()
-                        self.playtest.level_manager.load_level()
+                        self.playtest.level_manager.load_level(self.level_id)
 
                     if event.key == pygame.K_c:
                         self.selector.copy_link()
@@ -1718,7 +1517,6 @@ class EditorSimulation:
         if changing_size:
             self.screen.blit(screenshot, (0, 0))
 
-
     def run(self):
         while True:
             match self.state:
@@ -1767,6 +1565,286 @@ class EditorSimulation:
                 case "PlayTest":
                     self.playtest.run()
             pygame.display.update()
+
+
+class GroupsManager:
+    def __init__(self, editor_instance):
+        self.editor = editor_instance
+        self.screen_width, self.screen_height = editor_instance.screen.get_size()
+        self.toolbar_rect = editor_instance.ui.toolbar_rect
+        self.buttons_font = editor_instance.ui.buttons_font
+
+        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
+        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+
+        self.group_editor_buttons_width = self.group_editor_rect.width * (1 / 8)
+        self.group_editor_buttons_height = self.group_editor_rect.width * (1 / 8)
+        self.group_editor_top_buttons = []
+        self.group_editor_right_buttons = []
+        self.group_editor_buttons_parents = []
+
+        self.current_group = "0"
+        self.tags_editor = False
+
+        self.tags_manager = TagsManager(self)
+        self.init_buttons()
+
+    # ── tag / info CRUD ───────────────────────────────────────────────────────
+
+    def create_tag(self, tag: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {}
+
+        tags.setdefault(tag, {})
+
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+    def delete_tag(self, tag: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {tag: {}}
+
+        del tags[tag]
+
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+    def set_info_value(self, group_id: str, tag: str, info: str, value: str):
+        """Write a single info value for the given group/tag/info triple."""
+        self.editor.tilemap.tag_groups[group_id]["tags"][tag][info] = value
+        # Persist if the group is global
+        if self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    def get_tag_infos(self, tag: str) -> dict | bool:
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+                if tag in tags:
+                    return tags[tag]
+                else:
+                    self.create_tag(tag)
+                    return {}
+        else:
+            print(f"filepath: {filepath} not found")
+        return False
+
+    def add_tag_to_group(self, group_id: str, tag: dict):
+        if group_id not in self.editor.tilemap.tag_groups:
+            self.editor.tilemap.tag_groups[group_id] = BASE_GROUP
+        self.editor.tilemap.tag_groups[group_id]["tags"].update(tag)
+        if self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    def remove_tag_from_group(self, group_id: str, tag_name: str):
+        del self.editor.tilemap.tag_groups[group_id]["tags"][tag_name]
+        if self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    def update_group_tags(self, group_id: str):
+        with open("data/tags.json", "r") as f:
+            tags = json.load(f)
+            for tag_name in self.editor.tilemap.tag_groups[group_id]["tags"]:
+                tag = self.editor.tilemap.tag_groups[group_id]["tags"][tag_name]
+                if tag.keys() != tags[tag_name].keys():
+                    tag.update({info: "" for info in tags[tag_name].keys() if info not in tag.keys()})
+        if self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+
+    def create_info(self, tag: str, info: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {}
+
+        tags[tag][info] = ""
+
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+    def delete_info(self, tag: str, info: str):
+        filepath = "data/tags.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                tags = json.load(f)
+        else:
+            tags = {tag: {info: ""}}
+
+        del tags[tag][info]
+
+        with open(filepath, "w") as f:
+            f: TextIOWrapper
+            json.dump(tags, f, indent=4)
+
+        for group_id in self.editor.tilemap.tag_groups:
+            self.update_group_tags(group_id)
+
+    # ── global group persistence ──────────────────────────────────────────────
+
+    def update_global_group(self, group_id):
+        filepath = "data/global_groups.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                global_groups = json.load(f)
+        else:
+            global_groups = {}
+
+        global_groups[group_id] = self.editor.tilemap.tag_groups[group_id].copy()
+        global_groups[group_id]["tiles"] = []
+
+        with open(filepath, "w") as g:
+            g: TextIOWrapper
+            json.dump(global_groups, g, indent=4)
+
+    def remove_global_group(self, group_id):
+        filepath = "data/global_groups.json"
+
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                global_groups = json.load(f)
+        else:
+            global_groups = {}
+
+        if group_id in global_groups:
+            del global_groups[group_id]
+
+        with open(filepath, "w") as g:
+            g: TextIOWrapper
+            json.dump(global_groups, g, indent=4)
+
+    def toggle_group_global(self, group_id):
+        self.editor.tilemap.tag_groups[group_id]["flags"]["Global"] = \
+            not self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]
+        if self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]:
+            self.update_global_group(group_id)
+        else:
+            self.remove_global_group(group_id)
+
+    # ── buttons ───────────────────────────────────────────────────────────────
+
+    def init_buttons(self):
+        self.group_editor_top_buttons = []
+        self.group_editor_buttons_parents = []
+        self.group_editor_right_buttons = []
+
+        if not self.group_editor_top_buttons:
+            button = NumberStepper(
+                int(self.group_editor_rect.width / 2 - self.group_editor_rect.width / 8),
+                self.group_editor_rect.height // 10,
+                int(self.group_editor_rect.width / 4),
+                int(self.group_editor_rect.height * 0.1),
+                font=self.buttons_font
+            )
+            button.value = int(self.current_group)
+            self.group_editor_top_buttons.append(button)
+            close_button = IconButton(
+                "Close",
+                self.editor.ui.group_selector_images["Close"],
+                (self.group_editor_rect.x, self.group_editor_rect.y),
+                self.editor.ui.toolbar_buttons_width,
+                self.editor.ui.toolbar_buttons_height,
+                (200, 50, 50),
+                resize=0.8
+            )
+            self.group_editor_top_buttons.append(close_button)
+
+        if not self.group_editor_right_buttons:
+            pass
+
+    # ── events ────────────────────────────────────────────────────────────────
+
+    def handle_event(self, event):
+        # Pass events to the tags manager first.
+        offset = self.group_editor_rect.topleft
+        if self.tags_manager.handle_event(event, offset):
+            return  # consumed by tags panel
+        self.tags_manager.handle_motion(event, offset)  # hover updates
+
+        for button in self.group_editor_top_buttons[:-1]:
+            if button.handle_event(event, self.group_editor_rect.topleft):
+                self.current_group = str(button.value)
+                self.tags_manager.mark_dirty()
+                self.init_buttons()
+        if self.group_editor_top_buttons[-1].handle_event(event):
+            self.editor.current_tool = self.editor.ui.editor_previous_tool
+
+    # ── rendering ─────────────────────────────────────────────────────────────
+
+    def render(self, surf):
+        self.group_editor_rect.center = (
+            (self.screen_width - self.toolbar_rect.width) / 2,
+            self.screen_height / 2
+        )
+
+        overlay = pygame.Surface((self.group_editor_rect.width,
+                                  self.group_editor_rect.height))
+        overlay.fill((64, 64, 64))
+
+        # ── existing group-editor buttons ──────────────────────────────────
+        current_y = self.group_editor_rect.height // 4
+        for p in self.group_editor_buttons_parents:
+            p.draw(overlay, p.rect.x, current_y)
+            current_y += p.get_total_height()
+
+        for button in self.group_editor_top_buttons[:-1]:
+            button.draw(overlay)
+
+        # ── tags panel ─────────────────────────────────────────────────────
+        panel_x = int(self.group_editor_rect.width * 0.05)
+        panel_y = int(self.group_editor_rect.height * 0.25)
+        panel_width = int(self.group_editor_rect.width * 0.40)
+
+        self.tags_manager.render(overlay, panel_x, panel_y, panel_width)
+
+        # ── blit overlay and draw close button ─────────────────────────────
+        surf.blit(overlay, self.group_editor_rect)
+
+        close_button = self.group_editor_top_buttons[-1]
+        close_button.activated = True
+        close_button.rect.center = (self.group_editor_rect.x,
+                                    self.group_editor_rect.y)
+        close_button.draw(self.editor.screen)
+
+    # ── misc helpers ──────────────────────────────────────────────────────────
+
+    def toggle_tags_editor(self):
+        self.tags_editor = not self.tags_editor
+        self.tags_manager.mark_dirty()
+
+    def reload(self):
+        self.group_editor_rect = pygame.Rect(
+            0, 0,
+            self.screen_width * 0.75,
+            self.screen_height * 0.75
+        )
+        self.group_editor_rect.center = (
+            (self.screen_width - self.toolbar_rect.width) / 2,
+            self.screen_height / 2
+        )
+        self.tags_manager.mark_dirty()
+        self.init_buttons()
+
+
 
 class UI:
     TOOLBAR_COLOR = (64,64,64)
@@ -1857,16 +1935,6 @@ class UI:
         self.assets_button_width = self.assets_section_rect.width * (1 / 10)
         self.assets_button_height = self.assets_section_rect.width * (1 / 10)
         self.assets_buttons = []
-
-        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
-        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
-
-        self.group_editor_buttons_width = self.group_editor_rect.width * (1 / 8)
-        self.group_editor_buttons_height = self.group_editor_rect.width * (1 / 8)
-        self.group_editor_buttons = []
-        self.group_editor_buttons_parents = []
-        self.in_group_editor = False
-
 
 
         self.init_buttons()
@@ -1972,22 +2040,6 @@ class UI:
                                       self.toolbar_buttons_width, self.toolbar_buttons_height, (200, 50, 50),
                                       resize=0.8)
             self.group_selector_buttons.append(close_button)
-
-        if len(self.group_editor_buttons_parents) == 0:
-            button = ParentButton(self.group_editor_rect.width//10, self.group_editor_rect.height//4, self.screen_height / 20, self.screen_height / 20, self.buttons_font)
-            self.group_editor_buttons_parents.append(button)
-        else:
-            for parent in self.group_editor_buttons_parents:
-                parent.reload(self.screen_height/20,self.screen_height/20,self.buttons_font)
-
-        if len(self.group_editor_buttons) == 0:
-            button = NumberStepper(int(self.group_editor_rect.width/2 - self.group_editor_rect.width/8),
-                                   self.group_editor_rect.height//10,int(self.group_editor_rect.width/4),
-                                   int(self.group_editor_rect.height*0.1),font = self.buttons_font)
-            self.group_editor_buttons.append(button)
-        else:
-            for button in self.group_editor_buttons:
-                button.reload(int(self.group_editor_rect.width/2 - self.group_editor_rect.width/8),50,int(self.group_editor_rect.width/4),int(self.group_editor_rect.height*0.1),self.buttons_font)
 
 
     def init_assets_buttons(self, categories):
@@ -2191,22 +2243,9 @@ class UI:
             for button in self.group_buttons_list[c]:
                 button.draw(surface)
 
-    def render_group_editor(self):
-        # Update rect
-        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+    def render_group_editor(self, surf):
+        self.editor.groups_manager.render(surf)
 
-        # Creating the Overlay where everything will be blit
-        overlay = pygame.Surface((self.group_editor_rect.width, self.group_editor_rect.height))
-        overlay.fill(self.TOOLBAR_COLOR)
-
-        current_y = self.group_editor_rect.height//4
-        for p in self.group_editor_buttons_parents:
-            p.draw(overlay, p.rect.x, current_y)
-            current_y += p.get_total_height()
-
-        for button in self.group_editor_buttons:
-            button.draw(overlay)
-        self.screen.blit(overlay, self.group_editor_rect)
 
 
     def check_closed(self):
@@ -2246,8 +2285,7 @@ class UI:
         self.group_selector_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
         self.group_selector_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
 
-        self.group_editor_rect = pygame.Rect(0, 0, self.screen_width * 0.75, self.screen_height * 0.75)
-        self.group_editor_rect.center = (self.screen_width - self.toolbar_rect.width) / 2, self.screen_height / 2
+        self.editor.groups_manager.reload()
 
         self.init_buttons()
 
@@ -2268,6 +2306,8 @@ class UI:
             if self.assets_section_rect.width:
                 self.assets_section_rect.width = 0
 
+        # TODO: group removed from global_groups when global is unchecked
+
     def draw(self):
 
         self.clear_sections_rect()
@@ -2280,7 +2320,7 @@ class UI:
             case "LevelSelector":
                     self.render_level_selector()
             case "Groups":
-                self.render_group_editor()
+                self.render_group_editor(self.editor.screen)
             case "Selection" | "Move":
                 self.render_on_selection(self.toolbar_rect.x - 30*(self.screen_width/self.editor.SW))
         if self.in_group_selector:
@@ -2300,7 +2340,8 @@ class UI:
                     self.reload_assets_section_rect()
         if event.type == pygame.QUIT:
             pygame.quit()
-        self.handle_toolbar_event(event)
+        if not self.editor.current_tool == "Groups":
+            self.handle_toolbar_event(event)
         match self.editor.current_tool:
             case "Brush":
                 self.handle_assets_section_event(event)
@@ -2312,10 +2353,7 @@ class UI:
                 self.handle_on_selection_event(event)
         if self.in_group_selector:
             self.handle_group_selector_event(event)
-        if self.editor.current_tool == "Groups":
-            self.in_group_editor = True
-        else:
-            self.in_group_editor = False
+
 
     def handle_toolbar_event(self, event):
         for button in self.tools_buttons:
@@ -2450,19 +2488,7 @@ class UI:
                             self.editor.selector.remove_link_from_group(button.label)
 
     def handle_group_editor_event(self, event):
-        for button in self.group_editor_buttons:
-            button.handle_event(event,self.group_editor_rect.topleft)
-        for i,p in enumerate(self.group_editor_buttons_parents):
-            result = p.handle_event(event, self.group_editor_rect.topleft)
-            if result == "TOGGLE" and not p.is_expanded:
-                if len(self.group_editor_buttons_parents) > 2:
-                    self.group_editor_buttons_parents.remove(p)
-                else:
-                    self.group_editor_buttons_parents.remove(self.group_editor_buttons_parents[i + 1])
-        if self.group_editor_buttons_parents[-1].is_expanded:
-            new_y = self.group_editor_buttons_parents[-1].rect.y + self.group_editor_buttons_parents[-1].rect.width * 1.2
-            new_parent = ParentButton(self.group_editor_buttons_parents[-1].rect.x, new_y, self.screen_height / 20, self.screen_height / 20, self.buttons_font)
-            self.group_editor_buttons_parents.append(new_parent)
+        self.editor.groups_manager.handle_event(event)
 
 
 if __name__ == "__main__":

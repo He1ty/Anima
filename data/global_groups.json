@@ -1,2 +1,15 @@
 {
+    "0": {
+        "tiles": [],
+        "tags": {
+            "spike": {}
+        },
+        "flags": {
+            "Global": true,
+            "Matched": true
+        },
+        "matches": [
+            "spikes", "red_spikes", "gluy_spikes", "purpur_spikes"
+        ]
+    }
 }

@@ -144,6 +144,6 @@ class Pickup:
 
 def pickups_render_and_update(game, offset):
         for pickup in game.pickups:
-            if game.tilemap.pos_visible(game.display, pickup.pos, offset, additional_offset=pickup.size):
+            if game.tilemap.pos_visible(game.display, pickup.pos, offset, additional_offset=pickup.image):
                 pickup.update()
                 pickup.render(game.display, offset)

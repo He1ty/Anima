@@ -1,4 +1,6 @@
 import time
+from typing import override
+
 import pygame
 import random
 import math
@@ -240,7 +242,7 @@ class Enemy(PhysicsEntity):
     def check_if_player_close(self, vision_distance, mono_direction=True):
         # Check if the player is within detection distance and line of sight
         if (not (self.game.tilemap.between_check(self.game.player.pos, self.pos))
-                and self.game.player.pos[1] + self.game.player.size[1] == int(self.pos[1] + self.size[1])):
+                and self.game.player.pos[1] + self.game.player.image[1] == int(self.pos[1] + self.size[1])):
             if abs(self.player_x - self.enemy_x) <= vision_distance:
                 if mono_direction:
                     if self.flip and self.player_x < self.enemy_x:
@@ -257,7 +259,7 @@ class Enemy(PhysicsEntity):
         if self.pos[0] < self.player_x < self.pos[0] + self.size[0]:
             return True
         return math.sqrt((self.enemy_x + relative_player_pos * self.size[0] / 2 - self.player_x) ** 2 + (
-                (self.pos[1] + self.size[1]) - (self.game.player.pos[1] + self.game.player.size[1])) ** 2)
+                (self.pos[1] + self.size[1]) - (self.game.player.pos[1] + self.game.player.image[1])) ** 2)
 
     def player_looking_at_entity(self):
         # Check if the player is facing the enemy
@@ -398,55 +400,79 @@ class Throwable(PhysicsEntity):
         return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
 class DamageBlock:
-    def __init__(self, game, pos, size, hitbox_type='', rotation=0):
+    def __init__(self, game, pos, img, rotation=0):
         # Initialize a block that damages the player on contact
         self.pos = pos
-        self.size = size
+        self.image = img
         self.last_attack_time = 0
         self.game = game
-        self.type = hitbox_type
         self.rotation = (rotation - 1) % 4
         self.circle_hitbox = False
 
     def rect(self):
         # Return collision rectangle
 
-        if self.type == 'spike':
-            width = 10
-            height = 5
-            angle = self.rotation*math.pi/2
-            if self.rotation % 2 == 0:
-                width, height = height, width
-                pos = (self.pos[0] + (self.size.get_width() - width) / 2 - math.cos(angle) * (
-                            self.size.get_width() - width) / 2, self.pos[1] + (self.size.get_height() - height) / 2
-                       )
-            else:
-                pos = (self.pos[0] + (self.size.get_width() - width) / 2,
-                       self.pos[1] + ((self.size.get_height() - height) / 2) - math.sin(angle) * (self.size.get_height() - height) / 2
-                       )
-
-            r = pygame.Rect(pos[0], pos[1],
-                            width, height)
-
-        elif self.type == 'spike_block':
+        if 0:
             self.circle_hitbox = True
             r = pygame.Rect(self.pos[0], self.pos[1],
-                            self.size.get_width(), self.size.get_height())
+                            self.image.get_width(), self.image.get_height())
             r = r.inflate(-4, -4)
+
+            return r
+
+    def render(self, surf, offset=(0, 0)):
+        # Draw the damage block on screen
+        surf.blit(self.image, (self.pos[0] - offset[0], self.pos[1] - offset[1]))
+        if self.game.show_spikes_hitboxes:
+            r = self.rect()
+            if self.circle_hitbox:
+                xq = r.right - (r.right - r.x) / 2 != r.centerx
+                yq = r.bottom - (r.bottom - r.y) / 2 != r.centery
+
+                pygame.draw.circle(surf, (255, 0, 255),(r.centerx - offset[0] + 1*xq, r.centery - offset[1] + 1*yq), r.width/2)
+            else:
+                pygame.draw.rect(surf, (255, 0, 255), pygame.Rect(r.x - offset[0], r.y - offset[1],
+                                                              r.width, r.height))
+
+class Spike(DamageBlock):
+
+    def __init__(self, game, pos, size, rotation=0):
+        super().__init__(game, pos, size, rotation)
+
+    @override
+    def rect(self):
+        width = 10
+        height = 5
+        angle = self.rotation * math.pi / 2
+        if self.rotation % 2 == 0:
+            width, height = height, width
+            pos = (self.pos[0] + (self.image.get_width() - width) / 2 - math.cos(angle) * (
+                    self.image.get_width() - width) / 2, self.pos[1] + (self.image.get_height() - height) / 2
+                   )
+        else:
+            pos = (self.pos[0] + (self.image.get_width() - width) / 2,
+                   self.pos[1] + ((self.image.get_height() - height) / 2) - math.sin(angle) * (
+                               self.image.get_height() - height) / 2
+                   )
+
+        r = pygame.Rect(pos[0], pos[1],
+                        width, height)
 
         return r
 
-    def render(self, surf, circle, offset=(0, 0)):
-        # Draw the damage block on screen
-        r = self.rect()
-        if circle:
-            xq = r.right - (r.right - r.x) / 2 != r.centerx
-            yq = r.bottom - (r.bottom - r.y) / 2 != r.centery
-
-            pygame.draw.circle(surf, (255, 0, 255),(r.centerx - offset[0] + 1*xq, r.centery - offset[1] + 1*yq), r.width/2)
-        else:
-            pygame.draw.rect(surf, (255, 0, 255), pygame.Rect(r.x - offset[0], r.y - offset[1],
-                                                          r.width, r.height))
+    def update(self):
+        if not self.game.player.noclip:
+            if not self.circle_hitbox:
+                if self.game.player.collide_with(self.rect(), static_rect=True):
+                    kill_player(self.game)
+            else:
+                dx = self.game.player.pos[0] - self.pos[0]
+                dy = self.game.player.pos[1] - self.pos[1]
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+                if distance < (
+                        self.game.player.size[0] / 2 + self.image.get_width() / 2) and self.game.player.collide_with(
+                        self.rect(), static_rect=True):
+                    kill_player(self.game)
 
 
 def blur(surface, span):

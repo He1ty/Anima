@@ -40,6 +40,14 @@ class Entity:
     def _collision_actions(self, axe):
         return
 
+    def apply_momentum(self, dt):
+        """Applies velocity to the coords of the object. Slows down movement depending on environment"""
+
+        self.pos[0] += self.velocity[0] * dt
+        self.collision_check("x", dt)
+
+        self.pos[1] += self.velocity[1] * dt
+        self.collision_check("y", dt)
 
     def collision_check(self, axe, dt):
         """Checks for collision using tilemap"""
@@ -262,25 +270,30 @@ class Player(Entity):
     def __init__(self, game, tilemap, pos, size):
         super().__init__(game, tilemap, pos, size)
 
+        # DASH ATTRIBUTES
         self.dash_max_amt = 1
+        self.dash_amt = self.dash_max_amt
         self.dash_startup_cur = 0
         self.dashtime_cur = 0  # Used to determine whether we are dashing or not. Also serves as a timer.
         self.dash_cooldown_cur = 0
-        self.dash_amt = self.dash_max_amt
-        self.dash_started_in_air = False
         self.dash_direction = [0, 0]  # [dash_x, dash_y]
+        self.dash_started_in_air = False
         self.anti_dash_buffer = False
+        self.shadow_dash = False
         self.stop_dash_momentum = {"y": False, "x": False}
 
+        # JUMP ATTRIBUTES
         self.jumptime_cur = 0
         self.jump_buffering_cur = 0
         self.jump_multiplier = 1
         self.jumping = False
         self.holding_jump = False
 
+        # SUPERJUMP ATTRIBUTES
         self.superjump = False
         self.tech_momentum_mult = 0
 
+        # WALLJUMP ATTRIBUTES
         self.max_walljumps = 3
         self.can_walljump = {"sliding": False, "wall": 0, "buffer": False, "timer": 0, "blocks_around": False,
                              "allowed": True, "count": 0}
@@ -289,13 +302,14 @@ class Player(Entity):
         self.walljump_push_away_cur = 0
         self.wall_slide_acceleration_stabilized = False
 
-        # Slime physics constants
+        # SLIME PHYSICS ATTRIBUTES
         self.visual_scale = [1.0, 1.0]
         self.spring_velocity = [0.0, 0.0]  # Internal "jiggle" velocity
         self.stiffness = 0.15  # How fast it snaps back
         self.damping = 0.8  # How much it wobbles (lower = more wobbly)
         self.wall_trails = []
 
+        # LAST FRAME VARIABLES
         self.last_direction = 1
         self.last_velocity = [0, 0]  # To catch velocity right before collision
         self.last_on_floor_velocity = [0, 0]
@@ -481,6 +495,7 @@ class Player(Entity):
             self.gravity(dt)
             self.x_friction(dt)
             self.apply_momentum(dt)
+            self.walljump_collision_check()
 
             self.apply_particle()
             self.update_slime_deformation(dt)
@@ -824,6 +839,9 @@ class Player(Entity):
             else:
                 self.can_walljump["wall"] = 0
 
+        if self.can_walljump["blocks_around"] and self.can_walljump["wall"]:
+            self.walljump_sliding_check(self.can_walljump["wall"])
+
     def walljump_setup_helper(self):
         self.jump_setup_helper()
         self.air_time = 0
@@ -928,20 +946,7 @@ class Player(Entity):
         if axe == "y":
             self.can_walljump["buffer"] = True
             self.can_walljump["sliding"] = False
-
-
-    def apply_momentum(self, dt):
-        """Applies velocity to the coords of the object. Slows down movement depending on environment"""
-
-        self.pos[0] += self.velocity[0] * dt
-        self.collision_check("x", dt)
-
-        self.pos[1] += self.velocity[1] * dt
-        self.collision_check("y", dt)
-
-        self.walljump_collision_check()
-        if self.can_walljump["blocks_around"] and self.can_walljump["wall"]:
-            self.walljump_sliding_check(self.can_walljump["wall"])
+            self.jumptime_cur = 0
 
 
     def get_direction(self, axis):

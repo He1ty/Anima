@@ -386,274 +386,6 @@ class TextButton(EditorButton):
         screen.blit(self.text, self.text_rect)
 
 
-class ChildButton:
-    """
-    A child node inside a ParentButton tree.
-    Can be expanded to reveal two text input fields: a variable name and a value.
-    Closing a ChildButton does not affect its siblings.
-    """
-
-    def __init__(self, x: int, y: int, width: int, height: int, font: pygame.font.Font, parent):
-        """
-        Initialize the child button with position, size, font, and a reference to its parent.
-
-        :param x: Left position on screen.
-        :param y: Top position on screen.
-        :param width: Width of the toggle button (input fields use multiples of this).
-        :param height: Height of the button row.
-        :param font: Pygame font used for labels and text input rendering.
-        :param parent: The ParentButton instance this child belongs to.
-        """
-        self.parent = parent
-        self.rect = pygame.Rect(x, y, width, height)
-        self.variable_input_rect = pygame.Rect(x + width, y, width * 5, height)
-        self.variable_text_input = ""
-        self.value_input_rect = pygame.Rect(self.variable_input_rect.right + 20, y, width * 5, height)
-        self.value_text_input = ""
-        self.variable_active = False
-        self.value_active = False
-        self.font = font
-        self.is_expanded = False
-
-    def handle_event(self, event: pygame.event.Event, offset=None):
-        """
-        Process mouse and keyboard events for this child.
-        Clicking the toggle button expands/collapses the input fields.
-        Typing updates the active input field (variable name or value).
-        Returns "TOGGLE" when the expansion state changes.
-
-        :param event: The Pygame event to process.
-        :param offset: Optional (dx, dy) offset applied to rects.
-        :return: "TOGGLE" if the expansion state changed, None otherwise.
-        """
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if offset:
-                if self.value_input_rect.move(offset).collidepoint(event.pos):
-                    self.value_active = True
-                else:
-                    self.value_active = False
-                if self.rect.move(offset).collidepoint(event.pos):
-                    self.is_expanded = not self.is_expanded
-                    if self.is_expanded:
-                        self.variable_active = True
-                    self.value_text_input = ""
-                    self.variable_text_input = ""
-                    return "TOGGLE"
-            else:
-                if self.value_input_rect.collidepoint(event.pos):
-                    self.value_active = True
-                else:
-                    self.value_active = False
-                if self.rect.collidepoint(event.pos):
-                    self.is_expanded = not self.is_expanded
-                    if self.is_expanded:
-                        self.variable_active = True
-                    self.value_text_input = ""
-                    self.variable_text_input = ""
-                    return "TOGGLE"
-
-        if (self.variable_active or self.value_active) and event.type == pygame.KEYDOWN:
-            if self.variable_active and event.key == pygame.K_RETURN:
-                self.variable_active = False
-            if event.key == pygame.K_BACKSPACE:
-                if self.variable_active:
-                    self.variable_text_input = self.variable_text_input[:-1]
-                else:
-                    self.value_text_input = self.value_text_input[:-1]
-            elif event.unicode.isprintable():
-                if self.variable_active:
-                    self.variable_text_input += event.unicode
-                else:
-                    self.value_text_input += event.unicode
-
-    def draw(self, surface: pygame.Surface, x: int, y: int):
-        """
-        Draw the child row at the given position.
-        Shows a +/- toggle button; if expanded, shows two text input fields.
-
-        :param surface: Target surface to draw on.
-        :param x: Left position for this row.
-        :param y: Top position for this row.
-        """
-        self.rect.topleft = (x, y)
-        self.variable_input_rect.topleft = (x + self.rect.width * 1.3, y)
-        self.value_input_rect.topleft = (self.variable_input_rect.right + self.rect.width // 2, y)
-
-        pygame.draw.rect(surface, COLOR_CHILD, self.rect)
-        symbole = "-" if self.is_expanded else "+"
-        lbl = self.font.render(symbole, True, (255, 255, 255))
-        surface.blit(lbl, lbl.get_rect(center=self.rect.center))
-        if self.is_expanded:
-            color = (255, 255, 255) if self.variable_active else COLOR_TEXT_BG
-            color2 = (255, 255, 255) if self.value_active else COLOR_TEXT_BG
-            pygame.draw.rect(surface, color, self.variable_input_rect)
-            txt_surf = self.font.render(self.variable_text_input, True, (0, 0, 0))
-            surface.blit(txt_surf, (self.variable_input_rect.x + 5, self.variable_input_rect.y + 5))
-            pygame.draw.rect(surface, color2, self.value_input_rect)
-            txt_surf = self.font.render(self.value_text_input, True, (0, 0, 0))
-            surface.blit(txt_surf, (self.value_input_rect.x + 5, self.value_input_rect.y + 5))
-
-    def reload(self, new_width: int, new_height: int, font: pygame.font.Font):
-        """
-        Resize the child button and update its input field rects and font.
-        Called when the parent is resized (e.g. on window resize).
-
-        :param new_width: New button width in pixels.
-        :param new_height: New button height in pixels.
-        :param font: Updated Pygame font to use.
-        """
-        self.font = font
-        self.rect.width = new_width
-        self.rect.height = new_height
-        self.variable_input_rect = pygame.Rect(self.rect.x + new_width, self.rect.y, new_width * 5, new_height)
-        self.value_input_rect = pygame.Rect(self.variable_input_rect.right + 20, self.rect.y, new_width * 5, new_height)
-
-
-class ParentButton:
-    """
-    A parent node in a collapsible tree UI.
-    When expanded, shows a text input field for the node name and a list of ChildButton rows.
-    Closing this node only affects its own children; sibling ParentButtons are untouched.
-    A new empty child is automatically added when the last existing child is expanded.
-    """
-
-    def __init__(self, x: int, y: int, width: int, height: int, font: pygame.font.Font):
-        """
-        Initialize the parent button.
-
-        :param x: Left position on screen.
-        :param y: Top position on screen.
-        :param width: Width of the toggle button.
-        :param height: Height of the button row.
-        :param font: Pygame font used for rendering labels and input text.
-        """
-        self.rect = pygame.Rect(x, y, width, height)
-        self.input_rect = pygame.Rect(x + width, y, width * 5, height)
-        self.is_expanded = False
-        self.active = False
-        self.text_input = ""
-        self.children = []
-        self.next_Parent = None
-        self.font = font
-
-    def handle_event(self, event: pygame.event.Event, offset=None):
-        """
-        Process mouse and keyboard events for the parent and propagate to children.
-        Clicking the toggle button expands/collapses the node and its children.
-        When collapsing, all children are removed and the text input is cleared.
-        A new child is automatically appended when the last child becomes expanded.
-
-        :param event: The Pygame event to process.
-        :param offset: Optional (dx, dy) offset applied to rects.
-        :return: "TOGGLE" if the expansion state changed, None otherwise.
-        """
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if offset:
-                if self.rect.move(offset).collidepoint(event.pos):
-                    self.is_expanded = not self.is_expanded
-                    if self.is_expanded:
-                        self.active = True
-                        if len(self.children) == 0:
-                            self.add_child()
-                    else:
-                        self.text_input = ""
-                        for _ in self.children:
-                            self.children = self.children[1:]
-                    return "TOGGLE"
-            else:
-                if self.rect.collidepoint(event.pos):
-                    self.is_expanded = not self.is_expanded
-                    if self.is_expanded:
-                        self.active = True
-                        if len(self.children) == 0:
-                            self.add_child()
-                    else:
-                        self.text_input = ""
-                        for _ in self.children:
-                            self.children = self.children[1:]
-                    return "TOGGLE"
-
-        if event.type == pygame.KEYDOWN:
-            if self.active and event.key == pygame.K_RETURN:
-                self.active = False
-
-        if self.active and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_BACKSPACE:
-                self.text_input = self.text_input[:-1]
-            elif event.unicode.isprintable():
-                self.text_input += event.unicode
-
-        if self.is_expanded:
-            for index, child in enumerate(self.children):
-                result = child.handle_event(event, offset)
-                if result == "TOGGLE" and not child.is_expanded:
-                    if index != 0 or len(self.children) > 2:
-                        self.children.remove(child)
-                    elif len(self.children) <= 2:
-                        self.children.remove(self.children[index + 1])
-                if self.children[-1].is_expanded:
-                    self.add_child()
-
-    def add_child(self):
-        """
-        Append a new empty ChildButton to the children list.
-        Position is calculated dynamically during draw.
-        """
-        self.children.append(ChildButton(0, 0, self.rect.width, self.rect.height, self.font, self))
-
-    def get_total_height(self) -> int:
-        """
-        Calculate the total vertical space occupied by this parent and all its children.
-
-        :return: Total height in pixels.
-        """
-        if not self.is_expanded:
-            return self.rect.height
-        return self.rect.height * 1.3 + (len(self.children) * self.rect.height * 1.3)
-
-    def draw(self, surface: pygame.Surface, x: int, y: int):
-        """
-        Draw the parent node and, if expanded, its text input and all children.
-
-        :param surface: Target surface to draw on.
-        :param x: Left position for this row.
-        :param y: Top position for this row.
-        """
-        self.rect.topleft = (x, y)
-        self.input_rect.topleft = (x + self.rect.width * 1.5, y)
-
-        pygame.draw.rect(surface, COLOR_PARENT, self.rect)
-        symbol = "-" if self.is_expanded else "+"
-        lbl = self.font.render(symbol, True, (255, 255, 255))
-        surface.blit(lbl, lbl.get_rect(center=self.rect.center))
-
-        if self.is_expanded:
-            color = (255, 255, 255) if self.active else COLOR_TEXT_BG
-            pygame.draw.rect(surface, color, self.input_rect)
-            txt_surf = self.font.render(self.text_input, True, (0, 0, 0))
-            surface.blit(txt_surf, (self.input_rect.x + 5, self.input_rect.y + 5))
-
-        if self.is_expanded:
-            for i, child in enumerate(self.children):
-                child_y = y + self.rect.height * 1.3 + (i * self.rect.height * 1.3)
-                child.draw(surface, self.input_rect.x, child_y)
-
-    def reload(self, new_width: int, new_height: int, font: pygame.font.Font):
-        """
-        Resize the parent button and propagate the resize to all children.
-
-        :param new_width: New button width in pixels.
-        :param new_height: New button height in pixels.
-        :param font: Updated Pygame font to use.
-        """
-        self.font = font
-        self.rect.width = new_width
-        self.rect.height = new_height
-        self.input_rect = pygame.Rect(self.rect.x + new_width, self.rect.y, new_width * 5, new_height)
-        for child in self.children:
-            child.reload(new_width, new_height, font)
-
-
 class NumberStepper:
     """
     A UI component to select a non-negative integer via arrow buttons or direct text input.
@@ -701,10 +433,12 @@ class NumberStepper:
                     self.value -= 1
                     self.temp_text = str(self.value)
                     self.active = False
+                    return True
                 elif self.plus_rect.collidepoint(event.pos):
                     self.value += 1
                     self.temp_text = str(self.value)
                     self.active = False
+                    return True
                 elif self.input_rect.collidepoint(event.pos):
                     self.active = True
                     self.temp_text = ""
@@ -716,10 +450,12 @@ class NumberStepper:
                     self.value -= 1
                     self.temp_text = str(self.value)
                     self.active = False
+                    return True
                 elif self.plus_rect.move(offset).collidepoint(event.pos):
                     self.value += 1
                     self.temp_text = str(self.value)
                     self.active = False
+                    return True
                 elif self.input_rect.move(offset).collidepoint(event.pos):
                     self.active = True
                     self.temp_text = ""
@@ -731,10 +467,13 @@ class NumberStepper:
             if event.key == pygame.K_RETURN:
                 self.active = False
                 self._validate_input()
+                return True
             elif event.key == pygame.K_BACKSPACE:
                 self.temp_text = self.temp_text[:-1]
             elif event.unicode.isdigit() or (event.unicode == "-" and len(self.temp_text) == 0):
                 self.temp_text += event.unicode
+
+        return False
 
     def _validate_input(self):
         """

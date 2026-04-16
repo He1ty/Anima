@@ -44,14 +44,17 @@ class Tilemap:
         self.render_filters = {}
 
     def extract(self, tile_loc, layer):
-
         if layer in self.tilemap:
             if tile_loc in self.tilemap[layer]:
+                tile = self.tilemap[layer][tile_loc]
                 del self.tilemap[layer][tile_loc]
+                return tile
 
         if layer in self.offgrid_tiles:
             if tile_loc in self.offgrid_tiles[layer]:
+                tile = self.offgrid_tiles[layer][tile_loc]
                 del self.offgrid_tiles[layer][tile_loc]
+                return tile
     
     def remove_tile(self, pos, layer):
         if layer in self.tilemap:
@@ -165,27 +168,49 @@ class Tilemap:
         if "offgrid" in map_data:
             self.offgrid_tiles = map_data["offgrid"]
 
+        t = open("data/tags.json", "r")
+        tags = json.load(t)
+
         #Load Groups
         if "tag_groups" in map_data:
             self.tag_groups = map_data["tag_groups"]
+
+        def tags_with_infos(old_tags):
+            tags_corrected = {}
+            for tag_name in old_tags:
+                tags_corrected[tag_name] = tags[tag_name]
+            return tags_corrected
 
         #Update Groups with global groups
         g = open("data/global_groups.json", 'r')
         global_groups = json.load(g)
         for group_id, group_infos in global_groups.items():
             tmp_tiles = []
+            tmp_tags = []
             if group_id in self.tag_groups:
                 tmp_tiles = self.tag_groups[group_id]["tiles"]
+                tmp_tags = self.tag_groups[group_id]["tags"]
             self.tag_groups[group_id] = group_infos
+
+            group_infos["tags"] = tags_with_infos(group_infos["tags"])
+
+            for tag in tmp_tags:
+                if tag in self.tag_groups[group_id]["tags"]:
+                    for info in self.tag_groups[group_id]["tags"][tag]:
+                        if info in tmp_tags:
+                            value = tmp_tags[tag][info]
+                            self.tag_groups[group_id]["tags"][info] = value
+
+
             self.tag_groups[group_id]["tiles"] = tmp_tiles
 
         #Update Matches
-        for tile_infos in self.tag_groups.values():
+        for group_id, tile_infos in self.tag_groups.items():
             if "matches" in tile_infos:
                 for tile_type in tile_infos["matches"]:
-                    for group_id in tile_infos["matches"][tile_type]:
-                        tile_id = self.tile_manager.get_id(tile_type)
-                        self.tile_manager.tiles[tile_id].groups.append(group_id)
+                    tile_id = self.tile_manager.get_id(tile_type)
+                    self.tile_manager.tiles[tile_id].groups.append(group_id)
+
 
 
         if "links" in map_data:
@@ -466,5 +491,5 @@ class Tilemap:
 
 
             if layer == "2" and with_player and self.show_collisions:
-                self.render_tiles_under(self.game.player.pos, self.game.player.size, 1)
+                self.render_tiles_under(self.game.player.pos, self.game.player.image, 1)
 

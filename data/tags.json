@@ -1,2 +1,10 @@
 {
+    "spike": {},
+    "door": {
+        "opening_speed": ""
+    },
+    "lever": {
+        "target_group": ""
+    },
+    "checkpoint": {}
 }
