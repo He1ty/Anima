@@ -1,12 +1,18 @@
 import pygame
 
-
-
 class CheckPoint:
-    def __init__(self, game_instance, pos, animation):
+    def __init__(self, game_instance, pos, tile):
+
         self.game = game_instance
+        tile_id, variant, rotation, flip_x, flip_y = game_instance.tilemap.tile_manager.unpack_tile(tile)
+        animation = game_instance.tilemap.tile_manager.tiles[tile_id].images
+
         self.pos = pos.copy()
         self.state = "deactivated"
+
+        self.flip_x = flip_x
+        self.flip_y = flip_y
+        self.rotation = rotation
         self.animation = animation.copy()
 
     @property
@@ -29,4 +35,7 @@ class CheckPoint:
         self.animation.update()
 
     def render(self, offset=(0, 0)):
-        self.game.display.blit(self.animation.img(), (self.pos[0] - offset[0], self.pos[1] - offset[1]))
+        img = pygame.transform.rotate(self.animation.img(), self.rotation* -90 )
+        img = pygame.transform.flip(img, self.flip_x, self.flip_y)
+
+        self.game.display.blit(img, (self.pos[0] - offset[0], self.pos[1] - offset[1]))

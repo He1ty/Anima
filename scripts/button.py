@@ -416,15 +416,16 @@ class NumberStepper:
         self.plus_rect = pygame.Rect(x + width - height, y, height, height)
         self.input_rect = pygame.Rect(x + height, y, width - 2 * height, height)
 
-        self.temp_text = str(start_val)
+        self.temp_text = ""
 
-    def handle_event(self, event: pygame.event.Event,offset=None):
+    def handle_event(self, event: pygame.event.Event, offset=None):
         """
         Process mouse and keyboard events.
         Minus/plus buttons decrement/increment the value.
         Clicking the input area enables text typing mode.
         Pressing Enter or clicking away validates and commits the typed value.
 
+        :param offset:
         :param event: The Pygame event to process.
         """
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -462,6 +463,7 @@ class NumberStepper:
                 else:
                     self.active = False
                     self._validate_input()
+
 
         if self.active and event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:

@@ -31,12 +31,14 @@ class LevelManager:
     def load_level(self, level_id):
         self.update_map(level_id)
 
+        self.game.checkpoints = []
         self.game.levers = []
         self.game.doors = []
         self.game.spikes = []
         self.game.fake_tiles = []
         self.game.pickups = []
         self.game.leaf_spawners = []
+
         self.game.camera_zones = []
         for group_id in self.game.tilemap.tag_groups:
             group = self.game.tilemap.tag_groups[group_id]
@@ -62,10 +64,8 @@ class LevelManager:
                 case _ if "checkpoint" in group_tags:
                     for tile_loc, tile_layer in group["tiles"]:
                         tile = self.game.tilemap.extract(tile_loc, tile_layer)
-                        tile_id, variant, rotation, flip_x, flip_y = self.game.tilemap.tile_manager.unpack_tile(tile)
-                        animation = self.game.tilemap.tile_manager.tiles[tile_id].images
                         pos = [float(val) * self.game.tile_size for val in tile_loc.split(";")]
-                        self.game.checkpoints.append(CheckPoint(self.game, pos, animation))
+                        self.game.checkpoints.append(CheckPoint(self.game, pos, tile))
 
 
             # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
@@ -216,7 +216,6 @@ class Game:
         self.death_counter = 0
         self.collected_souls = []
         self.nb_souls = 0
-        self.checkpoints = []
         self.current_checkpoint = None
         self.active_checkpoint_anim = None
         self.sections = {0: (0, 1, 2)}
@@ -396,8 +395,9 @@ class Game:
                 self.player.pos = [8 * self.tile_size, 5 * self.tile_size]
 
     def _render_checkpoints(self, render_scroll):
-        for checkpoint in self.checkpoints:
-            checkpoint.render(render_scroll)
+        if hasattr(self, "checkpoints"):
+            for checkpoint in self.checkpoints:
+                checkpoint.render(render_scroll)
 
 
 
@@ -407,8 +407,9 @@ class Game:
                 spike.update()
 
     def _update_checkpoints(self):
-        for checkpoint in self.checkpoints:
-            checkpoint.update()
+        if hasattr(self, "checkpoints"):
+            for checkpoint in self.checkpoints:
+                checkpoint.update()
 
 
 

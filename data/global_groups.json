@@ -9,7 +9,23 @@
             "Matched": true
         },
         "matches": [
-            "spikes", "red_spikes", "gluy_spikes", "purpur_spikes"
+            "spikes",
+            "red_spikes",
+            "gluy_spikes",
+            "purpur_spikes"
+        ]
+    },
+    "1": {
+        "tiles": [],
+        "tags": {
+            "checkpoint": {}
+        },
+        "flags": {
+            "Global": true,
+            "Matched": true
+        },
+        "matches": [
+            "campfire"
         ]
     }
 }

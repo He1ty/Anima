@@ -359,11 +359,7 @@ class Selector:
     def delete_link(self):
         if self.link:
             for tile_loc in self.link:
-                space = self.editor.check_tile_space(tile_loc)
-                if space == "tilemap":
-                    del self.editor.tilemap.tilemap[self.editor.current_layer][tile_loc]
-                else:
-                    del self.editor.tilemap.offgrid_tiles[self.editor.current_layer][tile_loc]
+                self.editor.remove_tile(tile_loc, self.editor.current_layer)
             self.link = []
 
     def unlink_link(self, link):
@@ -1080,39 +1076,48 @@ class EditorSimulation:
                     if [tile_loc, self.current_layer] not in self.tilemap.tag_groups[group_id]["tiles"]:
                         self.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.current_layer])
 
+    def remove_tile(self, tile_loc, layer):
+        space = self.check_tile_space(tile_loc)
+        if space == "tilemap":
+            del self.tilemap.tilemap[layer][tile_loc]
+        elif space == "offgrid":
+            for loc in self.tilemap.offgrid_tiles[layer].copy():
+                pos = [float(val) for val in loc.split(";")]
+                tile_id, variant, rot, flip_h, flip_v = self.tilemap.tile_manager.unpack_tile(
+                    self.tilemap.offgrid_tiles[layer][loc])
+                images = self.tilemap.tile_manager.tiles[tile_id].images.copy()
+                if isinstance(images, Animation):
+                    tile_img = images.img()
+                else:
+                    tile_img = images[variant]
+                tile_r = pygame.Rect(pos[0] - self.scroll[0],
+                                     pos[1] - self.scroll[1],
+                                     tile_img.get_width(),
+                                     tile_img.get_height())
+                if tile_r.collidepoint(self.mpos_scaled):  # Check both to be safe
+                    del self.tilemap.offgrid_tiles[layer][loc]
+
+        tile_link = self.selector.tile_has_link(tile_loc)
+        if tile_link:
+            self.tilemap.links[layer].remove(tile_link)
+            tile_link.remove(tile_loc)
+            if tile_link:
+                self.tilemap.links[layer].append(tile_link)
+
+        if not self.tilemap.links[layer]:
+            del self.tilemap.links[layer]
+
+        for group_id in self.tilemap.tag_groups:
+            if [tile_loc, layer] in self.tilemap.tag_groups[group_id]["tiles"]:
+                self.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, layer])
+
+
+
     def handle_eraser_tool(self):
         self.selector.link = []
         if self.clicking:
             tile_loc = str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])
-            if tile_loc in self.tilemap.tilemap[self.current_layer]:
-                del self.tilemap.tilemap[self.current_layer][tile_loc]
-
-
-            if self.current_layer in self.tilemap.offgrid_tiles:
-                for loc in self.tilemap.offgrid_tiles[self.current_layer].copy():
-                    pos = [float(val) for val in loc.split(";")]
-                    tile_id, variant, rot, flip_h, flip_v  = self.tilemap.tile_manager.unpack_tile(self.tilemap.offgrid_tiles[self.current_layer][loc])
-                    images = self.tilemap.tile_manager.tiles[tile_id].images.copy()
-                    if isinstance(images, Animation):
-                        tile_img = images.img()
-                    else:
-                        tile_img = images[variant]
-                    tile_r = pygame.Rect(pos[0] - self.scroll[0],
-                                         pos[1] - self.scroll[1],
-                                         tile_img.get_width(),
-                                         tile_img.get_height())
-                    if tile_r.collidepoint(self.mpos_scaled):  # Check both to be safe
-                        del self.tilemap.offgrid_tiles[self.current_layer][loc]
-
-            tile_link = self.selector.tile_has_link(tile_loc)
-            if tile_link:
-                self.tilemap.links[self.current_layer].remove(tile_link)
-                tile_link.remove(tile_loc)
-                self.tilemap.links[self.current_layer].append(tile_link)
-
-            for group_id in self.tilemap.tag_groups:
-                if [tile_loc, self.current_layer] in self.tilemap.tag_groups[group_id]["tiles"]:
-                    self.tilemap.tag_groups[group_id]["tiles"].remove([tile_loc, self.current_layer])
+            self.remove_tile(tile_loc, self.current_layer)
 
     def handle_move_tool(self, event):
         if self.clicking:
@@ -1581,7 +1586,6 @@ class GroupsManager:
         self.group_editor_buttons_height = self.group_editor_rect.width * (1 / 8)
         self.group_editor_top_buttons = []
         self.group_editor_right_buttons = []
-        self.group_editor_buttons_parents = []
 
         self.current_group = "0"
         self.tags_editor = False
@@ -1674,7 +1678,7 @@ class GroupsManager:
         else:
             tags = {}
 
-        tags[tag][info] = ""
+        tags[tag].setdefault(info, "")
 
         with open(filepath, "w") as f:
             f: TextIOWrapper
@@ -1744,7 +1748,6 @@ class GroupsManager:
 
     def init_buttons(self):
         self.group_editor_top_buttons = []
-        self.group_editor_buttons_parents = []
         self.group_editor_right_buttons = []
 
         if not self.group_editor_top_buttons:
@@ -1771,6 +1774,7 @@ class GroupsManager:
         if not self.group_editor_right_buttons:
             pass
 
+
     # ── events ────────────────────────────────────────────────────────────────
 
     def handle_event(self, event):
@@ -1785,6 +1789,7 @@ class GroupsManager:
                 self.current_group = str(button.value)
                 self.tags_manager.mark_dirty()
                 self.init_buttons()
+
         if self.group_editor_top_buttons[-1].handle_event(event):
             self.editor.current_tool = self.editor.ui.editor_previous_tool
 
@@ -1801,21 +1806,16 @@ class GroupsManager:
         overlay.fill((64, 64, 64))
 
         # ── existing group-editor buttons ──────────────────────────────────
-        current_y = self.group_editor_rect.height // 4
-        for p in self.group_editor_buttons_parents:
-            p.draw(overlay, p.rect.x, current_y)
-            current_y += p.get_total_height()
-
         for button in self.group_editor_top_buttons[:-1]:
             button.draw(overlay)
 
-        # ── tags panel ─────────────────────────────────────────────────────
+        # ── tags panel ─────────────────────────────────────────────────────────
         panel_x = int(self.group_editor_rect.width * 0.05)
         panel_y = int(self.group_editor_rect.height * 0.25)
         panel_width = int(self.group_editor_rect.width * 0.40)
+        panel_max_h = self.group_editor_rect.height - panel_y - 10  # ← add: space to bottom edge
 
-        self.tags_manager.render(overlay, panel_x, panel_y, panel_width)
-
+        self.tags_manager.render(overlay, panel_x, panel_y, panel_width, panel_max_h)  # ← pass max_h
         # ── blit overlay and draw close button ─────────────────────────────
         surf.blit(overlay, self.group_editor_rect)
 
@@ -1831,7 +1831,17 @@ class GroupsManager:
         self.tags_editor = not self.tags_editor
         self.tags_manager.mark_dirty()
 
+    def reload_data(self):
+        self.current_group = "0"
+        self.tags_manager.mark_dirty()
+        self.init_buttons()
+
     def reload(self):
+        self.screen_width, self.screen_height = self.editor.screen.get_size()
+        self.toolbar_rect = self.editor.ui.toolbar_rect
+        self.buttons_font = self.editor.ui.buttons_font
+        self.group_editor_buttons_width = self.group_editor_rect.width * (1 / 8)
+        self.group_editor_buttons_height = self.group_editor_rect.width * (1 / 8)
         self.group_editor_rect = pygame.Rect(
             0, 0,
             self.screen_width * 0.75,
@@ -1841,9 +1851,9 @@ class GroupsManager:
             (self.screen_width - self.toolbar_rect.width) / 2,
             self.screen_height / 2
         )
+
         self.tags_manager.mark_dirty()
         self.init_buttons()
-
 
 
 class UI:
@@ -2354,7 +2364,6 @@ class UI:
         if self.in_group_selector:
             self.handle_group_selector_event(event)
 
-
     def handle_toolbar_event(self, event):
         for button in self.tools_buttons:
             if button.handle_event(event, offset=(self.screen_width - self.toolbar_rect.width, 0)):
@@ -2421,7 +2430,7 @@ class UI:
                 self.editor.current_tool = self.editor_previous_tool
                 self.editor.camera_setup.creating = False
                 self.reload_assets_section()
-
+        self.editor.groups_manager.reload_data()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.editor.current_tool = self.editor_previous_tool

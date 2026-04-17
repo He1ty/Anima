@@ -112,6 +112,11 @@ class TagsManager:
         self._pending_input: _InputRow | None = None
         self._pending_edit:  _EditRow  | None = None
         self._dirty = True
+        self._scroll_y: int = 0  # ← add
+        self._content_h: int = 0  # ← add (total height of all rows)
+        self._panel_max_h: int = 9999  # ← add (set by caller each frame)
+        self._panel_x: int = 0
+        self._panel_y: int = 0
 
     # ── public trigger ────────────────────────────────────────────────────────
 
@@ -121,34 +126,59 @@ class TagsManager:
 
     # ── rendering ─────────────────────────────────────────────────────────────
 
-    def render(self, overlay: pygame.Surface, x: int, y: int, w: int) -> int:
+    def render(self, overlay: pygame.Surface, x: int, y: int, w: int, max_h: int = 9999) -> int:
         """
         Draw the tag list into *overlay* starting at (x, y) with width w.
-        Returns the total pixel height consumed.
+        max_h limits the visible height; content beyond it is scrollable.
+        Returns the total pixel height consumed (capped at max_h).
         """
         font = self._get_font()
         editor = self.gm.tags_editor
+
+        self._panel_x = x  # ← store
+        self._panel_y = y  # ← store
+        self._panel_max_h = max_h  # store for scroll clamping / hit-test
 
         if self._dirty:
             self._rebuild_rows()
             self._dirty = False
 
-        cursor_y = y
+        # ── draw into a tall scratch surface ──────────────────────────────────
+        # First pass: measure total height
+        scratch_h = max(max_h, self._measure_height())
+        scratch = pygame.Surface((w, scratch_h), pygame.SRCALPHA)
+        scratch.fill((0, 0, 0, 0))
 
+        cursor_y = 0
         for row in self._rows:
             if isinstance(row, _ParentRow):
-                cursor_y = self._draw_parent(overlay, row, x, cursor_y, w, editor, font)
+                cursor_y = self._draw_parent(scratch, row, 0, cursor_y, w, editor, font)
             elif isinstance(row, _ChildRow):
-                cursor_y = self._draw_child(overlay, row, x, cursor_y, w, editor, font)
+                cursor_y = self._draw_child(scratch, row, 0, cursor_y, w, editor, font)
             elif isinstance(row, _EditRow):
-                cursor_y = self._draw_edit_row(overlay, row, x, cursor_y, w, font)
+                cursor_y = self._draw_edit_row(scratch, row, 0, cursor_y, w, font)
             elif isinstance(row, _InputRow):
-                cursor_y = self._draw_input(overlay, row, x, cursor_y, w, font)
+                cursor_y = self._draw_input(scratch, row, 0, cursor_y, w, font)
             elif isinstance(row, _AddButton):
-                cursor_y = self._draw_add_button(overlay, row, x, cursor_y, w, font)
+                cursor_y = self._draw_add_button(scratch, row, 0, cursor_y, w, font)
 
-        return cursor_y - y
+        self._content_h = cursor_y
 
+        # Clamp scroll
+        max_scroll = max(0, self._content_h - max_h)
+        self._scroll_y = max(0, min(self._scroll_y, max_scroll))
+
+        # ── blit the visible slice ─────────────────────────────────────────────
+        visible_h = min(max_h, self._content_h)
+        if visible_h > 0:
+            clip_rect = pygame.Rect(0, self._scroll_y, w, visible_h)
+            overlay.blit(scratch, (x, y), clip_rect)
+
+        # ── scrollbar ─────────────────────────────────────────────────────────
+        if self._content_h > max_h:
+            self._draw_scrollbar(overlay, x + w + 3, y, 6, max_h)
+
+        return visible_h
     # ── draw helpers ──────────────────────────────────────────────────────────
 
     def _draw_parent(self, surf, row: _ParentRow, x, y, w, editor, font) -> int:
@@ -180,11 +210,13 @@ class TagsManager:
         else:
             bg = _CHILD_EDIT_HOVER if row.hover else _CHILD_BG
 
+
+
         pygame.draw.rect(surf, bg, rect, border_radius=4)
 
         # In view mode, draw a small pencil hint on hover
         if not editor and row.hover:
-            hint = font.render("✎", True, _TEXT_DIM)
+            hint = font.render("»", True, _TEXT_DIM)
             surf.blit(hint, (rect.x + 4, rect.centery - hint.get_height() // 2))
             key_x = rect.x + 4 + hint.get_width() + 4
         else:
@@ -261,6 +293,18 @@ class TagsManager:
 
         return y + ROW_H + GAP
 
+    def _draw_scrollbar(self, surf: pygame.Surface, x: int, y: int, w: int, h: int):
+        """Draw a minimal scrollbar to the right of the panel."""
+        track_rect = pygame.Rect(x, y, w, h)
+        pygame.draw.rect(surf, (60, 60, 60), track_rect, border_radius=3)
+
+        ratio = h / self._content_h
+        thumb_h = max(20, int(h * ratio))
+        scroll_range = self._content_h - h
+        thumb_y = y + int((self._scroll_y / scroll_range) * (h - thumb_h)) if scroll_range > 0 else y
+        thumb_rect = pygame.Rect(x, thumb_y, w, thumb_h)
+        pygame.draw.rect(surf, (130, 130, 130), thumb_rect, border_radius=3)
+
     # ── event handling ────────────────────────────────────────────────────────
 
     def handle_event(self, event: pygame.event.Event, offset: tuple):
@@ -268,6 +312,13 @@ class TagsManager:
         Call from GroupsManager.handle_event() *before* any other group buttons.
         offset = overlay's topleft on the actual screen.
         """
+        # ── scroll wheel ──────────────────────────────────────────────────────
+        if event.type == pygame.MOUSEWHEEL:
+            self._scroll_y -= event.y * (ROW_H + GAP)
+            max_scroll = max(0, self._content_h - self._panel_max_h)
+            self._scroll_y = max(0, min(self._scroll_y, max_scroll))
+            return True
+
         # ── keyboard: feed active edit row ────────────────────────────────────
         if self._pending_edit and event.type == pygame.KEYDOWN:
             row = self._pending_edit
@@ -299,24 +350,29 @@ class TagsManager:
 
         pos = event.pos
 
+        local_pos = (
+            pos[0] - self._panel_x,
+            pos[1] - self._panel_y + self._scroll_y
+        )
+
         # ── click outside active edit row → cancel ────────────────────────────
         if self._pending_edit:
             row = self._pending_edit
-            if row.rect and not row.rect.move(offset).collidepoint(pos):
+            if row.rect and not row.rect.move(offset).collidepoint(local_pos):
                 self._cancel_edit()
                 return True
 
         # ── click outside active input → cancel ───────────────────────────────
         if self._pending_input:
             row = self._pending_input
-            if row.rect and not row.rect.move(offset).collidepoint(pos):
+            if row.rect and not row.rect.move(offset).collidepoint(local_pos):
                 self._cancel_input()
                 return True
 
         # ── hit-test each row ─────────────────────────────────────────────────
         for row in self._rows:
             if isinstance(row, _AddButton):
-                if row.rect and row.rect.move(offset).collidepoint(pos):
+                if row.rect and row.rect.move(offset).collidepoint(local_pos):
                     self._start_input(row.kind, row.tag_name)
                     return True
 
@@ -327,18 +383,18 @@ class TagsManager:
                 pass  # focus handled above
 
             elif isinstance(row, _ParentRow):
-                if row.minus_rect and row.minus_rect.move(offset).collidepoint(pos):
+                if row.minus_rect and row.minus_rect.move(offset).collidepoint(local_pos):
                     self._remove_tag(row.tag_name)
                     return True
 
             elif isinstance(row, _ChildRow):
                 if self.gm.tags_editor:
-                    if row.minus_rect and row.minus_rect.move(offset).collidepoint(pos):
+                    if row.minus_rect and row.minus_rect.move(offset).collidepoint(local_pos):
                         self._remove_info(row.tag_name, row.info_key)
                         return True
                 else:
                     # View mode: click the child row to edit its value
-                    if row.rect and row.rect.move(offset).collidepoint(pos):
+                    if row.rect and row.rect.move(offset).collidepoint(local_pos):
                         self._start_edit(row.tag_name, row.info_key, row.info_val)
                         return True
 
@@ -349,9 +405,14 @@ class TagsManager:
         if event.type != pygame.MOUSEMOTION:
             return
         pos = event.pos
+
+        local_pos = (
+            pos[0] - self._panel_x,
+            pos[1] - self._panel_y + self._scroll_y
+        )
         for row in self._rows:
             if isinstance(row, _ChildRow):
-                row.hover = bool(row.rect and row.rect.move(offset).collidepoint(pos))
+                row.hover = bool(row.rect and row.rect.move(offset).collidepoint(local_pos))
 
     # ── internal helpers ──────────────────────────────────────────────────────
 
@@ -432,6 +493,10 @@ class TagsManager:
         else:
             self._rows.append(_AddButton("tag"))
 
+    def _measure_height(self) -> int:
+        """Estimate total pixel height without drawing."""
+        return len(self._rows) * (ROW_H + GAP)
+
     # ── input flow ────────────────────────────────────────────────────────────
 
     def _start_input(self, kind: str, tag_name: str = ""):
@@ -445,6 +510,7 @@ class TagsManager:
 
     def _commit_input(self, row: _InputRow):
         name = row.text.strip()
+        editor = self.gm.tags_editor
         if not name:
             self._cancel_input()
             return
@@ -452,7 +518,8 @@ class TagsManager:
         if row.kind == "tag":
             self.gm.create_tag(name)
             infos = self.gm.get_tag_infos(name) or {}
-            self.gm.add_tag_to_group(self.gm.current_group, {name: {k: "" for k in infos}})
+            if not editor:
+                self.gm.add_tag_to_group(self.gm.current_group, {name: {k: "" for k in infos}})
 
         elif row.kind == "info":
             self.gm.create_info(row.tag_name, name)
