@@ -390,7 +390,7 @@ class Selector:
     def add_link_to_group(self, group_id:str):
         for tile_loc in self.link:
             if group_id not in self.editor.tilemap.tag_groups:
-                self.editor.tilemap.tag_groups[group_id] = BASE_GROUP
+                self.editor.tilemap.tag_groups[group_id] = copy.deepcopy(BASE_GROUP)
             self.editor.tilemap.tag_groups[group_id]["tiles"].append([tile_loc, self.editor.current_layer])
 
     def rotate_link_90(self):
@@ -1491,9 +1491,10 @@ class EditorSimulation:
                 self.render_selection_tool()
             case "Move":
                 self.render_move_tool()
-            case "CameraSetup":
-                self.camera_setup.draw(self.display)
+
         self.render_map()
+        if self.current_tool == "CameraSetup":
+            self.camera_setup.draw(self.display)
         self.render_display()
         self.ui.draw()
 
@@ -1503,9 +1504,8 @@ class EditorSimulation:
         render_scroll = (int(self.scroll[0]), int(self.scroll[1]))
 
         self.tilemap.set_render_filter(self.selector.link, (152, 242, 255, 50))
-
         for layer in self.tilemap.tilemap:
-            if self.current_layer == layer:
+            if self.current_layer == layer or self.showing_all_layers:
                 self.tilemap.render(self.display, layer, offset=render_scroll)
             else:
                 mask = (255, 255, 255, 80)
@@ -1656,7 +1656,7 @@ class GroupsManager:
 
     def add_tag_to_group(self, group_id: str, tag: dict):
         if group_id not in self.editor.tilemap.tag_groups:
-            self.editor.tilemap.tag_groups[group_id] = BASE_GROUP
+            self.editor.tilemap.tag_groups[group_id] = copy.deepcopy(BASE_GROUP)
         self.editor.tilemap.tag_groups[group_id]["tags"].update(tag)
         if self.editor.tilemap.tag_groups[group_id]["flags"]["Global"]:
             self.update_global_group(group_id)

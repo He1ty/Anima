@@ -67,8 +67,7 @@ class Entity:
                 self.collision["top"] = False
 
 
-            for rect in tilemap.physics_rects_under(self.rect,
-                                                    self.GRAVITY_DIRECTION) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect, self.GRAVITY_DIRECTION):
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] > 0) or (
                             self.GRAVITY_DIRECTION == -1 and self.velocity[1] < 0):
@@ -81,7 +80,7 @@ class Entity:
                                                     self.size[1])
                                 if not any(
                                         right_shifted_hitbox_rect.colliderect(r)
-                                        for r in tilemap.physics_rects_under(right_shifted_hitbox_rect,
+                                        for r in tilemap.physics_rects_around(right_shifted_hitbox_rect,
                                                                              self.GRAVITY_DIRECTION)):
                                     self.pos[0] += i
                                     nudged = True
@@ -90,7 +89,7 @@ class Entity:
                                 left_shifted_hitbox_rect = pygame.Rect(round(self.pos[0]) - i, round(self.pos[1]), self.size[0],
                                                     self.size[1])
                                 if not any(left_shifted_hitbox_rect.colliderect(r)
-                                        for r in tilemap.physics_rects_under(left_shifted_hitbox_rect,
+                                        for r in tilemap.physics_rects_around(left_shifted_hitbox_rect,
                                                                              self.GRAVITY_DIRECTION)):
                                     self.pos[0] -= i
                                     nudged = True
@@ -113,7 +112,7 @@ class Entity:
                 if block_under_entitys_feet:
                     b_b.add(True)
 
-            for rect in tilemap.physics_rects_around(self.rect) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect, self.GRAVITY_DIRECTION):
                 if entity_rect.colliderect(rect):
                     if (self.GRAVITY_DIRECTION == 1 and self.velocity[1] < 0) or (
                             self.GRAVITY_DIRECTION == -1 and self.velocity[1] > 0):
@@ -127,7 +126,7 @@ class Entity:
                                 if not any(
                                         right_shifted_hitbox_rect.colliderect(r)
                                         for r in
-                                        tilemap.physics_rects_around(right_shifted_hitbox_rect)):
+                                        tilemap.physics_rects_around(right_shifted_hitbox_rect, self.GRAVITY_DIRECTION)):
                                     self.pos[0] += i
                                     nudged = True
                                     break
@@ -137,7 +136,7 @@ class Entity:
                                 if not any(
                                         left_shifted_hitbox_rect.colliderect(r)
                                         for r in
-                                        tilemap.physics_rects_around(left_shifted_hitbox_rect)):
+                                        tilemap.physics_rects_around(left_shifted_hitbox_rect, self.GRAVITY_DIRECTION)):
                                     self.pos[0] -= i
                                     nudged = True
                                     break
@@ -162,6 +161,9 @@ class Entity:
                 if block_on_entitys_head:
                     b_t.add(True)
 
+            if self.is_on_floor():
+                self.pos[1] = round(self.pos[1])
+
             self.get_block_on["top"] = bool(b_t)
             self.get_block_on["bottom"] = bool(b_b)
 
@@ -171,7 +173,7 @@ class Entity:
             if int(self.velocity[0]) < 0 or not self.get_block_on["right"] or self.velocity[0] == 0:
                 self.collision["right"] = False
 
-            for rect in tilemap.physics_rects_around(self.rect) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect, self.GRAVITY_DIRECTION):
                 if entity_rect.colliderect(rect):
                     # --- HORIZONTAL CORNER CORRECTION ---
                     # If hitting a wall, try to nudge the player Up or Down to bypass the corner
@@ -183,7 +185,7 @@ class Entity:
                             if not any(
                                     top_shifted_hitbox.colliderect(r)
                                     for
-                                    r in tilemap.physics_rects_around(top_shifted_hitbox)):
+                                    r in tilemap.physics_rects_around(top_shifted_hitbox, self.GRAVITY_DIRECTION)):
                                 self.pos[1] = self.pos[1] - i
                                 nudged = True
                                 break
@@ -192,7 +194,7 @@ class Entity:
                             if not any(
                                     bottom_shifted_hitbox.colliderect(r)
                                     for
-                                    r in tilemap.physics_rects_around(bottom_shifted_hitbox)):
+                                    r in tilemap.physics_rects_around(bottom_shifted_hitbox, self.GRAVITY_DIRECTION)):
                                 self.pos[1] = self.pos[1] + i
                                 nudged = True
                                 break
@@ -209,7 +211,7 @@ class Entity:
                         self.pos[0] = entity_rect.x
                         self._collision_actions(axe)
 
-            for rect in tilemap.physics_rects_around(self.rect) + self.game.doors_rects:
+            for rect in tilemap.physics_rects_around(self.rect, self.GRAVITY_DIRECTION):
                 if ((self.GRAVITY_DIRECTION == 1 and (entity_rect.y - self.size[1] < rect.y <= entity_rect.y or
                                                       entity_rect.y + self.size[1] > rect.y >= entity_rect.y)) or
                         (self.GRAVITY_DIRECTION == -1 and (entity_rect.y <= rect.y < entity_rect.y + self.size[1] or
@@ -229,8 +231,7 @@ class Entity:
         # Offset depends on gravity: +1 if normal (down), -1 if inverted (up)
         y_offset = self.GRAVITY_DIRECTION
 
-        for rect in self.tilemap.physics_rects_under(self.rect,
-                                                     self.GRAVITY_DIRECTION) + self.game.doors_rects:
+        for rect in self.tilemap.physics_rects_around(self.rect, self.GRAVITY_DIRECTION):
             entity_rect = pygame.Rect(round(self.pos[0]), round(self.pos[1]) + y_offset, self.size[0], self.size[1])
             if entity_rect.colliderect(rect):
                 if self.GRAVITY_DIRECTION == 1:
@@ -360,7 +361,7 @@ class Player(Entity):
         """Update the player sounds depending on the player state"""
 
         # Landing sounds
-        if self.is_on_floor() and not self.was_on_floor:
+        if self.is_on_floor() and not self.was_on_floor and self.air_time > 2:
             self.game.play_se('land')
 
         # Mise à jour de l'état du sol pour le prochain frame
@@ -455,7 +456,7 @@ class Player(Entity):
 
 
         rotation_speed = 4.5
-        if not self.is_on_floor() and not self.can_walljump["sliding"]:
+        if not self.is_on_floor() and not self.can_walljump["sliding"] and self.air_time > 2:
             # Spin speed (Adjust "8" to make it faster/slower
             # Spin based on direction (Clockwise if facing right, CCW if left)
             # We use last_direction so you keep spinning even if you stop pressing keys in mid-air
@@ -508,6 +509,9 @@ class Player(Entity):
         else:
             self.pos[0] += self.SPEED * self.get_direction("x")
             self.pos[1] += self.SPEED * -self.get_direction("y")
+
+        if not self.is_on_floor():
+            pass
 
     def force_player_movement_direction(self):
         """forces some keys to be pressed"""
@@ -1289,7 +1293,7 @@ class Player(Entity):
             blit_rect = pygame.Rect(render_x, render_y, final_img.get_width(), final_img.get_height())
 
         # --- TILE CLIPPING (always applied) ---
-        solid_rects = self.game.tilemap.physics_rects_around(self.rect)
+        solid_rects = self.game.tilemap.physics_rects_around(self.rect, self.GRAVITY_DIRECTION)
         if solid_rects:
             keep_mask = pygame.Surface(final_img.get_size(), pygame.SRCALPHA)
             keep_mask.fill((255, 255, 255, 255))

@@ -79,10 +79,10 @@ class Tilemap:
             if tile_loc in self.offgrid_tiles[layer]:
                 return "offgrid"
 
-    def neighbor_offset(self, size):
+    def neighbor_offset(self, size, gravity_dir):
         offset = []
         tiles_x = round_up(size[0]/self.tile_size) + 1
-        tiles_y = round_up(size[1]/self.tile_size) + 1
+        tiles_y = round_up(size[1]/self.tile_size) + gravity_dir
         for x in range(-1, tiles_x):
             for y in range(-1, tiles_y):
                 offset.append((x, y))
@@ -96,20 +96,10 @@ class Tilemap:
                 return True
         return False
 
-    def under_offset(self, size, gravity_dir):
-        u_offset = []
-        tiles_x = round_up(size[0] / self.tile_size) + 1
-        tiles_y = round_up(size[1] / self.tile_size) + gravity_dir
-        r = range(tiles_y - 1, tiles_y)
-        for x in range(-1, tiles_x):
-            for y in r:
-                u_offset.append((x, y))
-        return u_offset
-
-    def tiles_around(self, pos, size):
+    def tiles_around(self, pos, size, gravity_dir):
         tiles = []
         tile_loc = (int((pos[0]+size[0]/2) // self.tile_size), int((pos[1]+size[1]/2) // self.tile_size))
-        for offset in self.neighbor_offset(size):
+        for offset in self.neighbor_offset(size, gravity_dir):
             check_loc = str(tile_loc[0] + offset[0]) + ';' + str(tile_loc[1] + offset[1])
             if self.show_collisions:
                 pygame.draw.rect(self.game.display, (255, 0, 255),
@@ -121,31 +111,6 @@ class Tilemap:
                 if check_loc in self.tilemap[layer]:
                     tiles.append((check_loc, self.tilemap[layer][check_loc]))
         return tiles
-
-    def tiles_under(self, pos, size, gravity_dir):
-        u_tiles = []
-        u_tile_loc = (int((pos[0] + size[0]/2) // self.tile_size), int((pos[1] + size[1]/2) // self.tile_size))
-        for offset in self.under_offset(size, gravity_dir):
-            check_loc = str(u_tile_loc[0] + offset[0]) + ';' + str(u_tile_loc[1] + offset[1])
-            if self.show_collisions:
-                pygame.draw.rect(self.game.display, (0, 0, 255),
-                                ((u_tile_loc[0] + offset[0]) * self.tile_size - int(self.game.scroll[0]),
-                                  (u_tile_loc[1] + offset[1]) * self.tile_size - int(self.game.scroll[1]),
-                                  16,
-                                  16))
-            for layer in self.tilemap:
-                if check_loc in self.tilemap[layer]:
-                    u_tiles.append((check_loc, self.tilemap[layer][check_loc]))
-        return u_tiles
-
-    def render_tiles_under(self, pos, size, gravity_dir):
-        u_tile_loc = (int((pos[0] + size[0] / 2) // self.tile_size), int((pos[1] + size[0]/2) // self.tile_size))
-        for offset in self.under_offset(size, gravity_dir):
-            pygame.draw.rect(self.game.display, (0, 0, 255),
-                                 ((u_tile_loc[0] + offset[0]) * self.tile_size - int(self.game.scroll[0]),
-                                  (u_tile_loc[1] + offset[1]) * self.tile_size - int(self.game.scroll[1]),
-                                  16,
-                                  16))
 
     def save(self, path):
         f = open(path, 'w')
@@ -335,6 +300,11 @@ class Tilemap:
                 elif transparent_check and tile_type in set(PASSABLE_TILES.keys()) and tile.variant in PASSABLE_TILES[tile_type]:
                     return self.tilemap[layer][tile_loc]
 
+        for rect in self.game.sinking_rects:
+            if rect.left < pos[0] < rect.right and rect.top < pos[1] < rect.bottom:
+                return True
+            pass
+
     def transparent_tile_check(self, tile_pos, tile, hitbox: pygame.Rect, gravity_dir):
         u_rects = []
         pos, size = hitbox.topleft, hitbox.size
@@ -350,29 +320,21 @@ class Tilemap:
                                 self.tile_size))
         return u_rects
 
-    def physics_rects_around(self, hitbox: pygame.Rect):
+    def physics_rects_around(self, hitbox: pygame.Rect, gravity_dir):
         pos, size = hitbox.topleft, hitbox.size
         rects = []
-        for tile_loc, tile in self.tiles_around(pos, size):
+        for tile_loc, tile in self.tiles_around(pos, size, gravity_dir):
             tile_pos = [float(val) for val in tile_loc.split(";")]
             tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(tile)
             tile_type = self.tile_manager.tiles[tile_id].type
             if tile_type in PHYSICS_TILES:
                 rects.append(pygame.Rect(tile_pos[0] * self.tile_size, tile_pos[1] * self.tile_size, self.tile_size, self.tile_size))
-        return rects
-
-    def physics_rects_under(self, hitbox: pygame.Rect, gravity_dir):
-        u_rects = []
-        pos, size = hitbox.topleft, hitbox.size
-        for tile_loc, tile in self.tiles_under(pos, size, gravity_dir):
-            tile_pos = [float(val) for val in tile_loc.split(";")]
-            tile_id, variant, rotation, flip_x, flip_y = self.tile_manager.unpack_tile(tile)
-            tile_type = self.tile_manager.tiles[tile_id].type
-            if tile_type in PHYSICS_TILES:
-                u_rects.append(pygame.Rect(tile_pos[0] * self.tile_size, tile_pos[1] * self.tile_size, self.tile_size, self.tile_size))
             else:
-                u_rects += self.transparent_tile_check(tile_pos, tile, hitbox, gravity_dir)
-        return u_rects
+                rects += self.transparent_tile_check(tile_pos, tile, hitbox, gravity_dir)
+
+        rects += self.game.sinking_rects
+        rects += self.game.doors_rects
+        return rects
 
     def get_type_from_rect(self, rect):
         for layer in self.tilemap:
@@ -465,7 +427,4 @@ class Tilemap:
 
                 surf.blit(img,
                           (pos[0] - offset[0], pos[1] - offset[1]))
-
-        if layer == "2" and self.show_collisions:
-            self.render_tiles_under(self.game.player.pos, self.game.player.image, 1)
 

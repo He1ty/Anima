@@ -7,6 +7,7 @@ from scripts.checkpoint import CheckPoint
 # These modules handle specific game logic like physics, entities, and UI.
 from scripts.entities import *
 from scripts.fake_tiles_group import FakeTilesGroup
+from scripts.sinking_group import SinkingGroup
 from scripts.utils import *
 from scripts.tilemap import Tilemap
 from scripts.physics import Player
@@ -23,9 +24,10 @@ from scripts.pickup import Pickup
 
 class LevelManager:
 
-    TAGS = {"lever", "door", "spike", "fake_tile", "checkpoint"}
     ROLE_TAGS = {"lever", "door", "spike", "checkpoint"}
-    STATE_TAGS = {"fake_tile"}
+    STATE_TAGS = {"fake_tile", "sinking"}
+    TAGS = ROLE_TAGS.union(STATE_TAGS)
+
 
     def __init__(self, game):
         self.game = game
@@ -60,12 +62,14 @@ class LevelManager:
         self.game.doors = []
         self.game.spikes = []
         self.game.fake_tiles = []
+        self.game.sinking = []
         self.game.pickups = []
         self.game.leaf_spawners = []
         self.game.camera_zones = []
 
-        #ROLE_TAGS before
         tagged_tiles = self.get_tagged_tiles()
+
+        #ROLE_TAGS before
         for tile_loc, tile_layer in tagged_tiles:
             tile_space = self.game.tilemap.get_tile_space(tile_loc, tile_layer)
             tile = self.game.tilemap.extract(tile_loc, tile_layer)
@@ -98,6 +102,7 @@ class LevelManager:
 
         #STATE TAGS after
         fake_tile_groups = {}
+        sinking_groups = {}
         for tile_loc, tile_layer in tagged_tiles:
             tile_space = self.game.tilemap.get_tile_space(tile_loc, tile_layer)
             tile = self.game.tilemap.extract(tile_loc, tile_layer)
@@ -110,15 +115,25 @@ class LevelManager:
                     continue
                 if group_id not in fake_tile_groups:
                     fake_tile_groups[group_id] = {}
+                if group_id not in sinking_groups:
+                    sinking_groups[group_id] = {}
 
                 if "fake_tile" in group_tags:
                     fake_tile_groups[group_id][tile_loc] = (tile, tile_layer)
                     self.game.layers["fake_tile"].add(tile_layer)
 
+                elif "sinking" in group_tags:
+                    sinking_groups[group_id][tile_loc] = (tile, tile_layer)
+                    self.game.layers["sinking"].add(tile_layer)
+
 
         if fake_tile_groups:
             for group_id in fake_tile_groups:
                 self.game.fake_tiles.append(FakeTilesGroup(self.game, fake_tile_groups[group_id]))
+
+        if sinking_groups:
+            for group_id in sinking_groups:
+                self.game.sinking.append(SinkingGroup(self.game, sinking_groups[group_id]))
 
 
         # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
@@ -277,6 +292,8 @@ class Game:
         }
 
         # Activators / interactables
+        self.sinking_colliding_group = None
+        self.sinking_rects = []
         self.activators = []
         self.spawners = {}
         self.spawner_pos = {}
@@ -447,11 +464,6 @@ class Game:
                 self.level_manager.load_level(self.level_id)
                 self.player.pos = [8 * self.tile_size, 5 * self.tile_size]
 
-    def _render_checkpoints(self, render_scroll):
-        if hasattr(self, "checkpoints"):
-            for checkpoint in self.checkpoints:
-                checkpoint.render(render_scroll)
-
 
 
     def _update_spikes(self):
@@ -464,6 +476,17 @@ class Game:
             for checkpoint in self.checkpoints:
                 checkpoint.update()
 
+    def _update_fake_tiles(self):
+        if hasattr(self, "fake_tiles"):
+            for group in self.fake_tiles:
+                group.update()
+
+    def _update_sinking(self, dt):
+        if hasattr(self, "sinking"):
+            for group in self.sinking:
+                group.update(dt)
+
+
 
 
     def _render_spikes(self, render_scroll):
@@ -471,17 +494,22 @@ class Game:
             for spike in self.spikes:
                 spike.render(self.display, render_scroll)
 
-
-
-    def _update_fake_tiles(self):
-        if hasattr(self, "fake_tiles"):
-            for group in self.fake_tiles:
-                group.update()
+    def _render_checkpoints(self, render_scroll):
+        if hasattr(self, "checkpoints"):
+            for checkpoint in self.checkpoints:
+                checkpoint.render(render_scroll)
 
     def _render_fake_tiles(self, render_scroll):
         if hasattr(self, "fake_tiles"):
             for group in self.fake_tiles:
                 group.render(self.display, render_scroll)
+
+    def _render_sinking(self, render_scroll):
+        if hasattr(self, "sinking"):
+            for group in self.sinking:
+                group.render(self.display, render_scroll)
+
+
 
     def main_game_logic(self):
         raw_dt = self.clock.tick(60)
@@ -502,14 +530,11 @@ class Game:
         self._update_spikes()
         self._update_checkpoints()
         self._update_fake_tiles()
+        self._update_sinking(dt)
         self.player.physics_process(self.dict_kb, dt)
 
+
         self.update_transitions()
-        if self.teleporting:
-            update_teleporter(self, self.tp_id)
-        self.player.disablePlayerInput = (
-                self.cutscene or self.moving_visual or self.teleporting
-        )
         if not self.game_initialized:
             self.start_time = time.time()
 
@@ -528,6 +553,9 @@ class Game:
 
             if layer in self.layers["checkpoint"]:
                 self._render_checkpoints(render_scroll)
+
+            if layer in self.layers["sinking"]:
+                self._render_sinking(render_scroll)
 
         self._render_fake_tiles(render_scroll)
 
