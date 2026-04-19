@@ -1,9 +1,12 @@
 import sys
 
+from setuptools.sandbox import run_setup
+
 from scripts.checkpoint import CheckPoint
 # --- Game Script Imports ---
 # These modules handle specific game logic like physics, entities, and UI.
 from scripts.entities import *
+from scripts.fake_tiles_group import FakeTilesGroup
 from scripts.utils import *
 from scripts.tilemap import Tilemap
 from scripts.physics import Player
@@ -19,6 +22,11 @@ from scripts.sound import Sound
 from scripts.pickup import Pickup
 
 class LevelManager:
+
+    TAGS = {"lever", "door", "spike", "fake_tile", "checkpoint"}
+    ROLE_TAGS = {"lever", "door", "spike", "checkpoint"}
+    STATE_TAGS = {"fake_tile"}
+
     def __init__(self, game):
         self.game = game
         self.first_level_id = 1
@@ -28,9 +36,25 @@ class LevelManager:
         self.game.tilemap.load(f"data/maps/{level_id:03d}.json")
         self.game.tilemap.tile_size = self.game.tile_size
 
+    def get_tagged_tiles(self):
+        '''format: {(tile_loc, tile_layer):{groups}}'''
+
+        tagged_tiles = {}
+        for group_id in self.game.tilemap.tag_groups:
+            group = self.game.tilemap.tag_groups[group_id]
+            for tile_loc, tile_layer in group["tiles"]:
+                if (tile_loc, tile_layer) in tagged_tiles:
+                    tagged_tiles[(tile_loc, tile_layer)].add(group_id)
+                else:
+                    tagged_tiles[(tile_loc, tile_layer)] = {group_id}
+        return tagged_tiles
+
+
+
     def load_level(self, level_id):
         self.update_map(level_id)
 
+        self.game.layers = {tag:set() for tag in self.TAGS}
         self.game.checkpoints = []
         self.game.levers = []
         self.game.doors = []
@@ -38,38 +62,66 @@ class LevelManager:
         self.game.fake_tiles = []
         self.game.pickups = []
         self.game.leaf_spawners = []
-
         self.game.camera_zones = []
-        for group_id in self.game.tilemap.tag_groups:
-            group = self.game.tilemap.tag_groups[group_id]
-            group_tags = group["tags"]
-            match group_tags:
-                case _ if "lever" in group_tags:
-                    tag = group_tags["lever"]
-                    for tile_loc, tile_layer in group["tiles"]:
-                        self.game.tilemap.extract(tile_loc, tile_layer)
-                        #self.game.levers.append(Lever(group_id, tile_pos, tag["target_group"]))
-                        pass
-                case _ if "door" in group_tags:
-                    pass
-                case _ if "spike" in group_tags:
-                    for tile_loc, tile_layer in group["tiles"]:
-                        tile = self.game.tilemap.extract(tile_loc, tile_layer)
-                        tile_id, variant, rotation, flip_x, flip_y = self.game.tilemap.tile_manager.unpack_tile(tile)
-                        image = self.game.tilemap.tile_manager.tiles[tile_id].images[variant]
-                        pos = [float(val)*self.game.tile_size for val in tile_loc.split(";")]
-                        self.game.spikes.append(Spike(self.game, pos, image, rotation))
-                case _ if "fake_tile" in group_tags:
-                    pass
-                case _ if "checkpoint" in group_tags:
-                    for tile_loc, tile_layer in group["tiles"]:
-                        tile = self.game.tilemap.extract(tile_loc, tile_layer)
-                        pos = [float(val) * self.game.tile_size for val in tile_loc.split(";")]
-                        self.game.checkpoints.append(CheckPoint(self.game, pos, tile))
+
+        #ROLE_TAGS before
+        tagged_tiles = self.get_tagged_tiles()
+        for tile_loc, tile_layer in tagged_tiles:
+            tile_space = self.game.tilemap.get_tile_space(tile_loc, tile_layer)
+            tile = self.game.tilemap.extract(tile_loc, tile_layer)
+            new_tile = tile
+            pos = [float(val) * self.game.tile_size for val in tile_loc.split(";")]
+            for group_id in tagged_tiles[(tile_loc, tile_layer)]:
+                group = self.game.tilemap.tag_groups[group_id]
+                group_tags = group["tags"]
+                if set(group_tags).intersection(self.ROLE_TAGS) == set():
+                    continue
+
+                if "spike" in group_tags:
+                    new_tile = Spike(self.game, pos, tile)
+                    self.game.spikes.append(new_tile)
+                    self.game.layers["spike"].add(tile_layer)
+
+            check = False
+            for group_id in tagged_tiles[(tile_loc, tile_layer)]:
+                group = self.game.tilemap.tag_groups[group_id]
+                group_tags = group["tags"]
+                if set(group_tags).intersection(self.STATE_TAGS) != set():
+                    check = True
+                    break
+
+            if check:
+                if tile_space == "tilemap":
+                    self.game.tilemap.tilemap[tile_layer][tile_loc] = new_tile
+                elif tile_space == "offgrid":
+                    self.game.tilemap.offgrid_tiles[tile_layer][tile_loc] = new_tile
+
+        #STATE TAGS after
+        fake_tile_groups = {}
+        for tile_loc, tile_layer in tagged_tiles:
+            tile_space = self.game.tilemap.get_tile_space(tile_loc, tile_layer)
+            tile = self.game.tilemap.extract(tile_loc, tile_layer)
+            new_tile = tile
+            pos = [float(val) * self.game.tile_size for val in tile_loc.split(";")]
+            for group_id in tagged_tiles[(tile_loc, tile_layer)]:
+                group = self.game.tilemap.tag_groups[group_id]
+                group_tags = group["tags"]
+                if set(group_tags).intersection(self.STATE_TAGS) == set():
+                    continue
+                if group_id not in fake_tile_groups:
+                    fake_tile_groups[group_id] = {}
+
+                if "fake_tile" in group_tags:
+                    fake_tile_groups[group_id][tile_loc] = (tile, tile_layer)
+                    self.game.layers["fake_tile"].add(tile_layer)
 
 
-            # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
+        if fake_tile_groups:
+            for group_id in fake_tile_groups:
+                self.game.fake_tiles.append(FakeTilesGroup(self.game, fake_tile_groups[group_id]))
 
+
+        # Set scroll on player spawn position at the very start (before any save), it updates later in load_game function in saving.py
         for zone in self.game.tilemap.camera_zones:
             self.game.camera_zones.append([int(val) for val in zone.split(";")])
 
@@ -242,6 +294,7 @@ class Game:
         self.holding_attack = False
         self.transitions = []
         self.doors_rects = []
+        self.layers = {}
 
         # Lighting
         self._init_lighting()
@@ -420,33 +473,15 @@ class Game:
 
 
 
-    def fake_tiles_render(self, offset=(0, 0)):
-        group_to_remove = None
-        for group in self.fake_tile_groups:
-            opacity = 255
-            for fake_tile in group:
-                if self.tilemap.fake_tile_colliding_with_player(fake_tile):
-                    self.fake_tiles_colliding_group = group.copy()
-                    break
+    def _update_fake_tiles(self):
+        if hasattr(self, "fake_tiles"):
+            for group in self.fake_tiles:
+                group.update()
 
-            if group == self.fake_tiles_colliding_group:
-                self.fake_tiles_opacity = max(0, self.fake_tiles_opacity - 30)
-                opacity = self.fake_tiles_opacity
-                if opacity == 0:
-                    group_to_remove=self.fake_tiles_colliding_group
-
-            for fake_tile in group:
-                img = self.assets[fake_tile.type][fake_tile.variant].copy()
-                img.fill((255, 255, 255, opacity),special_flags=pygame.BLEND_RGBA_MULT)
-
-                self.display.blit(img, (
-                    fake_tile.pos[0]*self.tile_size - offset[0], fake_tile.pos[1]*self.tile_size - offset[1]))
-
-        if group_to_remove:
-            if group_to_remove in self.fake_tile_groups:
-                self.fake_tile_groups.remove(group_to_remove)
-            self.fake_tiles_opacity = 255
-            self.fake_tiles_colliding_group = []
+    def _render_fake_tiles(self, render_scroll):
+        if hasattr(self, "fake_tiles"):
+            for group in self.fake_tiles:
+                group.render(self.display, render_scroll)
 
     def main_game_logic(self):
         raw_dt = self.clock.tick(60)
@@ -463,7 +498,12 @@ class Game:
     def _update_world(self, dt):
         self._camera_borders_check()
         self.camera.update_camera()
+
+        self._update_spikes()
+        self._update_checkpoints()
+        self._update_fake_tiles()
         self.player.physics_process(self.dict_kb, dt)
+
         self.update_transitions()
         if self.teleporting:
             update_teleporter(self, self.tp_id)
@@ -476,14 +516,20 @@ class Game:
     def _render_world(self):
         render_scroll = (round(self.scroll[0]), round(self.scroll[1]))
         display_level_bg(self, self.level_id)
-        self.tilemap.render(self.display, offset=render_scroll)
+        for layer in self.tilemap.tilemap:
+            self.tilemap.render(self.display, layer, offset=render_scroll)
 
-        self._update_spikes()
-        self._update_checkpoints()
+            if layer == self.tilemap.player_layer:
+                self.player.render(self.display, offset=render_scroll)
+                self.player.render_wall_trails(self.display, offset=render_scroll)
 
+            if layer in self.layers["spike"]:
+                self._render_spikes(render_scroll)
 
-        self._render_spikes(render_scroll)
-        self._render_checkpoints(render_scroll)
+            if layer in self.layers["checkpoint"]:
+                self._render_checkpoints(render_scroll)
+
+        self._render_fake_tiles(render_scroll)
 
 
 

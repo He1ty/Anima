@@ -6,407 +6,11 @@ import random
 import math
 
 
-
-class PhysicsEntity:
-    def __init__(self, game, e_type, pos, size):
-        # Initialize a physics-based entity with position, size and movement properties
-        self.game = game
-        self.type = e_type
-        self.pos = list(pos)
-        self.size = size
-        self.velocity = [0, 0]
-        self.collisions = {'up': False, 'down': False, 'right': False, 'left': False}
-
-        self.action = ''
-        self.flip = False
-        try:
-            self.set_action('idle')
-        except AttributeError:
-            pass
-        except KeyError:
-            pass
-
-        self.last_movement = [0, 0]
-
-    def rect(self):
-        # Return the collision rectangle for this entity
-        return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
-
-    def set_action(self, action):
-        # Change the animation action for this entity
-        if action != self.action:
-            self.action = action
-            self.animation = self.game.assets[self.type + '/' + self.action].copy()
-
-    def update(self, tilemap, movement=(0, 0)):
-        # Update entity position, handle collisions with environment and apply physics
-        self.collisions = {'up': False, 'down': False, 'right': False, 'left': False}
-
-        frame_movement = (movement[0] + self.velocity[0], movement[1] + self.velocity[1])
-
-        self.pos[0] += frame_movement[0]
-        entity_rect = self.rect()
-        for rect in tilemap.physics_rects_around(self.pos, self.size) + self.game.doors_rects:
-            if entity_rect.colliderect(rect):
-                if frame_movement[0] > 0:
-                    entity_rect.right = rect.left
-                    self.collisions['right'] = True
-                if frame_movement[0] < 0:
-                    entity_rect.left = rect.right
-                    self.collisions['left'] = True
-                self.pos[0] = entity_rect.x
-
-        self.pos[1] += frame_movement[1]
-        entity_rect = self.rect()
-        for rect in tilemap.physics_rects_under(self.pos, self.size) + self.game.doors_rects:
-            if entity_rect.colliderect(rect):
-                if frame_movement[1] > 0:
-                    entity_rect.bottom = rect.top
-                    self.collisions['down'] = True
-                self.pos[1] = entity_rect.y
-        for rect in tilemap.physics_rects_around(self.pos, self.size):
-            if entity_rect.colliderect(rect):
-                if frame_movement[1] < 0:
-                    entity_rect.top = rect.bottom
-                    self.collisions['up'] = True
-            self.pos[1] = entity_rect.y
-
-        if movement[0] > 0:
-            self.flip = False
-        if movement[0] < 0:
-            self.flip = True
-
-        self.last_movement = movement
-
-        self.velocity[1] = min(5, self.velocity[1] + 0.1)
-
-        if self.collisions['down'] or self.collisions['up']:
-            self.velocity[1] = 0
-
-        self.animation.update()
-
-    def render(self, surf, offset=(0, 0)):
-        # Draw the entity on the screen with proper orientation
-        surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False),
-                  (self.pos[0] - offset[0], self.pos[1] - offset[1]))
-
-
-class Enemy(PhysicsEntity):
-    def __init__(self, game, enemy_type, pos, size, hp, attack_info):
-        # Initialize an enemy entity with behavior and combat stats
-        super().__init__(game, 'enemy', pos, size)
-
-        self.walking = 0
-        self.enemy_type = enemy_type
-
-        self.attack_distance = attack_info["attack_distance"]
-        self.vision_distance = 100
-        self.is_attacking = False
-        self.is_chasing = False
-        self.mono_direction_attack_check = False
-        self.player_x = self.game.player.rect().centerx
-        self.enemy_x = self.rect().centerx
-        self.enemy_y = self.rect().centery
-        self.last_attack_time = 0
-        self.attack_dmg = attack_info["attack_dmg"]
-        self.attack_time = attack_info["attack_time"]
-        self.first_attack_time = 0
-        self.is_dealing_damage = False
-        self.hp = hp
-        self.hit = False
-        self.stunned = False
-        self.last_stun_time = 0
-        self.is_attacked = False
-        self.knockback_dir = [0, 0]
-        self.animation = self.game.assets[self.enemy_type + '/idle'].copy()
-
-    def update(self, tilemap, movement=(0, 0)):
-        # Update enemy behavior, AI and combat state
-        self.player_x = self.game.player.rect().centerx
-        self.enemy_x = self.rect().centerx
-        self.is_attacked = (self.game.attacking
-                            and self.distance_with_player() <= self.game.player_attack_dist
-                            and self.player_looking_at_entity()
-                            and not self.is_attacked)
-
-        if self.hp <= 0:
-            self.animation.update()
-            return
-
-        if self.is_attacked and not self.hit:
-            self.is_attacking = True
-            self.is_chasing = True
-            if time.time() - self.game.player_last_attack_time >= self.game.player_attack_time:
-                deal_dmg(self.game, 'player', self)
-                self.stunned = True
-                self.hit = True
-                self.last_stun_time = time.time()
-
-        if not self.game.holding_attack and (
-                not ("attack" in self.game.player.action) or self.game.player.animation.done):
-            self.hit = False
-
-        self.update_attack()
-
-        # Handle stun state first
-        if self.stunned:
-            self.is_chasing = False
-            self.is_attacking = False
-
-            # Calculate time since stun started
-            stun_elapsed = time.time() - self.last_stun_time
-            stun_duration = 0.5
-
-            if stun_elapsed >= stun_duration:
-                self.stunned = False
-                self.is_attacking = True
-                self.is_chasing = True
-
-            else:
-                # Add stun animation/movement here
-                movement = deal_knockback(self.game.player, self, 1)
-                super().update(tilemap, movement=movement)
-                self.flip = self.player_x < self.enemy_x
-                self.animations(movement)
-                return  # Skip the rest of the normal update logic
-        self.knockback_dir = [0, 0]
-
-        # Regular (non-stunned) behavior continues below
-        if self.walking:
-            if tilemap.solid_check((self.rect().centerx + (-7 if self.flip else 7), self.pos[1] + 23)):
-                if self.collisions['right'] or self.collisions['left']:
-                    self.flip = not self.flip
-                else:
-                    movement = (movement[0] - 0.5 if self.flip else 0.5, movement[1])
-                self.walking = max(0, self.walking - 1)
-            else:
-                self.flip = not self.flip
-                self.is_attacking = False
-                self.is_chasing = False
-
-        elif not (self.is_attacking or self.is_chasing):
-            rand = random.random()
-            if rand < 0.01:
-                self.walking = random.randint(30, 120)
-
-        if self.distance_with_player() <= self.vision_distance:
-            if tilemap.solid_check((self.rect().centerx + (-7 if self.flip else 7), self.pos[1] + 23)):
-                if (self.check_if_player_close(self.vision_distance, not self.is_chasing)
-                        or (not self.game.player.is_on_floor() and self.is_chasing)):
-                    if self.check_if_player_close(self.vision_distance, not self.is_chasing):
-                        if self.player_x < self.enemy_x:
-                            self.flip = True
-                        elif self.player_x > self.enemy_x:
-                            self.flip = False
-                    if not self.is_attacking:
-                        self.is_chasing = True
-                        movement = (movement[0] - 1 if self.flip else 1, movement[1])
-                else:
-                    self.is_chasing = False
-
-                if self.check_if_player_close(self.attack_distance, self.mono_direction_attack_check) or (
-                        not self.game.player.is_on_floor() and self.is_attacking):
-                    self.walking = 0
-                    self.is_attacking = True
-                    self.is_chasing = True
-            else:
-                self.flip = not self.flip
-                self.is_attacking = False
-                self.is_chasing = False
-
-        if self.distance_with_player() > self.attack_distance and self.is_attacking:
-            self.is_attacking = False
-
-        if self.distance_with_player() > self.vision_distance and self.is_chasing:
-            self.is_chasing = False
-
-        super().update(tilemap, movement=movement)
-        self.animations(movement)
-
-    def set_action(self, action):
-        # Set the enemy's animation based on its current action
-        if action != self.action:
-            self.action = action
-            self.animation = self.game.assets[self.enemy_type + '/' + self.action].copy()
-
-    def update_attack(self):
-        # Handle enemy attack logic and timing
-        if self.is_attacking and not self.stunned:
-            if time.time() - self.first_attack_time >= self.attack_time / 5:
-                deal_dmg(self.game, self, 'player', self.attack_dmg, self.attack_time)
-                self.is_dealing_damage = False
-        elif not self.is_attacking:
-            self.last_attack_time = 0
-            self.first_attack_time = time.time()
-
-    def check_if_player_close(self, vision_distance, mono_direction=True):
-        # Check if the player is within detection distance and line of sight
-        if (not (self.game.tilemap.between_check(self.game.player.pos, self.pos))
-                and self.game.player.pos[1] + self.game.player.image[1] == int(self.pos[1] + self.size[1])):
-            if abs(self.player_x - self.enemy_x) <= vision_distance:
-                if mono_direction:
-                    if self.flip and self.player_x < self.enemy_x:
-                        return True
-                    if not self.flip and self.player_x > self.enemy_x:
-                        return True
-                else:
-                    return True
-        return False
-
-    def distance_with_player(self):
-        # Calculate the distance between enemy and player
-        relative_player_pos = 1 if self.player_x > self.enemy_x else -1
-        if self.pos[0] < self.player_x < self.pos[0] + self.size[0]:
-            return True
-        return math.sqrt((self.enemy_x + relative_player_pos * self.size[0] / 2 - self.player_x) ** 2 + (
-                (self.pos[1] + self.size[1]) - (self.game.player.pos[1] + self.game.player.image[1])) ** 2)
-
-    def player_looking_at_entity(self):
-        # Check if the player is facing the enemy
-        if (not (self.game.tilemap.between_check(self.game.player.pos, self.pos))
-                and self.game.player.pos[1] <= self.pos[1] + self.size[1]):
-            if self.pos[0] + self.size[0] >= self.player_x >= self.pos[0]:
-                return True
-            elif self.game.player.last_direction == 1:
-                return self.enemy_x > self.player_x
-            elif self.game.player.last_direction == -1:
-                return self.enemy_x < self.player_x
-
-    def render(self, surf, offset=(0, 0)):
-        # Draw the enemy on screen with proper orientation
-        if self.game.e_info[self.enemy_type]["left/right"]:
-            surf.blit(self.animation.img(), (self.pos[0] - offset[0], self.pos[1] - offset[1]))
-        else:
-            surf.blit(pygame.transform.flip(self.animation.img(), self.flip, False),
-                      (self.pos[0] - offset[0], self.pos[1] - offset[1]))
-
-    def animations(self, movement):
-        # Set appropriate animation based on enemy state
-        animation_running = False
-
-        if self.stunned:
-            self.set_action("hit")
-            animation_running = True
-
-        if self.is_attacking and not animation_running and not self.stunned:
-            if self.action != "attack":
-                self.set_action("attack")
-            animation_running = True
-
-        if not self.is_attacking and not animation_running:
-            if movement[0] != 0:
-                if self.game.e_info[self.enemy_type]["left/right"]:
-                    if self.flip:
-                        self.set_action("run/left")
-                    else:
-                        self.set_action("run/right")
-                else:
-                    self.set_action("run")
-            else:
-                self.set_action("idle")
-
-
-class DistanceEnemy(Enemy):
-    def __init__(self, game, enemy_type, pos, size, hp, attack_info):
-        # Initialize a ranged enemy that can fire projectiles
-        super().__init__(game, enemy_type, pos, size, hp, attack_info)
-        self.projectile_sent = False
-        self.mono_direction_attack_check = True
-
-    def update_attack(self):
-        # Handle ranged attack logic and create projectiles
-        if self.is_attacking and not self.stunned:
-            if time.time() - self.first_attack_time >= self.attack_time / 5:
-                if time.time() - self.last_attack_time >= self.attack_time:
-                    self.last_attack_time = time.time()
-                    self.game.projectiles.append({"type": self.enemy_type + "_projectile",
-                                                  "pos": self.pos.copy(),
-                                                  "direction": [-1 if self.flip else 1, 0],
-                                                  "timer": 0,
-                                                  "dmg": 10})
-                    self.is_dealing_damage = True
-                self.is_dealing_damage = False
-        elif not self.is_attacking:
-            self.last_attack_time = 0
-            self.first_attack_time = time.time()
-
-class Throwable(PhysicsEntity):
-    def __init__(self, game, o_type, pos, size):
-        # Initialize an object that can be picked up and thrown
-        super().__init__(game, o_type, pos, size)
-        self.action = ''
-        self.flip = False
-        try:
-            self.set_action('intact')
-        except AttributeError:
-            pass
-        self.grabbed = False
-        self.grabbing_entity = None
-
-    def update(self, tilemap, movement=(0, 0)):
-        # Update physics for throwable objects, handle grabbing state
-        if not self.grabbed:
-            self.game.player_grabbing = False
-
-            # Call parent update (handles physics and movement)
-            super().update(tilemap, movement=(0, 0))
-
-            # Check if we've collided with something (implement based on your collision system)
-            # If we hit something horizontally, stop horizontal movement
-            if self.collisions["left"] or self.collisions["right"] or self.collisions["down"] or self.collisions["up"]:
-                self.velocity[0] = 0
-            # We keep vertical velocity for gravity effects
-
-        else:
-            self.game.player_grabbing = True
-            self.pos = [
-                self.grabbing_entity.rect().centerx + 5 if self.grabbing_entity.last_direction == 1 else self.grabbing_entity.rect().centerx - 15,
-                self.grabbing_entity.rect().centery - 10]
-
-    def can_interact(self, player_rect, interaction_distance=2):
-        # Check if player is close enough to interact with this object
-        can_interact = self.rect().colliderect(player_rect.inflate(interaction_distance, interaction_distance))
-        return can_interact
-
-    def grab(self, entity):
-        # Player grabs this object
-        self.grabbed = True
-        self.grabbing_entity = entity
-
-    def launch(self, direction, strength):
-        # Throw the object in a specific direction with given strength
-        # Release from grabbed state
-        self.grabbed = False
-
-        # Calculate magnitude of the direction vector
-        magnitude = math.sqrt(direction[0] ** 2 + direction[1] ** 2)
-
-        # Avoid division by zero
-        if magnitude > 0:
-            # Normalize and multiply by strength
-            normalized_x = direction[0] / magnitude
-            normalized_y = direction[1] / magnitude
-
-            # Set velocity based on strength and direction
-            self.velocity[0] = normalized_x * strength
-            self.velocity[1] = normalized_y * strength
-        else:
-            # If direction vector is zero, just throw upward
-            self.velocity[0] = 0
-            self.velocity[1] = -strength
-
-    def rect(self):
-        # Return collision rectangle
-        return pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
-
 class DamageBlock:
-    def __init__(self, game, pos, img, rotation=0):
+    def __init__(self, game_instance, pos):
         # Initialize a block that damages the player on contact
         self.pos = pos
-        self.image = img
-        self.last_attack_time = 0
-        self.game = game
-        self.rotation = (rotation - 1) % 4
+        self.game = game_instance
         self.circle_hitbox = False
 
     def rect(self):
@@ -420,31 +24,25 @@ class DamageBlock:
 
             return r
 
-    def render(self, surf, offset=(0, 0)):
-        # Draw the damage block on screen
-        surf.blit(self.image, (self.pos[0] - offset[0], self.pos[1] - offset[1]))
-        if self.game.show_spikes_hitboxes:
-            r = self.rect()
-            if self.circle_hitbox:
-                xq = r.right - (r.right - r.x) / 2 != r.centerx
-                yq = r.bottom - (r.bottom - r.y) / 2 != r.centery
-
-                pygame.draw.circle(surf, (255, 0, 255),(r.centerx - offset[0] + 1*xq, r.centery - offset[1] + 1*yq), r.width/2)
-            else:
-                pygame.draw.rect(surf, (255, 0, 255), pygame.Rect(r.x - offset[0], r.y - offset[1],
-                                                              r.width, r.height))
-
 class Spike(DamageBlock):
 
-    def __init__(self, game, pos, size, rotation=0):
-        super().__init__(game, pos, size, rotation)
+    def __init__(self, game_instance, pos, tile):
+        super().__init__(game_instance, pos)
+        tile_id, variant, rotation, flip_x, flip_y = game_instance.tilemap.tile_manager.unpack_tile(tile)
+        image = game_instance.tilemap.tile_manager.tiles[tile_id].images[variant]
+        image = pygame.transform.rotate(image, rotation * -90)
+        image = pygame.transform.flip(image, flip_x, flip_y)
+        self.rotation = rotation
+        self.flip_x = flip_x
+        self.flip_y = flip_y
+        self.image = image
 
     @override
     def rect(self):
         width = 10
         height = 5
-        angle = self.rotation * math.pi / 2
-        if self.rotation % 2 == 0:
+        angle = ((self.rotation - 1) % 4) * math.pi / 2
+        if ((self.rotation - 1) % 4) % 2 == 0:
             width, height = height, width
             pos = (self.pos[0] + (self.image.get_width() - width) / 2 - math.cos(angle) * (
                     self.image.get_width() - width) / 2, self.pos[1] + (self.image.get_height() - height) / 2
@@ -473,6 +71,24 @@ class Spike(DamageBlock):
                         self.game.player.size[0] / 2 + self.image.get_width() / 2) and self.game.player.collide_with(
                         self.rect(), static_rect=True):
                     kill_player(self.game)
+
+    def render(self, surf, offset=(0, 0)):
+        img = self.image
+
+        surf.blit(img, (self.pos[0] - offset[0], self.pos[1] - offset[1]))
+        if self.game.show_spikes_hitboxes:
+            r = self.rect()
+            if self.circle_hitbox:
+                xq = r.right - (r.right - r.x) / 2 != r.centerx
+                yq = r.bottom - (r.bottom - r.y) / 2 != r.centery
+
+                pygame.draw.circle(surf, (255, 0, 255),
+                                   (r.centerx - offset[0] + 1 * xq, r.centery - offset[1] + 1 * yq), r.width / 2)
+            else:
+                pygame.draw.rect(surf, (255, 0, 255), pygame.Rect(r.x - offset[0], r.y - offset[1],
+                                                                  r.width, r.height))
+
+
 
 
 def blur(surface, span):

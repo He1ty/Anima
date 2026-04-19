@@ -200,9 +200,9 @@ def display_level_bg(game, map_id):
         fog_surface.fill((0, 0, 0, 190))
         game.display.blit(fog_surface, (0, 0))
     else:
-        game.display.blit(pygame.transform.scale(game.assets[f'{environment}/0'], game.display.get_size()) , (0, 0))
-        display_bg(game.display, pygame.transform.scale(game.assets[f'{environment}/1'], game.display.get_size()), (game.scroll[0]/20, 0))
-        game.display.blit(pygame.transform.scale(game.assets[f'{environment}/2'], game.display.get_size()), (0, 0))
+        game.display.blit(pygame.transform.scale(game.assets[f'{2}/0'], game.display.get_size()) , (0, 0))
+        display_bg(game.display, pygame.transform.scale(game.assets[f'{2}/1'], game.display.get_size()), (game.scroll[0]/20, 0))
+        game.display.blit(pygame.transform.scale(game.assets[f'{2}/2'], game.display.get_size()), (0, 0))
         fog_surface = pygame.Surface(game.display.get_size(), pygame.SRCALPHA)
         fog_surface.fill((0,0,0,100))
         game.display.blit(fog_surface, (0, 0))

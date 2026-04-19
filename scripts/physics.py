@@ -262,7 +262,7 @@ class Player(Entity):
     DASHTIME = 10
     JUMPTIME = 8
     MIN_JUMPTIME = 2
-    COYOTE_TIME = 2
+    COYOTE_TIME = 3
     WALLJUMP_PUSHAWAY_TIME = 10
     DASH_COOLDOWN = 18
     DASH_STARTUP_FRAMES = 3
@@ -283,6 +283,7 @@ class Player(Entity):
         self.stop_dash_momentum = {"y": False, "x": False}
 
         # JUMP ATTRIBUTES
+        self.coyote_cur = 0
         self.jumptime_cur = 0
         self.jump_buffering_cur = 0
         self.jump_multiplier = 1
@@ -439,7 +440,7 @@ class Player(Entity):
         if self.is_on_floor():
             self.was_on_floor = True
             # Resets dash amount and walljump count
-            if self.dashtime_cur < 5 and self.dash_amt == 0:
+            if self.dashtime_cur <= self.DASHTIME * 2/3:
                 self.dash_amt = self.dash_max_amt
 
             self.can_walljump["count"] = 0
@@ -641,6 +642,7 @@ class Player(Entity):
 
     def jump(self, dt):
         """Handles player jump and super/hyperdash tech"""
+        self.coyote_cur = max(self.coyote_cur - dt, 0)
         self.walljump_push_away_cur =  max(self.walljump_push_away_cur - dt, 0)
         self.can_walljump["timer"] = max(0, self.can_walljump["timer"] - dt)
 
@@ -652,6 +654,9 @@ class Player(Entity):
         if not (not self.can_walljump["buffer"] and not self.is_on_floor() and self.can_walljump[
             "blocks_around"] and self.can_walljump["timer"]):
             self.can_walljump["sliding"] = False
+
+        if self.is_on_floor():
+            self.coyote_cur = self.COYOTE_TIME
 
         if self.dict_kb["key_jump"] == 0:
             if self.jumptime_cur and self.holding_jump:
@@ -671,7 +676,7 @@ class Player(Entity):
             # Jumping
             if self.dash_startup_cur <= 0:
                 # Jump on the ground
-                if self.is_on_floor() and not self.holding_jump:
+                if (self.is_on_floor() or self.coyote_cur) and not self.holding_jump:
                     self.jump_setup_helper()
                     self.game.play_se('jump')
 
@@ -856,8 +861,8 @@ class Player(Entity):
 
         # Super walljump
         if self.dash_direction[1] == 1:
-            self.velocity[0] = 2.5 * -self.can_walljump["wall"] + (1.5/self.DASHTIME)*(self.dashtime_cur-self.DASHTIME)
-            self.jump_multiplier = min_y_boost -((max_y_boost-min_y_boost)/self.DASHTIME)*(self.dashtime_cur-self.DASHTIME)
+            self.velocity[0] = 2.5 * -self.can_walljump["wall"] - self.can_walljump["wall"]*(0.6/self.DASHTIME)*(self.dashtime_cur-self.DASHTIME)
+            self.jump_multiplier = min_y_boost -self.GRAVITY_DIRECTION*((max_y_boost-min_y_boost)/self.DASHTIME)*(self.dashtime_cur-self.DASHTIME)
             self.superjump = True
 
 

@@ -28,6 +28,8 @@ BASE_GROUP = {"tiles": [],
                   "matches":{}
                   }
 
+BASE_TILEMAP = {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}}
+
 class EditorCameraSetup:
 
     HANDLE_SIZE = 8  # pixels around border that trigger resize
@@ -685,10 +687,8 @@ class EditorLevelManager:
         except FileNotFoundError:
             if not os.path.exists('data/maps/'):
                 os.makedirs('data/maps/')
-            with open(filepath, 'w') as f:
-                f: TextIOWrapper
-                json.dump({'tilemap': {"0": {}, "1": {}, "2": {}, "3": {}, "4": {}, "5": {}, "6": {}},
-                           'tilesize': 16, 'offgrid': {}}, f)
+            new_map = Tilemap(self.editor)
+            new_map.save(filepath)
             self.editor.tilemap.load(filepath)
 
         self.editor.reload()
@@ -752,7 +752,7 @@ class PlayTestLevelManager(LevelManager):
 
     @override
     def update_map(self, level_id):
-        self.game.level_id = self.game.level_id
+        self.game.level_id = level_id
         self.game.level = f"{self.game.level_id:03d}"
         self.game.tilemap = self.game.editor.tilemap.copy(self.game)
         self.game.player = Player(self.game, self.game.tilemap,
@@ -1061,6 +1061,8 @@ class EditorSimulation:
             t_groups = self.tilemap.tile_manager.tiles[t_id].groups
             if self.ongrid:
                 tile_loc = str(self.tile_pos[0]) + ";" + str(self.tile_pos[1])
+                if self.current_layer not in self.tilemap.tilemap:
+                    self.tilemap.tilemap[self.current_layer] = {}
                 self.tilemap.tilemap[self.current_layer][tile_loc] = (
                     self.tilemap.tile_manager.pack_tile(t_id, self.tile_variant, self.rotation))
 
@@ -1104,8 +1106,9 @@ class EditorSimulation:
             if tile_link:
                 self.tilemap.links[layer].append(tile_link)
 
-        if not self.tilemap.links[layer]:
-            del self.tilemap.links[layer]
+        if layer in self.tilemap.links:
+            if not self.tilemap.links[layer]:
+                del self.tilemap.links[layer]
 
         for group_id in self.tilemap.tag_groups:
             if [tile_loc, layer] in self.tilemap.tag_groups[group_id]["tiles"]:
@@ -1501,9 +1504,12 @@ class EditorSimulation:
 
         self.tilemap.set_render_filter(self.selector.link, (152, 242, 255, 50))
 
-        self.tilemap.render(self.display, offset=render_scroll,
-                            precise_layer=self.current_layer if not self.showing_all_layers else None,
-                            with_player=False)
+        for layer in self.tilemap.tilemap:
+            if self.current_layer == layer:
+                self.tilemap.render(self.display, layer, offset=render_scroll)
+            else:
+                mask = (255, 255, 255, 80)
+                self.tilemap.render(self.display, layer, offset=render_scroll, mask_instance=mask)
 
         self.tilemap.render_filters = {}
 
@@ -1569,6 +1575,7 @@ class EditorSimulation:
 
                 case "PlayTest":
                     self.playtest.run()
+
             pygame.display.update()
 
 
@@ -1833,6 +1840,7 @@ class GroupsManager:
 
     def reload_data(self):
         self.current_group = "0"
+        self.tags_manager = TagsManager(self)
         self.tags_manager.mark_dirty()
         self.init_buttons()
 
